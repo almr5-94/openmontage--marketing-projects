@@ -14,3 +14,4 @@ openai>=2.44.0         # Videos API support for Sora 2
 fastapi>=0.110
 uvicorn>=0.29
 watchfiles>=0.21
+typesafe-sdk>=0.7.0     # Jev typed judgments (tools/analysis/jev_judge.py)
