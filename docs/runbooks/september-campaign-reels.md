@@ -30,13 +30,41 @@ put the open ones to the user.
 
 ## Step 0 — Preconditions
 
+FFmpeg and Node are **manual prerequisites** — `make setup` does not install
+them. Check them first, because a missing one surfaces much later as a compose
+failure:
+
+```bash
+python --version     # 3.10+ (repo pins 3.10 in .python-version)
+ffmpeg -version      # must resolve
+node --version       # 18+ for Remotion, >= 22 for HyperFrames
+```
+
+Then get the branch and install:
+
 ```bash
 cd <path-to>/openmontage--marketing-projects
 git fetch origin && git checkout claude/build-abood-pc-8vn0q9 && git pull
-python --version     # 3.10+
-node --version       # >= 22 if HyperFrames is in play
-ffmpeg -version      # must resolve
+make setup
 ```
+
+`make setup` is the entry point, not `make install`/`install-dev`. It creates
+`.venv` (or reuses an active venv/conda env), installs `requirements.txt`, runs
+`npm install` in `remotion-composer/` — whose `node_modules` is gitignored, so
+Remotion cannot render without it — installs `piper-tts` for zero-key narration,
+warms the `npx hyperframes` cache, and copies `.env.example` to `.env` without
+overwriting an existing one. Add `make install-dev` only if you need pytest.
+
+A fresh clone is missing three things the runbook later assumes:
+
+- **`.env` starts blank.** Every provider key is optional; the preflight in Step
+  3 is what tells you which capabilities are actually configured. Fill in keys
+  before preflight if you already know what this batch needs.
+- **`music_library/` does not exist** (gitignored). Step 5 says to check it
+  before generating music — in a fresh clone it will be empty until the user
+  creates it and drops tracks in. Say so rather than silently going to generated
+  music.
+- **`projects/` does not exist** (gitignored). `init_project` creates it.
 
 Read [`AGENT_GUIDE.md`](../../AGENT_GUIDE.md) before acting. Rule Zero binds this
 run: every video goes through the pipeline system, and each stage's director
