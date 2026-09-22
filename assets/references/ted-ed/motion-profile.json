@@ -1,0 +1,253 @@
+{
+  "fps_assumed": 24.0,
+  "pixel_reference_width": 1920,
+  "videos": {
+    "ted-ed1": {
+      "pairs": 2497,
+      "fps": 24.0,
+      "player_ui_share": 0.203,
+      "static_pair_share": 0.687,
+      "shots": 19,
+      "shot_seconds": {
+        "p25": 1.9583,
+        "median": 3.4583,
+        "p75": 5.6667
+      },
+      "transitions": {
+        "hard_cuts": 24,
+        "soft": 8,
+        "soft_frames": {
+          "median": 14.0,
+          "p75": 76.75
+        }
+      },
+      "hold": {
+        "share_of_time_holding": 0.694,
+        "hold_seconds": {
+          "median": 1.375,
+          "p75": 1.9792
+        }
+      },
+      "line_boil": {
+        "threshold_line_change": 0.02,
+        "events_share_of_hold_frames": 0.096,
+        "cadence_frames_mode": 2,
+        "cadence_seconds": 0.083,
+        "autocorrelation": {
+          "lag_frames": 2,
+          "strength": 0.638
+        },
+        "line_change_while_holding": {
+          "median": 0.0001,
+          "p90": 0.019
+        },
+        "amplitude_px_at_1920": {
+          "median": 0.0,
+          "p90": 3.0
+        }
+      },
+      "paper_grain": {
+        "bg_flicker_std_while_holding": 0.0464,
+        "bg_flicker_std_p90": 1.1418
+      },
+      "camera_drift": {
+        "shots_measured": 19,
+        "share_of_shots_moving": 0.316,
+        "pan_px_per_s": {
+          "median": 24.395,
+          "p75": 50.04
+        },
+        "zoom_pct_per_s": {
+          "median": 0.0,
+          "p75": 0.066
+        },
+        "directions": {
+          "push-in": 2,
+          "pull-out": 0,
+          "pan": 4
+        },
+        "easing": {
+          "linear": 0,
+          "ease-in": 1,
+          "ease-out": 1,
+          "ease-in-out": 4
+        }
+      },
+      "idle_motion": {
+        "events": 162,
+        "per_minute": 93.4
+      }
+    },
+    "ted-ed2": {
+      "pairs": 936,
+      "fps": 24.0,
+      "player_ui_share": 0.691,
+      "static_pair_share": 0.368,
+      "shots": 6,
+      "shot_seconds": {
+        "p25": 0.9688,
+        "median": 1.375,
+        "p75": 2.0625
+      },
+      "transitions": {
+        "hard_cuts": 1,
+        "soft": 5,
+        "soft_frames": {
+          "median": 127.0,
+          "p75": 198.0
+        }
+      },
+      "hold": {
+        "share_of_time_holding": 0.232,
+        "hold_seconds": {
+          "median": 0.3958,
+          "p75": 1.0833
+        }
+      },
+      "line_boil": {
+        "threshold_line_change": 0.02,
+        "events_share_of_hold_frames": 0.005,
+        "cadence_frames_mode": null,
+        "cadence_seconds": null,
+        "autocorrelation": {
+          "lag_frames": 2,
+          "strength": 0.381
+        },
+        "line_change_while_holding": {
+          "median": 0.0001,
+          "p90": 0.008
+        },
+        "amplitude_px_at_1920": {
+          "median": 0.0,
+          "p90": 0.0
+        }
+      },
+      "paper_grain": {
+        "bg_flicker_std_while_holding": 0.0532,
+        "bg_flicker_std_p90": 0.1011
+      },
+      "camera_drift": {
+        "shots_measured": 6,
+        "share_of_shots_moving": 0.333,
+        "pan_px_per_s": {
+          "median": 53.215,
+          "p75": 54.5775
+        },
+        "zoom_pct_per_s": {
+          "median": 19.85,
+          "p75": 19.9325
+        },
+        "directions": {
+          "push-in": 2,
+          "pull-out": 0,
+          "pan": 0
+        },
+        "easing": {
+          "linear": 0,
+          "ease-in": 0,
+          "ease-out": 1,
+          "ease-in-out": 1
+        }
+      },
+      "idle_motion": {
+        "events": 26,
+        "per_minute": 40.0
+      }
+    },
+    "ted-ed3": {
+      "pairs": 4075,
+      "fps": 24.0,
+      "player_ui_share": 0.4,
+      "static_pair_share": 0.333,
+      "shots": 26,
+      "shot_seconds": {
+        "p25": 1.625,
+        "median": 3.0208,
+        "p75": 5.6042
+      },
+      "transitions": {
+        "hard_cuts": 19,
+        "soft": 17,
+        "soft_frames": {
+          "median": 72.0,
+          "p75": 104.0
+        }
+      },
+      "hold": {
+        "share_of_time_holding": 0.418,
+        "hold_seconds": {
+          "median": 0.2083,
+          "p75": 1.0
+        }
+      },
+      "line_boil": {
+        "threshold_line_change": 0.02,
+        "events_share_of_hold_frames": 0.086,
+        "cadence_frames_mode": 2,
+        "cadence_seconds": 0.083,
+        "autocorrelation": {
+          "lag_frames": 5,
+          "strength": 0.002
+        },
+        "line_change_while_holding": {
+          "median": 0.0015,
+          "p90": 0.0179
+        },
+        "amplitude_px_at_1920": {
+          "median": 0.0,
+          "p90": 15.0
+        }
+      },
+      "paper_grain": {
+        "bg_flicker_std_while_holding": 0.3431,
+        "bg_flicker_std_p90": 5.1255
+      },
+      "camera_drift": {
+        "shots_measured": 26,
+        "share_of_shots_moving": 0.577,
+        "pan_px_per_s": {
+          "median": 51.2,
+          "p75": 219.435
+        },
+        "zoom_pct_per_s": {
+          "median": 0.343,
+          "p75": 1.0905
+        },
+        "directions": {
+          "push-in": 7,
+          "pull-out": 6,
+          "pan": 2
+        },
+        "easing": {
+          "linear": 2,
+          "ease-in": 3,
+          "ease-out": 6,
+          "ease-in-out": 4
+        }
+      },
+      "idle_motion": {
+        "events": 95,
+        "per_minute": 33.6
+      }
+    }
+  },
+  "pooled_from": [
+    "ted-ed1",
+    "ted-ed3"
+  ],
+  "pooled": {
+    "boil_cadence_seconds": 0.083,
+    "boil_amplitude_px": 0.0,
+    "line_change_while_holding_median": 0.0009,
+    "boil_share_of_hold_frames": 0.0905,
+    "grain_flicker_std": 0.21,
+    "drift_pan_px_per_s": 39.1721,
+    "drift_zoom_pct_per_s": 0.1891,
+    "share_of_shots_moving": 0.4599,
+    "shot_seconds_median": 3.2171,
+    "soft_transition_seconds": 1.9156,
+    "idle_events_per_minute": 60.4333,
+    "fps": 24.0,
+    "pairs": 6572
+  }
+}

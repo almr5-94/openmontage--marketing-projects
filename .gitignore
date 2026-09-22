@@ -104,3 +104,16 @@ venv/
 
 # Local Wan / diffusers GPU environment
 .venv-wan/
+
+# Style reference frames (large, local-only; board/ + motion-profile.json are tracked)
+assets/references/*/raw/
+assets/references/*/clean/
+assets/references/*/work/
+assets/references/*/raw-video/
+
+# Local ML stack for the style LoRA (ComfyUI, trainer, weights) — regenerable, never committed
+.ml/
+assets/references/*/dataset/
+assets/references/*/board/
+assets/references/*/motion/
+assets/references/*/raw-partial-pngs/

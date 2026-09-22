@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>ted-ed-alive calibration scene</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="profile.js"></script>
+    <script src="alive.js"></script>
+    <style>
+      body { margin: 0; background: #d9d2cf; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #ddd5d3; }
+      .clip { position: absolute; inset: 0; }
+      .alive-hold { position: absolute; inset: 0; }
+      .paper { position: absolute; inset: -4%; background: radial-gradient(ellipse at 50% 45%, #e6dfdd 0%, #d6cdca 70%, #c9bfbc 100%); }
+      .figure { position: absolute; left: 50%; top: 22%; width: 520px; height: 900px; margin-left: -260px; }
+      .figure svg { width: 100%; height: 100%; overflow: visible; }
+      .props-float { position: absolute; left: 930px; top: 230px; width: 60px; height: 60px; }
+      .props-float .dot { position: absolute; left: 0; top: 0; width: 34px; height: 34px; border-radius: 50%;
+        border: 3px solid #111; opacity: 0; }
+      .props-pop .icon { position: absolute; width: 96px; height: 96px; border-radius: 50%; background: #efe8e4;
+        border: 3.2px solid #111; font: 700 52px/90px serif; text-align: center; color: #2b2a2c;
+        font-style: normal; opacity: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-width="1920" data-height="1080" data-duration="10">
+      <section id="scene-hold" class="clip" data-start="0" data-duration="10">
+        <div class="alive-hold" data-drift="on">
+          <div class="paper"></div>
+          <!-- thought bubbles rising out of the open head -->
+          <div class="alive-float props-float" data-rise="120">
+            <i class="dot" style="background:#c46a3c"></i><i class="dot" style="background:#6f8fa6"></i>
+            <i class="dot" style="background:#8d9152"></i><i class="dot" style="background:#c46a3c"></i>
+            <i class="dot" style="background:#6f8fa6"></i><i class="dot" style="background:#8d9152"></i>
+            <i class="dot" style="background:#9a6f93"></i><i class="dot" style="background:#c46a3c"></i>
+          </div>
+          <!-- icons popping in around the head, one after another -->
+          <div class="alive-pop props-pop" data-lead="1.2">
+            <i class="icon" style="left:520px;top:170px">?</i>
+            <i class="icon" style="left:1290px;top:210px">!</i>
+            <i class="icon" style="left:600px;top:420px">&#9998;</i>
+            <i class="icon" style="left:1220px;top:460px">&#9733;</i>
+            <i class="icon" style="left:1360px;top:330px">&#9881;</i>
+          </div>
+          <div class="figure alive-boil">
+            <svg viewBox="0 0 520 900">
+              <g class="alive-breathe">
+                <!-- sweater: flat charcoal fill, thin black outline -->
+                <path d="M150 390 C150 350 200 330 260 330 C320 330 370 350 372 392 L392 700 L128 700 Z"
+                      fill="#2b2a2c" stroke="#111" stroke-width="3.2" stroke-linejoin="round" />
+                <!-- trousers -->
+                <path d="M140 700 L380 700 L372 900 L290 900 L262 760 L234 900 L150 900 Z"
+                      fill="#5f6166" stroke="#111" stroke-width="3.2" stroke-linejoin="round" />
+                <!-- arm raised to chin -->
+                <path d="M170 420 C120 520 150 600 210 560 C240 540 250 470 262 300"
+                      fill="none" stroke="#111" stroke-width="3.2" stroke-linecap="round" />
+                <g class="alive-sway">
+                  <!-- neck + head -->
+                  <path d="M232 300 L232 340 L288 340 L288 300" fill="#f6ddd0" stroke="#111" stroke-width="3" />
+                  <path d="M190 130 C190 70 330 70 330 130 L330 262 C330 300 300 312 260 312 C220 312 190 300 190 262 Z"
+                        fill="#f6ddd0" stroke="#111" stroke-width="3.2" />
+                  <!-- hair -->
+                  <path d="M184 150 C170 70 250 40 300 58 C350 72 345 120 336 160 C320 120 290 110 262 128 C240 108 215 112 196 170 Z"
+                        fill="#8a8a8c" stroke="#111" stroke-width="3" stroke-linejoin="round" />
+                  <!-- eyes: half-lidded ovals, the blink target -->
+                  <g class="alive-blink">
+                    <ellipse cx="228" cy="196" rx="24" ry="9" fill="#fff6e8" stroke="#111" stroke-width="2.6" />
+                    <ellipse cx="292" cy="196" rx="24" ry="9" fill="#fff6e8" stroke="#111" stroke-width="2.6" />
+                    <path d="M206 196 L250 196 M270 196 L314 196" stroke="#c9a15a" stroke-width="3" />
+                  </g>
+                  <!-- single-line mouth -->
+                  <path d="M246 262 C258 256 272 258 282 266" fill="none" stroke="#111" stroke-width="3" stroke-linecap="round" />
+                </g>
+                <!-- finger at chin -->
+                <path d="M262 300 C270 280 280 286 276 304" fill="#f6ddd0" stroke="#111" stroke-width="3" />
+              </g>
+            </svg>
+          </div>
+        </div>
+      </section>
+      <div class="alive-grain"></div>
+    </div>
+    <script>
+      const tl = gsap.timeline({ paused: true });
+      TedEdAlive.apply(tl, document.getElementById("root"), { duration: 10 });
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

@@ -110,6 +110,7 @@ Key capability families to look for in the output:
 | â†³ HunyuanVideo Prompting | `creative/prompting/hunyuan-prompting.md` | HunyuanVideo formula, I2V best practices | â€" |
 | Storytelling | `creative/storytelling.md` | Narrative structure, hooks, pacing, Mayer's principles | â€" |
 | Sound Design | `creative/sound-design.md` | Audio ducking, LUFS targets, SFX timing, AI TTS mixing | `elevenlabs` |
+| Hand-drawn Explainer Style | `creative/ted-ed-style.md` | The measured hand-drawn explainer look: playbook, reference board, the ted-ed-alive motion layer, the tededstyle LoRA | `hyperframes`, `image-gen-usage` |
 | Typography | `creative/typography.md` | Font selection, text sizing, safe zones, caption styling | â€" |
 | ManimCE Usage | `creative/manim-usage.md` | Scene composition, animation timing, color usage | `manimce-best-practices` |
 | Image Gen Usage | `creative/image-gen-usage.md` | Prompt consistency, hero reference, batch strategy | `flux-best-practices`, `bfl-api` |
