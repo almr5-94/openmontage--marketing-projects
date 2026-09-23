@@ -105,6 +105,33 @@ Per family, in this order (from the study's director checklist):
 Full criteria and the numeric threshold: `docs/handdrawn-acceptance.md`. Evaluation prompts:
 `assets/style/handdrawn/eval-prompts.yaml`.
 
+## Known weaknesses, and what to do about each
+
+Measured in the acceptance pass (`docs/handdrawn-acceptance-results.md`). Three of the
+four are handled in the pipeline; the fourth needs new source material.
+
+| Weakness | Cause | Handling |
+|---|---|---|
+| Wrong subject count ("two people" returns three) | base-model behaviour, not style | **fixed in the pipeline** — `generate_scene.py` counts the subjects in the render with the local vision model and moves to the next seed until the count matches |
+| Gibberish lettering on cards, signs and labels | diffusion models cannot spell | **fixed in the pipeline** — the generator adds a no-text negative, asks for a blank label area, rejects any render containing letters, and the real words are typeset in the composition where they can be spelled and translated |
+| C's diagram mode holds in only 3 seeds of 5 | few diagram frames exist in the source | **build diagrams in HyperFrames instead of generating them** — discs, connectors and icons as HTML, styled from `handdrawn-biotext.yaml`. The study's rule already says topology before styling; a generated graph cannot be trusted to have the right edges anyway |
+| B's landscapes fall back to generic flat vector | 43 training frames, mostly detail crops, almost no clean environments | **not fixed** — use family B for figures and props, and carry its scenes with A- or C-style environments, or supply a clean recording (below) |
+
+### The one thing that needs you
+
+Family B is thin because its recording has the player's controls on screen 69% of the
+time, which also makes its timing unmeasurable. A clean capture would fix both at once.
+
+```bash
+# play the video full screen, let the controls fade, then record the screen only
+# (no browser window, no cursor), and drop the file next to the others:
+#   assets/references/handdrawn/raw-video/video2.mov
+```
+
+With a clean capture: rerun `build_datasets.py`, `caption_frames.py`,
+`.ml/train_family.sh b`, and `motion_analysis.py` — B then gets real environment
+examples and its own measured timing instead of A's borrowed numbers.
+
 ## When something comes out wrong
 
 | Output failure | Where to look | What to change |
