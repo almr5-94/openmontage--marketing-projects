@@ -30,9 +30,13 @@ a training frame. That is what stops a memorised hold from scoring as success.
 | Run | Family | Captions | Epochs | Result | Notes |
 |---|---|---|---|---|---|
 | (mixed) | A+B+C | single trigger | — | stopped at 21%, deleted | averaged three contradictory systems |
-| 1 | A | boilerplate | 12 | pending | |
-| 2 | C | boilerplate | 12 | pending | |
-| 3 | B | boilerplate | 12 | pending | thinnest evidence; expected weakest |
+| 1 | A | boilerplate | 12 | done — 63 train frames, 756 steps | pass: 15/25 usable |
+| 2 | C | boilerplate | 12 | done — 116 train frames, 1,392 steps | pass: 17/25 usable |
+| 3 | B | boilerplate | 12 | done — 39 train frames, 936 steps | pass: 17/25, weak environments |
+
+Results and their weaknesses: `docs/handdrawn-acceptance-results.md`. The caption
+ablation (minimal vs boilerplate) has not been run: all three ran with the boilerplate
+variant, and the comparison is the next experiment rather than a finished one.
 
 Stopping is decided by held-out output, not by step count: whether the defining structure
 improves, whether new content stays controllable, and whether source-specific objects start
