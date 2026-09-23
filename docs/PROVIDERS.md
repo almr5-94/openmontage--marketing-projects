@@ -1369,6 +1369,35 @@ First run downloads the model (~4GB). Subsequent runs use the cached model.
 
 ---
 
+### Qwen Image (Local) — Offline Generation and Editing (GPU Required)
+
+> **Free Qwen-Image generation and editing.** No API cost, no key, fully offline. The open model with the most reliable text *inside* the picture.
+
+**Tools:** `qwen_image_local` (text to image), `qwen_image_edit_local` (instruction editing, 1-3 input images)
+**Runtime:** Local GPU (CUDA required)
+**Env var:** None (enable by installing dependencies and fetching the weights)
+
+#### Setup
+
+```bash
+uv pip install --python .venv/bin/python --index-strategy unsafe-best-match \
+  --extra-index-url https://download.pytorch.org/whl/cu128 \
+  torch torchvision "diffusers>=0.40" "transformers>=5.0" accelerate bitsandbytes
+
+hf download Qwen/Qwen-Image-2.1            # 33 GB
+hf download Qwen/Qwen-Image-Edit-2511      # 58 GB
+```
+
+Weights are read from the shared Hugging Face cache, and generation runs with `HF_HUB_OFFLINE=1` — nothing is fetched at run time.
+
+**VRAM requirement:** both tools default to 4-bit NF4 quantization plus CPU offload, which fits a 16 GB card. Full bfloat16 (`quantization="none"`) needs roughly 33 GB for Qwen-Image-2.1 and 58 GB for Qwen-Image-Edit-2511 across VRAM and RAM.
+
+**Supports:** negative prompts, seeds, custom sizes, text rendering in English and Chinese, and — for the edit tool — up to three reference images composed into one frame.
+
+**Trade-off:** minutes per image rather than seconds, because a 7B (or 20B) transformer is being paged through one consumer card. Reach for it when the run must be free, offline, or text-accurate; reach for FLUX or GPT Image 2 when turnaround matters more.
+
+---
+
 ### LTX-2 on Modal — Self-Hosted Cloud GPU
 
 > **Run LTX-2 on Modal's cloud GPUs.** Your own endpoint, your own scale. More consistent than local GPU, cheaper than commercial APIs.
@@ -1433,6 +1462,7 @@ These tools require only FFmpeg or Python packages — no GPU, no API key.
 | **Tencent Hunyuan** | `TENCENT_TOKENHUB_API_KEY` | `hunyuan_cloud_video` | Pay-as-you-go (~$0.25–0.83/gen) |
 | **Local GPU** | `VIDEO_GEN_LOCAL_ENABLED` | `wan_video`, `hunyuan_video`, `cogvideo_video`, `ltx_video_local` | Free (GPU required) |
 | **Local Diffusion** | — (install only) | `local_diffusion` | Free (GPU required) |
+| **Qwen Image (local)** | — (install + weights) | `qwen_image_local`, `qwen_image_edit_local` | Free (GPU required) |
 | **Modal** | `MODAL_LTX2_ENDPOINT_URL` | `ltx_video_modal` | Self-hosted cloud |
 | **ComfyUI** | optional server URL overrides | `comfyui_video` | Local GPU, or paid Partner Node credits |
 

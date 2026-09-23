@@ -14,6 +14,8 @@
 | `openai_image` | GPT Image 2 (OpenAI) | ~$0.01-0.21 | ~5-15s | Complex instructions, text in images, multi-element |
 | `recraft_image` | Recraft V4 via fal.ai | ~$0.04-0.25 | ~5-10s | Logos, SVG vectors, brand assets, text rendering (see caveat below) |
 | `local_diffusion` | Stable Diffusion (local) | Free | ~30s+ | Offline, privacy, free |
+| `qwen_image_local` | Qwen-Image-2.1 (local GPU) | Free | ~2-4 min | Text inside the image, offline, free |
+| `qwen_image_edit_local` | Qwen-Image-Edit-2511 (local GPU) | Free | ~4-8 min | Editing a frame or merging up to 3 refs, offline, free |
 | `image_gen` | Multi (legacy, deprecated) | Varies | Varies | **Deprecated** — use `image_selector` or per-provider tools |
 
 ### Stock Providers (search and download existing images)
@@ -44,7 +46,9 @@
 | **Hero image (key visual)** | `flux_image` | Highest visual quality | `openai_image` |
 | **Thumbnail** | `flux_image` or `recraft_image` | Needs to be eye-catching | — |
 | **Budget/free project** | `pexels_image` or `pixabay_image` | Free, immediate | `local_diffusion` |
-| **Offline/air-gapped** | `local_diffusion` | No network needed | — |
+| **Offline/air-gapped** | `local_diffusion` | No network needed | `qwen_image_local` |
+| **Free image with legible text** | `qwen_image_local` | Strongest open text rendering, English and Chinese | `openai_image` |
+| **Free edit of an existing frame** | `qwen_image_edit_local` | Instruction editing, 1-3 input images, nothing leaves the machine | `grok_image` |
 
 ## Provider-Specific Caveats
 
@@ -74,7 +78,8 @@ PRODUCTION PATH: Budget
 └── Total: $0.00
 
 PRODUCTION PATH: Offline
-├── All generated: local_diffusion ($0.00)
+├── Generated: qwen_image_local ($0.00, best text) or local_diffusion ($0.00, faster)
+├── Edits: qwen_image_edit_local ($0.00)
 ├── Diagrams: diagram_gen ($0.00)
 └── Total: $0.00 (but slower, lower quality)
 ```
@@ -101,7 +106,7 @@ Use `allowed_providers` to restrict to free or local options:
 # Budget mode: only free providers
 result = image_selector.execute({
     "prompt": "server room interior",
-    "allowed_providers": ["pexels", "pixabay", "local_diffusion"],
+    "allowed_providers": ["pexels", "pixabay", "qwen_local", "local_diffusion"],
     "output_path": "assets/images/scene-3.jpg"
 })
 ```

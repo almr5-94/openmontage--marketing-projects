@@ -3,3 +3,15 @@
 torch>=2.0
 torchaudio>=2.0
 torchvision>=0.15
+
+# Local Qwen-Image tools (tools/graphics/qwen_image_local.py,
+# tools/graphics/qwen_image_edit_local.py). bitsandbytes is what lets the 20B
+# edit model fit on a 16 GB card.
+# Qwen-Image-2.1 needs QwenImage21Pipeline, which is on diffusers main and
+# not in 0.40.0 (released 2026-08-20, before the model shipped). Qwen-Image-
+# Edit-2511 runs on 0.40.0. Install main:
+#   uv pip install --no-deps git+https://github.com/huggingface/diffusers.git@main
+diffusers>=0.40
+transformers>=5.0
+accelerate>=1.6
+bitsandbytes>=0.45
