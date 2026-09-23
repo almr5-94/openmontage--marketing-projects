@@ -1,0 +1,31 @@
+{
+  "title": "Facts inform, stories stay",
+  "family": "a",
+  "playbook": "handdrawn-paperfolk",
+  "scenes": [
+    {"id": "s1", "line": "A fact walks into your head, and leaves through the back door.",
+     "prompt": "one person standing centred, a small grey block floating out of the back of their head, open paper field around them",
+     "subjects": 1, "caption": null},
+    {"id": "s2", "line": "A story moves in, and unpacks.",
+     "prompt": "one person standing centred with an open suitcase beside them, small objects rising out of the suitcase in an arc",
+     "subjects": 1, "caption": null},
+    {"id": "s3", "line": "Your head files things by what happened, not by what is true.",
+     "prompt": "one person in profile, the top of the head open like a drawer with colourful folders standing inside it",
+     "subjects": 1, "caption": null},
+    {"id": "s4", "line": "A fact is one loose item. A story is an item with a hook on it.",
+     "prompt": "two small objects side by side on an empty paper field, the right one carrying a simple hook shape, no people",
+     "subjects": 0, "caption": null},
+    {"id": "s5", "line": "So when you need someone to remember a number, give the number a person.",
+     "prompt": "one person holding a large blank card in front of the torso, the card completely empty",
+     "subjects": 1, "caption": "62%"},
+    {"id": "s6", "line": "Show who lived it.",
+     "prompt": "two people standing on a shared baseline facing each other, one gesturing, generous quiet margins",
+     "subjects": 2, "caption": null},
+    {"id": "s7", "line": "Show what changed for them.",
+     "prompt": "one person walking to the right carrying a small glowing shape, a trail of small marks behind them",
+     "subjects": 1, "caption": null},
+    {"id": "s8", "line": "Facts inform. Stories stay.",
+     "prompt": "one person standing centred and calm on an open paper field, a small object resting in their open hand",
+     "subjects": 1, "caption": "Facts inform. Stories stay."}
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "total": 28.651,
+  "scenes": [
+    {
+      "id": "s1",
+      "start": 0.0,
+      "duration": 4.055,
+      "line": "A fact walks into your head, and leaves through the back door."
+    },
+    {
+      "id": "s2",
+      "start": 4.055,
+      "duration": 2.801,
+      "line": "A story moves in, and unpacks."
+    },
+    {
+      "id": "s3",
+      "start": 6.856,
+      "duration": 3.82,
+      "line": "Your head files things by what happened, not by what is true."
+    },
+    {
+      "id": "s4",
+      "start": 10.676,
+      "duration": 5.361,
+      "line": "A fact is one loose item. A story is an item with a hook on it."
+    },
+    {
+      "id": "s5",
+      "start": 16.037,
+      "duration": 5.779,
+      "line": "So when you need someone to remember a number, give the number a person."
+    },
+    {
+      "id": "s6",
+      "start": 21.816,
+      "duration": 1.782,
+      "line": "Show who lived it."
+    },
+    {
+      "id": "s7",
+      "start": 23.598,
+      "duration": 2.017,
+      "line": "Show what changed for them."
+    },
+    {
+      "id": "s8",
+      "start": 25.615,
+      "duration": 3.036,
+      "line": "Facts inform. Stories stay."
+    }
+  ]
+}
