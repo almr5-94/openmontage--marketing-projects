@@ -1,7 +1,7 @@
 """Pick the reference board: the few frames that cover the whole style.
 
 Usage:
-    python -m scripts.style_refs.select_board assets/references/ted-ed --count 40
+    python -m scripts.style_refs.select_board assets/references/handdrawn --count 40
 
 Takes the cleaned frames and keeps the most different ones (farthest-point
 selection on their perceptual hashes), proportionally per video, so the board

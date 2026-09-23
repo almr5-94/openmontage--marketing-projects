@@ -1,0 +1,157 @@
+# Family A — "paper folk". One of three separate illustration systems; never blend it
+# with handdrawn-incise or handdrawn-biotext.
+#
+# Colour values are medians measured on the reference frames and re-verified pixel by
+# pixel (docs/handdrawn-palette-verification.md, 35/35 samples reproduce).
+# Motion values are measured by scripts/style_refs/motion_analysis.py over reference
+# video 1 (assets/references/handdrawn/motion-profile.json).
+# Drawing detail that does not fit this schema lives in
+# assets/style/handdrawn/construction/a.yaml, and the controlled vocabulary in
+# assets/style/handdrawn/lexicon.json.
+identity:
+  name: "Hand-drawn Paper Folk"
+  category: whiteboard
+  mood: quiet, editorial, wry, unhurried
+  pace: moderate
+  best_for: "Narrated explainers carried by simple outlined people and symbolic props"
+
+visual_language:
+  color_palette:
+    primary: ["#181818", "#6C6766"]
+    accent: ["#B3978A", "#594154", "#F9E1D1", "#E5DBDB"]
+    background: "#E7D6BE"
+    text: "#181818"
+    muted: "#595550"
+  composition: >-
+    A narrow subject on open paper. An isolated figure sits centred at 45-60% of the art
+    height while filling under 10% of its area, so the plate reads as both large subject
+    and wide quiet field. Lineups share one foot baseline and keep a deliberate gap where
+    a figure is conceptually separate. Props stand in for places: a podium, a stair, a
+    certificate, a pinboard - never a fully furnished room.
+  texture: >-
+    Flat local colour inside enclosed near-black contours, over a quiet mottled paper
+    field with sparse blemishes. Texture is not one blanket: hair and dark cloth carry
+    visible material variation while eye whites, pupils and skin stay calm. No gradients
+    on bodies, no drop shadows, no gloss.
+
+typography:
+  headings:
+    font: "Source Serif 4"
+    weight: 600
+    tracking: "0em"
+    line_height: 1.25
+  body:
+    font: "Source Sans 3"
+    weight: 400
+    line_height: 1.45
+  code:
+    font: "IBM Plex Mono"
+    weight: 400
+  stat_card:
+    font: "Source Serif 4"
+    weight: 700
+    size_multiplier: 3.0
+  scale_system: "major_third"
+  weight_matrix:
+    title: 600
+    heading: 600
+    body: 400
+    caption: 400
+
+motion:
+  # measured on reference video 1: shots 3.46 s median, holds 1.38 s, 32% of shots
+  # carry a slow move (24.4 px/s pan, no measurable zoom), easing mostly ease-in-out,
+  # a secondary prop event about every 0.64 s, changes land on every 2nd frame at 24 fps
+  transitions: [cut, crossfade, wipe-reveal]
+  animation_style: >-
+    On twos - everything that moves updates 12 times a second. The drawing itself holds
+    still: lines never wobble and the paper grain never flickers. Life comes from
+    secondary props entering and leaving around the subject, roughly once a second.
+  pacing_rules:
+    min_scene_hold_seconds: 1.4
+    max_scene_hold_seconds: 8
+    text_card_hold_seconds: 2.5
+    stat_card_hold_seconds: 2.0
+    transition_duration_seconds: 0.6
+  entrance: "pop from 0 with a small overshoot (back.out), 0.25 s, stepped on twos"
+  exit: "shrink and fade (power2.in), 0.3 s, staggered across pieces"
+
+audio:
+  voice_style: "calm, curious narrator; unhurried; lifts on the question, lands the answer plainly"
+  music_mood: "light acoustic or muted piano bed, no drums"
+  music_volume: 0.1
+  sfx_style: "sparing - a soft paper rustle on a reveal, nothing on ordinary cuts"
+  ducking_threshold_db: -6
+  voice_variation_allowed: true
+  hero_moment_voice_shift: "slower, half a step lower, small pause before the payoff"
+
+asset_generation:
+  image_prompt_prefix: >-
+    hdx_paperfolk, enclosed fine contour drawing, restrained contour-width variation,
+    differentiated local-color fills, quiet mottled paper field, sparse structural
+    interior marks,
+  image_negative_prompt: >-
+    black cutout face, white incised facial construction, realistic muscle modeling,
+    dense anatomical hatching, glossy facial highlights, strong cinematic rim light,
+    oversized detailed footwear, heavy universal drop shadows, video player controls,
+    playback progress bar, browser chrome, seek preview thumbnail, mouse cursor,
+    platform watermark, accidental interface text, compression blocks, photographic skin pores
+  diagram_style: "enclosed hand-inked outlines on paper, shallow overlapping cards, labels in Source Sans 3"
+  consistency_anchors:
+    - "Paper field #E7D6BE, or the pink-gray alternative #E5DBDB, with a fixed grain"
+    - "Near-black enclosed contours; 0.10-0.18% of art width (about 2-3.5 px at 1920)"
+    - "Pale circular eye enclosures with small solid pupils; no prominent frontal nose"
+    - "Compact adult build of about 3.8-4.4 cranial-face units, small hands and shoe wedges"
+    - "Garments are unmodelled local colour separated by value, not by shading"
+    - "One idea per frame; ideas appear as physical props, never as labelled boxes"
+
+overlays:
+  stat_card:
+    bg: "#EFE4D6"
+    border: "#181818"
+    radius: 10
+  key_term:
+    bg: "#E9DCCD"
+    text: "#181818"
+    radius: 6
+  section_title:
+    bg: "#E7D6BE"
+    text: "#181818"
+  hero_title:
+    bg: "#E7D6BE"
+    text: "#181818"
+  stat_reveal:
+    bg: "#EFE4D6"
+    text: "#6B3B1E"
+  provider_chip:
+    bg: "#EFE4D6"
+    text: "#595550"
+    radius: 999
+  code_block:
+    bg: "#EFE4D6"
+    text: "#181818"
+    highlight: "#6B3B1E"
+
+quality_rules:
+  - "Check the face first: pale bounded eye enclosures, small purposeful pupils, compact mouth"
+  - "Then the body: about four units tall, narrow limbs, small hands and feet, clear prop contact"
+  - "Only then tune paper grain and garment texture - a correct background cannot rescue a wrong face"
+  - "Every held shot carries a secondary prop event about once a second; nothing is ever frozen"
+  - "Animated elements step at 12 fps; smooth 24 fps motion reads as a different style"
+  - "Isolated plate keeps 70-90% quiet field; a lineup keeps 35-55%"
+  - "Do not manufacture a cast shadow, rim light or gradient body shading to fill a checklist"
+  - "Pure black in pupils and contours and near-white eye whites are allowed; only broad sterile fields are not"
+  - "No source-channel marks, characters or scenes may be reproduced"
+
+chart_palette:
+  - "#6B3B1E"
+  - "#594154"
+  - "#6C6766"
+  - "#B3978A"
+  - "#3F5E63"
+  - "#7A6A3A"
+
+color_rules:
+  harmony_type: "analogous"
+  contrast_validation: true
+  colorblind_safe: true

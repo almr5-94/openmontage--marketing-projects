@@ -66,21 +66,41 @@ def detect_content_box(frames: list[Path], samples: int = 60, inset: float = 0.0
     return (int(left + dx), int(top + dy), int(right - dx), int(bottom - dy))
 
 
-def has_player_ui(path: Path) -> bool:
-    """True when the YouTube player controls are drawn over the picture.
+def _ui_signals(a: np.ndarray) -> dict:
+    """Counts of the player's own graphics inside an RGB array."""
+    h, w = a.shape[:2]
+    band = a[int(h * 0.90) : int(h * 0.97)]
+    red = int(((band[..., 0] > 200) & (band[..., 1] < 70) & (band[..., 2] < 70)).sum())
+    top = a[int(h * 0.03) : int(h * 0.085)]
+    white_top = int((top.min(axis=2) > 235).sum())
+    # the seek preview is a bright, hard-edged rectangle sitting over the picture
+    mid = a[int(h * 0.55) : int(h * 0.85), : int(w * 0.55)]
+    bright = (mid.min(axis=2) > 225)
+    preview = int(bright.sum())
+    return {"red_bar": red, "title_text": white_top, "preview_box": preview}
 
-    Those frames carry the red progress bar near the bottom and the white
-    video title near the top; either one means the frame is not clean art.
+
+def has_player_ui(path: Path) -> bool:
+    """True when the video player's own graphics are drawn over the picture.
+
+    Those frames carry the red progress bar near the bottom, the white video
+    title near the top, or a bright seek-preview rectangle over the artwork.
+    Any of them means the frame is not clean art.
     """
     img = Image.open(path).convert("RGB")
     img = img.resize((img.width // 4, img.height // 4), Image.NEAREST)
-    a = np.asarray(img).astype(np.int16)
-    h = a.shape[0]
-    band = a[int(h * 0.90) : int(h * 0.97)]
-    red = ((band[..., 0] > 200) & (band[..., 1] < 70) & (band[..., 2] < 70)).sum()
-    top = a[int(h * 0.03) : int(h * 0.085)]
-    white = (top.min(axis=2) > 235).sum()
-    return bool(red > 20 or white > 50)
+    s = _ui_signals(np.asarray(img).astype(np.int16))
+    return bool(s["red_bar"] > 20 or s["title_text"] > 50 or s["preview_box"] > 3000)
+
+
+def array_has_player_ui(rgb: np.ndarray) -> bool:
+    """Same check on an already-cropped region (used to test a salvage crop)."""
+    a = np.asarray(rgb).astype(np.int16)
+    if a.shape[0] > 600:
+        step = a.shape[0] // 400
+        a = a[::step, ::step]
+    s = _ui_signals(a)
+    return bool(s["red_bar"] > 8 or s["title_text"] > 25 or s["preview_box"] > 1500)
 
 
 def phash(gray: np.ndarray, size: int = 32, keep: int = 8) -> np.ndarray:

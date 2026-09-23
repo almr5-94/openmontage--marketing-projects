@@ -1,0 +1,158 @@
+# Family C — "bio texture". One of three separate illustration systems; never blend it
+# with handdrawn-paperfolk or handdrawn-incise.
+#
+# Colours are medians measured on reference video 3's frames and re-verified pixel by
+# pixel (docs/handdrawn-palette-verification.md).
+# Motion is measured by scripts/style_refs/motion_analysis.py over reference video 3.
+# Drawing detail: assets/style/handdrawn/construction/c.yaml. This family has four
+# distinct modes - botanical environment, diagram plate, biological cutaway, human
+# close-up - and the mode is chosen before anything else.
+identity:
+  name: "Hand-drawn Bio Texture"
+  category: minimalist
+  mood: curious, scientific, warm-earthy
+  pace: moderate
+  best_for: "Nature and science explainers built from organic shapes, callouts and networks"
+
+visual_language:
+  color_palette:
+    primary: ["#1E4146", "#5D5E1E"]
+    accent: ["#E9783C", "#EDA094", "#34624D", "#DADFC9"]
+    background: "#94C0B9"
+    text: "#173035"
+    muted: "#2C4A52"
+  composition: >-
+    Layered organic planes. A botanical plate frames an open middle distance with unequal
+    foreground masses; a diagram spreads unequal hand-shaped discs over a quiet field with
+    connectors running behind them; a callout ties each magnified window to its organism
+    with one unambiguous pointer; a close-up fills the frame with a face or a cutaway.
+    Depth comes from overlap, scale and colour, not from converging architecture.
+  texture: >-
+    Filled organic shapes with local-colour outlines, plus object-specific drawn pattern:
+    dots along trunks, veins inside leaves, growth rings in cut wood, radial lines in an
+    iris. Surface irregularity stays subordinate - it must never turn a diagram into noisy
+    wallpaper or a leaf into a botanical engraving.
+
+typography:
+  headings:
+    font: "Caveat"
+    weight: 700
+    tracking: "0.01em"
+    line_height: 1.2
+  body:
+    font: "Source Sans 3"
+    weight: 400
+    line_height: 1.45
+  code:
+    font: "IBM Plex Mono"
+    weight: 400
+  stat_card:
+    font: "Source Sans 3"
+    weight: 700
+    size_multiplier: 2.8
+  scale_system: "major_third"
+  weight_matrix:
+    title: 700
+    heading: 600
+    body: 400
+    caption: 400
+
+motion:
+  # measured on reference video 3: shots 3.02 s median, 58% of shots carry a move
+  # (51.2 px/s pan, 0.34%/s zoom), easing spread across ease-out and ease-in-out,
+  # a local event about every 1.8 s, changes on every 2nd frame at 24 fps
+  transitions: [cut, crossfade, morph, wipe-reveal]
+  animation_style: >-
+    On twos - 12 updates a second. Organisms hold their shape while parts of the scene
+    grow, drift, dissolve or magnify. Lines do not wobble; the surface texture is fixed.
+    More than half of the shots carry a slow camera move.
+  pacing_rules:
+    min_scene_hold_seconds: 1.2
+    max_scene_hold_seconds: 8
+    text_card_hold_seconds: 2.5
+    stat_card_hold_seconds: 2.0
+    transition_duration_seconds: 0.8
+  entrance: "grow from the attachment point (stem, root, pointer), 0.35 s, stepped on twos"
+  exit: "shrink toward the same attachment point, or dissolve piece by piece"
+
+audio:
+  voice_style: "curious science narrator; even pace; small lift when a mechanism is revealed"
+  music_mood: "soft marimba or warm synth pad, organic, no drums"
+  music_volume: 0.1
+  sfx_style: "tiny organic accents on a magnification or a growth reveal"
+  ducking_threshold_db: -6
+  voice_variation_allowed: true
+  hero_moment_voice_shift: "slower, warmer, a pause before the mechanism lands"
+
+asset_generation:
+  image_prompt_prefix: >-
+    hdx_biotext, organic filled-shape construction, selective structural drawing,
+    object-specific internal patterning, controlled surface irregularity, explanatory
+    shape hierarchy,
+  image_negative_prompt: >-
+    uniform heavy black contour around all plants, glossy scientific discs, metallic
+    interface panels, random network connections, decorative arrows with no target,
+    photographic leaf rendering, identical mechanically perfect organic shapes, excessive
+    texture obscuring small icons, video player controls, playback progress bar, browser
+    chrome, seek preview thumbnail, mouse cursor, platform watermark, accidental interface text
+  diagram_style: >-
+    unequal hand-shaped cream discs on a quiet field, dark-green pictograms, pale
+    connectors drawn behind the containers, a visible rim inside every disc
+  consistency_anchors:
+    - "Choose the mode first: botanical environment, diagram plate, cutaway, or close-up face"
+    - "Outlines take the object's own colour - darker green on leaves, red on the salmon form"
+    - "Drawn pattern follows the object: veins split a leaf, rings follow a cut trunk"
+    - "Diagram mode keeps its own restricted palette: cream discs, quiet field, dark-green icons"
+    - "Close-up faces keep large radial irises, a tapered nose plane and visible nostril marks"
+    - "Warm accents (#E9783C, #EDA094) mark biological emphasis and stay spatially concentrated"
+
+overlays:
+  stat_card:
+    bg: "#DADFC9"
+    border: "#1E4146"
+    radius: 12
+  key_term:
+    bg: "#DADFC9"
+    text: "#1E4146"
+    radius: 8
+  section_title:
+    bg: "#94C0B9"
+    text: "#173035"
+  hero_title:
+    bg: "#94C0B9"
+    text: "#173035"
+  stat_reveal:
+    bg: "#DADFC9"
+    text: "#8C3A15"
+  provider_chip:
+    bg: "#DADFC9"
+    text: "#2C4A52"
+    radius: 999
+  code_block:
+    bg: "#1E4146"
+    text: "#DADFC9"
+    highlight: "#E9783C"
+
+quality_rules:
+  - "Identify the mode before judging anything; the four modes have different subsystems"
+  - "Botanical plates need coherent branching: leaf to stem, cap to stalk, root to body"
+  - "A network is wrong if its connections are wrong, however attractive the discs look"
+  - "A callout needs one unambiguous pointer to its source organism"
+  - "Close-up faces keep detailed irises and nostrils; do not import the flat-face grammar"
+  - "Black, orange, red and saturated accents are allowed; only uniform heavy black outlines are not"
+  - "Keep a network's connective breathing room at 20-40% and never bury a connector under texture"
+  - "Full-body human proportions are not established for this family; do not invent them"
+  - "No source-channel marks, characters or scenes may be reproduced"
+
+chart_palette:
+  - "#34624D"
+  - "#E9783C"
+  - "#416C7B"
+  - "#5D5E1E"
+  - "#8C6239"
+  - "#1E4146"
+
+color_rules:
+  harmony_type: "analogous"
+  contrast_validation: true
+  colorblind_safe: true

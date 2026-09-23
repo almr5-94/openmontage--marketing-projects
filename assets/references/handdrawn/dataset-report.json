@@ -1,0 +1,63 @@
+{
+  "families": {
+    "a": {
+      "accepted": 74,
+      "quarantined_player_ui": 221,
+      "dropped_duplicate": 330,
+      "validation": 11,
+      "salvaged_detail_crops": 0,
+      "family": "A",
+      "name": "paper folk",
+      "trigger": "hdx_paperfolk",
+      "candidates": 625,
+      "scenes": 61,
+      "scenes_accepted": 38,
+      "picture_box": [
+        103,
+        218,
+        2837,
+        1758
+      ]
+    },
+    "b": {
+      "accepted": 43,
+      "quarantined_player_ui": 399,
+      "dropped_duplicate": 27,
+      "validation": 4,
+      "salvaged_detail_crops": 34,
+      "family": "B",
+      "name": "incised silhouette",
+      "trigger": "hdx_incise",
+      "candidates": 469,
+      "scenes": 24,
+      "scenes_accepted": 16,
+      "picture_box": [
+        103,
+        222,
+        2837,
+        1758
+      ]
+    },
+    "c": {
+      "accepted": 128,
+      "quarantined_player_ui": 450,
+      "dropped_duplicate": 441,
+      "validation": 12,
+      "salvaged_detail_crops": 0,
+      "family": "C",
+      "name": "bio texture",
+      "trigger": "hdx_biotext",
+      "candidates": 1019,
+      "scenes": 107,
+      "scenes_accepted": 54,
+      "picture_box": [
+        103,
+        218,
+        2837,
+        1758
+      ]
+    }
+  },
+  "scene_break_hamming": 14,
+  "duplicate_hamming": 6
+}

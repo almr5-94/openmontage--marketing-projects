@@ -1,25 +1,25 @@
 {
   "raw_frames": 753,
   "raw_per_video": {
-    "ted-ed1": 416,
-    "ted-ed2": 156,
-    "ted-ed3": 679
+    "video1": 416,
+    "video2": 156,
+    "video3": 679
   },
   "skipped_player_ui": 498,
   "picture_boxes": {
-    "ted-ed1": [
+    "video1": [
       103,
       218,
       2837,
       1758
     ],
-    "ted-ed2": [
+    "video2": [
       103,
       218,
       2837,
       1758
     ],
-    "ted-ed3": [
+    "video3": [
       103,
       218,
       2837,
@@ -29,9 +29,9 @@
   "dedupe_hamming_threshold": 5,
   "kept": 227,
   "kept_per_video": {
-    "ted-ed1": 89,
-    "ted-ed2": 10,
-    "ted-ed3": 128
+    "video1": 89,
+    "video2": 10,
+    "video3": 128
   },
   "contact_sheets": [
     "contact_01.jpg",

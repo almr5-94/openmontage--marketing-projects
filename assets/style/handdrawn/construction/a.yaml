@@ -1,0 +1,503 @@
+family:
+  key: A
+  name: "Paper Folk"
+  trigger: hdx_paperfolk
+  source_video_role: "reference video 1"
+  summary: >-
+    Outlined editorial characters on textured paper. Characters have enclosed
+    dark outlines, pale eye whites, small dark pupils, elongated simplified
+    faces, compact bodies, mostly unmodeled clothing, and restrained
+    paperlike surface variation. Environments frequently operate as symbolic
+    stages: podiums, disconnected stairs, portraits, laptops, a pinboard of
+    associations.
+
+evidence_labels:
+  measured: >-
+    Calculated from specified pixels or file properties (for example a patch
+    median hex value). This is an actual property of the chosen captured
+    region. It does not prove what value an artist entered in the source
+    application.
+  observed: >-
+    Visible in the inspected images without requiring a hidden production
+    history. Observations can have limited scope: a feature observed in one
+    close-up should not automatically be assigned to every distant figure.
+  inferred: >-
+    A plausible explanation of the image, such as separate texture layers or
+    vector-friendly construction. Several different workflows can produce
+    similar flattened pixels; an inference must remain distinguishable from
+    a fact.
+  prescribed: >-
+    A concrete reconstruction setting or design rule proposed by the study
+    (brush spacing, opacity ranges, head-unit templates, margin targets,
+    caption formats). Prescriptions make reproduction testable; they are not
+    a claim that original project files were recovered.
+
+toolset_hypothesis:
+  status: inferred
+  summary: >-
+    A vector-friendly or carefully inked raster character workflow, combined
+    with paperlike background and material textures. Evidence includes
+    smooth closed silhouettes, repeatable facial elements, consistent limb
+    widths, controlled interior marks, and texture that varies by region.
+  practical_reconstruction: >-
+    A path-based shape tool plus a fine round contour brush is a practical
+    candidate. Use filled shapes to keep clothing and facial regions stable,
+    and add controlled texture through clipped masks. If drawing entirely in
+    raster, a stabilized opaque brush can achieve the same contour grammar.
+    The criterion is the final edge behavior, not whether the tool
+    internally stores Bezier curves.
+  explicitly_not_established: "no vendor or brush engine identified"
+
+linework:
+  measured_edge_samples:
+    - anchor: A3
+      description: >-
+        On source row 919, the selected scan segment contains a 3-pixel dark
+        core at x 1335-1337, under a threshold requiring every RGB channel
+        to be below 60.
+      status: measured
+      caveat: >-
+        This is not the full anti-aliased stroke width; transition pixels
+        outside the threshold still contribute to the visible line, and an
+        oblique crossing changes the horizontal run length. The measurement
+        establishes a narrow dark core at that location, not a universal
+        3-pixel brush.
+
+  brush_preset:
+    contour_width_pct_of_art_width:
+      value: "0.10-0.18% of art width for medium-scale figures"
+      status: prescribed
+    contour_width_px_at_1920_wide:
+      value: "about 1.9-3.5 pixels before scale-specific adjustment"
+      status: prescribed
+    opacity:
+      value: "100% brush opacity for the primary contour; pressure should not control opacity by default"
+      status: prescribed
+    size_variation:
+      value: "0-10% over ordinary contour segments, with deliberate local correction around small facial marks"
+      status: prescribed
+    spacing:
+      value: "0-5% brush-tip spacing (as a percentage of tip diameter); confirm no dotted stepping remains"
+      status: prescribed
+    scatter:
+      value: "0% scatter and 0% random angle jitter; organic contour shape should come from controlled drawing"
+      status: prescribed
+    taper:
+      value: "0-10% of the mark length for ordinary internal strokes; closed outlines have no visible terminal caps"
+      status: prescribed
+    stabilisation:
+      value: "approximately 20-40% on a normalized control, then tune visually (different applications assign different meanings to this number)"
+      status: prescribed
+    internal_to_outer_ratio:
+      value: "0.55-0.9 of the selected outer contour width, unless optical legibility requires a specific exception"
+      status: prescribed
+    caps:
+      value: "round or gently softened for small free marks; do not add long calligraphic tails to eyelids or clothing seams"
+      status: prescribed
+    material_variation_note: >-
+      Apply material variation inside fills separately from the contour.
+      Let hair and dark cloth carry more visible texture than eye whites.
+    calibration_caveat: >-
+      These settings are starting recipes. They must be calibrated against
+      the anchor at a matched display scale. Software percentage controls
+      are not standardized, so numerical agreement between two brush panels
+      does not guarantee visual agreement. The acceptance criterion is the
+      reproduced edge, not the copied slider value.
+
+  boundary_colour_rule: >-
+    Dark neutral boundaries, not a consistently warm sepia or blue-black
+    contour. The sampled face-edge dark core supports a dark boundary but
+    does not establish one invariant source hex value across every outline.
+    Begin near black, then match the reference locally; do not tint all
+    contours brown merely because the paper is warm. Mouth, pupils, and
+    clothing divisions may use similarly dark values while differing in
+    width and scale. (status: observed for the dark-boundary tendency;
+    status: prescribed for the "begin near black, match locally" rule.)
+
+  internal_drawing_grammar: >-
+    Internal lines describe a small set of structural events: eyes, mouth,
+    eyebrow or forehead marks, clothing openings, certificates, fingers,
+    hair subdivisions, and selected folds. A forehead can be communicated
+    with only a few short wavering marks; a thinking pose can be
+    communicated by the hand contour, a few finger separations, and the
+    mouth angle, without a web of anatomical tendons. This omission is
+    systematic (status: observed). A fixed claim that internal lines are
+    exactly 50% of outer contours is not supported; use the 0.55-0.9
+    contour-width range instead, with optical compensation for tiny facial
+    features as needed (status: prescribed, not a measured population
+    statistic).
+
+rendering:
+  mode: >-
+    Flat local colour. "Flat" means the base fill does not continuously
+    model a three-dimensional light response; it does not mean every pixel
+    is identical. Texture can modulate the fill while leaving its
+    volumetric interpretation mostly unchanged. (status: observed)
+
+  form_shadow_rule: >-
+    Generally inapplicable to the canonical character fill. No systematic
+    illuminated-versus-shadow division is present in the anchors (the taupe
+    sweater is not divided into warm-lit and cool-shadow sides; the dark
+    shirt's patch variation reads as material texture, not directional
+    illumination). Overlap edges (silhouette, contour, value contrast) are
+    more important than form shadows for reading a body. Where a prop such
+    as a laptop screen or door shows a gradient elsewhere in the overview,
+    that is a prop-specific exception, captioned and modeled as that prop's
+    own treatment, not generalized into a requirement for gradient faces
+    and limbs. (status: observed, with a prescribed exception-handling rule)
+
+  cast_shadow_rule: >-
+    A standing figure does not require a visible shadow pool; shoes align
+    to an implied baseline and the figure's vertical organization is
+    sufficient. One anchor uses direct foot-to-step contact as a grounding
+    cue instead. Where a shadow is absent, do not manufacture one merely to
+    satisfy a conventional illustration checklist -- absence of a cast
+    shadow is a meaningful rendering choice. (status: observed / prescribed)
+
+  ambient_and_rim_rule: >-
+    No consistent ambient-bounce rule is supported across the collection.
+    The family does not visibly tint the shadow side of a face with its
+    background. Rim lighting should be an exceptional, reference-driven
+    choice, not a default ingredient in a master style prompt. (status:
+    observed for the absence of a rule; status: prescribed for the
+    exception-only guidance)
+
+  colorist_steps:
+    - step: 1
+      instruction: "Lay down the appropriate paper field, using the selected anchor's warm or pink-gray base rather than assuming one universal beige."
+      status: prescribed
+    - step: 2
+      instruction: "Block each garment, face, hair mass, and prop as a stable local-color region. Keep the figure readable before adding texture."
+      status: prescribed
+    - step: 3
+      instruction: "Use Normal at 100% for base fills and contours, as a prescribed reconstruction method, not a recovered source-layer setting."
+      status: prescribed
+    - step: 4
+      instruction: "Introduce subdued fill texture through a clipped layer: begin around 3-8% opacity for broad paper variation and 5-15% for visible dark-cloth variation, then calibrate by appearance."
+      status: prescribed
+    - step: 5
+      instruction: "If using Multiply for dark texture, start around 3-6% and check that faces and eye whites do not become dirty. Use a separate light layer only where actual light marks are desired."
+      status: prescribed
+    - step: 6
+      instruction: "Keep conventional form-shadow layers off by default. Add a small local shadow only when the chosen reference demonstrates it or the new object would otherwise be unreadable."
+      status: prescribed
+    - step: 7
+      instruction: "Preserve contour contrast across pale fields. Avoid soft airbrushed terminators on the standard body."
+      status: prescribed
+    - step: 8
+      instruction: "Compare the new asset at the same figure height as the isolated-figure or lineup anchors; an enlarged close-up naturally exposes more surface detail."
+      status: prescribed
+    - note: >-
+        The listed blending modes are reproducible options. The exact
+        combination of source color and opacity cannot be uniquely inferred
+        from a final pixel because multiple layer stacks can yield the same
+        result; a report that states an exact blend percentage without
+        access to layers would be presenting a fabrication as a
+        measurement.
+
+  forbidden:
+    canonical_recipe_exclusions:
+      - "glossy plastic highlights on faces"
+      - "broad cinematic rim lights"
+      - "automatic blue ambient shadows under every chin"
+      - "metallic reflections on ordinary clothing"
+      - "intensely saturated environmental glow"
+      - "strong three-dimensional gradient modeling on every limb"
+    scope_note: >-
+      These are production exclusions for this reconstruction recipe, not
+      claims that the entire unseen source video could never contain an
+      exceptional effect.
+    must_not_be_banned: >-
+      Pure black is not forbidden: pupils and narrow contours can
+      legitimately approach true black, and the shirt-patch median is
+      #181818 with some pixels exactly black, though broad black clothing
+      often retains visible material variation rather than a perfectly
+      featureless mass. Pure white is not forbidden: eye whites,
+      certificates, and UI-like objects can approach white in the visible
+      material, though sampled paper backgrounds do not -- avoid turning the
+      entire background sterile white, but keep eye whites lighter and
+      cleaner than the substrate.
+
+palette:
+  entries:
+  - role: "Warm paper"
+    hex: "#E7D6BE"
+    rgb: [231, 214, 190]
+    source_anchor: "A1 background patch"
+    status: measured
+  - role: "Pink-gray paper"
+    hex: "#E5DBDB"
+    rgb: [229, 219, 219]
+    source_anchor: "A2 background patch; alternative substrate"
+    status: measured
+  - role: "Taupe clothing"
+    hex: "#B3978A"
+    rgb: [179, 151, 138]
+    source_anchor: "A1 sweater interior"
+    status: measured
+  - role: "Charcoal trousers"
+    hex: "#6C6766"
+    rgb: [108, 103, 102]
+    source_anchor: "A1 trouser interior"
+    status: measured
+  - role: "Purple garment"
+    hex: "#594154"
+    rgb: [89, 65, 84]
+    source_anchor: "A2 skirt interior"
+    status: measured
+  - role: "Textured near-black"
+    hex: "#181818"
+    rgb: [24, 24, 24]
+    source_anchor: "A3 shirt patch median"
+    status: measured
+  - role: "Pale warm skin"
+    hex: "#F9E1D1"
+    rgb: [249, 225, 209]
+    source_anchor: "A3 selected face region; patch includes some boundary variation, not a clean texture-strength measurement"
+    status: measured
+  organizing_principle: >-
+    A large pale background against small, clearly bounded local-color
+    figures. Garments have enough value difference to distinguish torso,
+    trousers, and shoes without conventional form shading. This is one
+    character's sampled palette, not an ethnic or identity rule -- a second
+    character retains its own local fill under the same drawing and
+    rendering grammar rather than being recolored to match this sample.
+  rejected_patch: >-
+    A2's "red jacket" candidate patch (median #E8E4E0) intersects a
+    certificate held in front of the garment and returns the paper color,
+    not the jacket color. It is retained in the numerical companion for
+    audit only and is not used as an authoritative garment swatch.
+
+proportions:
+  definitions: >-
+    Head envelope: the visible outer head including ordinary hair. Cranial-
+    face unit: the estimated scalp-to-chin construction excluding large
+    external ornaments. The latter often requires interpretation because
+    the scalp can be hidden; head-envelope ratios are easier to check in a
+    flattened frame but should not be mistaken for hidden skeletal anatomy.
+  measured_landmarks:
+    - anchor: A1
+      description: >-
+        Visible character extends approximately y 242-602 in the
+        1,200-pixel-wide inspection view; hair-and-face envelope extends
+        roughly y 242-345. Approximate visible-envelope ratio: 360 / 103 =
+        3.50 heads.
+      status: measured
+      caveat: "A visual landmark estimate, not an automated detection or a population mean. If the hair expansion is excluded, the inferred cranial-face unit is smaller and the ratio rises."
+    - anchor: A2
+      description: >-
+        The rightmost standing figure extends approximately y 216-602, with
+        the head-and-neck junction around y 309, giving a rough envelope
+        ratio near 4.15 using that 93-pixel interval.
+      status: measured
+      caveat: "The exact neck boundary is ambiguous; read as roughly four units rather than a hidden model-sheet constant. Together with A1, this refutes an unsupported eight-head heroic template for the family."
+  template:
+    cranial_face_units: "3.8-4.4 for a full standing figure, with head-envelope variation for hair and character design"
+    torso_plus_pelvis_units: "1.25-1.55"
+    legs_units: "1.35-1.75"
+    shoes_units: "0.10-0.20"
+    shoulders_relative_to_head_width_H: "1.45-1.9 H"
+    neck_relative_to_head_width_H: "0.35-0.65 H"
+    upper_limb_relative_to_head_width_H: "0.18-0.30 H"
+    status: prescribed
+    caveat: >-
+      These intervals overlap at garment junctions and are not intended to
+      sum mechanically without a drawing; their purpose is to constrain
+      relative visual emphasis. Match each new character individually
+      instead of forcing it to the midpoint of every interval.
+
+face_map:
+  coordinate_system: >-
+    Normalized coordinates within the visible face envelope: x ranges 0 at
+    the left face boundary to 1 at the right; y ranges 0 at the hairline or
+    upper face boundary to 1 at the chin.
+  starting_map:
+    eye_centres_x: [0.30, 0.70]
+    eye_centres_y: "0.35-0.45"
+    eye_width_relative_to_face_width: "0.20-0.25"
+    mouth_y: "0.63-0.75"
+    pupil: "a dark solid disc positioned within the white enclosure to establish gaze"
+    nose: "minimized or absent in frontal views unless the particular character demonstrates one; no universal ban on noses for other views"
+    hair: "an enclosing shape with selected internal divisions or texture; individual hair strands are not the default"
+    status: prescribed
+    caveat: "A drafting template, not recovered landmarks from an original model sheet; adapt to each character."
+  expression_note: >-
+    Expression is produced by pupil placement, mouth angle, and pose rather
+    than complex eyelid anatomy; a closed-eye expression can reduce the
+    circular open-eye system to curved closed lids.
+
+articulation:
+  hands: >-
+    Small palm mass plus a thumb and the minimum visible finger contours
+    needed for the action. A holding hand can present a stack of short
+    divisions along a paper edge; a pointing or thinking hand needs a
+    clearly extended digit. Fingernails and knuckle modeling are not needed
+    in the canonical recipe, without claiming their impossibility elsewhere.
+    Capture scale and overlap prevent reliable finger counting in every
+    anchor, so the conclusion is "small, simplified, pose-specific," not a
+    fixed finger count.
+  feet: >-
+    Small wedges or flattened shoe shapes at the ends of simple trouser
+    legs, with limited calf modeling. Footwear is not literally identical
+    across every character (some taller boots appear on one figure). Common
+    grammar: limited detail, clear grounding, low visual weight relative to
+    head and torso.
+  elbows_and_knees: >-
+    The knee is readable through a change of direction, not a drawn
+    kneecap. Arms use smoother curves, especially when bent around props.
+    The body mixes softly curved limbs with designed angular bends; it is
+    not pure "rubber hose" with no directional joints.
+  line_of_action: >-
+    A quiet vertical standing default (a shared baseline supports a
+    lineup), but not an absolute restriction: one anchor introduces a clear
+    asymmetry through a thinking hand and hand-on-hip arm, another changes
+    the dominant gesture to a climbing bend. Identify the line of action
+    before detailing: upright for a comparison plate, a shallow curve for a
+    thoughtful lean, a bent diagonal for stepping.
+  silhouette_readability: >-
+    Not every pose needs to be fully decoded from the outer silhouette
+    alone, but critical gestures should not disappear into undifferentiated
+    masses -- a negative-space opening between a bent arm and torso can
+    preserve a hand-on-hip action in silhouette. When a prop (such as a
+    certificate) connects the hands, captioning should describe the object
+    interaction, not merely "standing person"; removing the prop while
+    leaving the hands unchanged would make the pose ambiguous.
+  foreshortening: >-
+    Strong photographic foreshortening is not the default. Limb widths are
+    relatively stable, and staging is mostly frontal or shallow.
+
+layout_modes:
+  - mode: "A isolated full figure"
+    evidence_anchor: A1
+    primary_organization: "Centered subject with label beneath"
+    prescribed_target: "Figure height 45-60% of art height; generous side space"
+  - mode: "A comparison lineup"
+    evidence_anchor: A2
+    primary_organization: "Shared foot baseline, repeated vertical bodies"
+    prescribed_target: "Similar figure scale; deliberate grouping gap"
+  - mode: "A medium action plate"
+    evidence_anchor: A3
+    primary_organization: "Central body, asymmetrical arm gesture"
+    prescribed_target: "Keep face and action hand clear; allow lower-body crop"
+  - mode: "A relationship board"
+    evidence_anchor: A4
+    primary_organization: "Overlapping cards connected by strings"
+    prescribed_target: "Hierarchy through card scale and connection paths"
+  - mode: "A symbolic stairs"
+    evidence_anchor: A5
+    primary_organization: "Repeated horizontal steps on diagonals"
+    prescribed_target: "Clear foot contact and readable route geometry"
+
+negative_space_targets:
+  isolated_figure: { value: "70-90% quiet field", status: prescribed }
+  lineup: { value: "35-55% quiet field", status: prescribed }
+  worked_example:
+    anchor: A1
+    figure_rectangle_px: "128 x 361 = 46,208 square pixels"
+    art_field_px: "1,200 x 675 = 810,000 square pixels"
+    occupancy_pct: "5.70%"
+    status: measured
+    note: >-
+      The figure rectangle occupies about 5.70% of the art field even though
+      the standing person can be more than half the art-field height,
+      because the body is narrow. "The figure is large" and "the frame has
+      extensive negative space" are not contradictory; height, width, and
+      filled area describe different things. The actual silhouette occupies
+      less than the rectangle, which includes surrounding gaps.
+  warning: >-
+    A bounding rectangle overestimates the actual filled subject area
+    because it includes empty corners and openings around bent limbs.
+    Negative-space targets are design ranges to test visually, not measured
+    coverage statistics for the whole source collection. An enlarged
+    action-plate anchor occupies much more of the frame than the isolated-
+    figure worked example; the layout mode must be selected before an
+    occupancy target is applied.
+
+camera: >-
+  Frontal and shallow. Figures are presented like editorial subjects on a
+  stage rather than photographed bodies in a fully modeled room; size and
+  baseline communicate grouping more than lens perspective. "Orthographic-
+  like staging" is a reasonable description but is not proof of a true
+  orthographic camera or isometric grid. One anchor has no visible
+  architectural horizon (the implied ground is established by feet and
+  label placement); another uses a shared foot baseline, which is a layout
+  baseline, not necessarily the horizon of a perspective projection. A
+  symbolic staircase scene with disconnected routes should not be
+  "corrected" into a plausible building. A laptop prop elsewhere in the
+  overview shows the family can depict oblique perspective when useful,
+  without making the frontal people a 50mm camera simulation. A focal
+  length cannot be uniquely recovered from stylized two-dimensional art
+  without known geometry and camera assumptions; the useful instruction is
+  shallow frontal character staging with selectively angled props. (status:
+  observed for the staging pattern; the focal-length refusal is explicit
+  in the study.)
+
+scenography: >-
+  Environments frequently use metonymy: a small set of objects stands for a
+  larger concept or place (certificates imply achievement, podiums imply
+  ranking, stairs imply progress or comparison, a pinboard implies a
+  network of associations). A complete furnished room is not needed when
+  one prop already communicates the idea. Grounding depends on mode: an
+  isolated figure stands on an implied baseline, a podium figure contacts
+  the top face of a simple block, a stair figure contacts a rectangular
+  step, and pinboard portraits are mounted within cards -- each mode has its
+  own contact logic, and a floating person above a podium is an error even
+  if floating icons elsewhere are intentional. Isolated plates may have
+  only a subject layer and substrate; it is unnecessary to invent a
+  foreground object solely to satisfy a three-layer depth formula. In a
+  pinboard scene, depth is shallow and local: one card overlaps another, a
+  pin sits over paper, a string crosses the surface. Diegetic vs. non-
+  diegetic: portraits, grade papers, pins, and strings on a board are
+  diegetic objects belonging to the depicted world; a presentation-style
+  name label beneath a figure functions more like an external label; title
+  text belonging to the video player is capture contamination, not part of
+  the illustration. Treating all three as the same kind of "UI" would
+  corrupt both analysis and captions. (status: observed, with prescribed
+  grounding rules)
+
+information_graphics: >-
+  Boards, certificates, and labels. A relationship-board scene shows
+  diegetic portraits, grade papers, pins, and connecting strings; hierarchy
+  comes from card scale and connection paths. Lettering and grade marks can
+  have rougher edges than ordinary character contours (as seen in the
+  board anchor); a universal monoweight rule should not erase this more
+  expressive marking used for written annotations. (status: observed)
+
+typography_and_padding: >-
+  Label roles are distinct, not evidence for one universal font: a
+  presentation-style name label uses a typewriter-like serif appearance,
+  while a board's central label uses bold irregular uppercase lettering;
+  exact font files cannot be identified reliably from the supplied frames.
+  There is no measured universal padding value across the source -- one
+  label card has ample breathing room around its central word, while
+  portrait cards have narrower visible borders. For reconstruction,
+  prescribe roughly 8-12% of card width as initial text-side padding for
+  large label cards (status: prescribed), then adjust for lettering shape.
+  Exact wording must be verified outside image generation -- a generated
+  asset can reserve a blank label field while preserving the style, but the
+  final image's typography must be checked separately for spelling,
+  meaning, alignment, and accidental capture-interface text.
+
+acceptance_checklist:
+  - order: 1
+    check: "Check the face first: eye enclosures pale and clearly bounded, pupils small and purposeful, mouth compact."
+  - order: 2
+    check: "Then check body proportions, the small hands and feet, and the prop interaction."
+  - order: 3
+    check: "Only after those pass, tune the paper surface and garment texture. A correct background cannot rescue the wrong facial system."
+  - order: 4
+    check: "For every family: compare at the intended final size and inspect the most information-dense region separately; remove accidental interface elements from the acceptance set; preserve exact scientific or textual meaning; record any deliberate departure from the source grammar as a design decision."
+
+open_questions:
+  - question: "Exact vendor and brush engine used to produce the family."
+    settled_by: "Original artwork files (brush presets, vector-versus-raster construction, layer blend modes, exact source swatches)."
+  - question: "Whether one invariant boundary hex value exists across every outline (only a dark-neutral tendency is established)."
+    settled_by: "Original artwork files or a perpendicular stroke-width and color measurement across many more contours."
+  - question: "Whether the 0.55-0.9 internal-to-outer contour ratio holds as a population statistic rather than a prescribed starting range."
+    settled_by: "Measurement across a larger, deduplicated set of anchors with manual silhouette masks."
+  - question: "Exact blend-mode percentages (Normal/Multiply opacities) used in production, versus the prescribed starting values given here."
+    settled_by: "Original layered project files; a final flattened pixel cannot prove a layer stack."
+  - question: "Exact typeface used for name labels and board lettering."
+    settled_by: "Original project files or font-matching against a much larger sample of clean, uncontaminated label crops."
+  - question: "A clean garment swatch for the A2 red-jacket region (the sampled patch intersects a certificate and was rejected)."
+    settled_by: "A clean interior patch selected from a frame where the certificate does not overlap the garment."

@@ -1,0 +1,521 @@
+family:
+  key: C
+  name: "Bio Texture"
+  trigger: hdx_biotext
+  source_video_role: "reference video 3"
+  summary: >-
+    Botanical and scientific cut-paper geometry with selective drawing.
+    Filled organic shapes, branching structures, stippled surface patterns,
+    irregular diagram discs, local-color outlines, and textured
+    environmental planes dominate. A close-up human face is a significant
+    special case: its large detailed irises and drawn nostrils contradict
+    any attempt to impose family A's facial grammar on this family.
+
+evidence_labels:
+  measured: >-
+    Calculated from specified pixels or file properties (for example a
+    patch median hex value). This is an actual property of the chosen
+    captured region. It does not prove what value an artist entered in the
+    source application.
+  observed: >-
+    Visible in the inspected images without requiring a hidden production
+    history. Observations can have limited scope: a feature observed in one
+    close-up should not automatically be assigned to every distant object.
+  inferred: >-
+    A plausible explanation of the image, such as a vector scene with a
+    lightly textured raster overlay. Several different workflows can
+    produce similar flattened pixels; an inference must remain
+    distinguishable from a fact.
+  prescribed: >-
+    A concrete reconstruction setting or design rule proposed by the study
+    (brush spacing, opacity ranges, proportion guidance, margin targets,
+    caption formats). Prescriptions make reproduction testable; they are
+    not a claim that original project files were recovered.
+
+toolset_hypothesis:
+  status: inferred
+  summary: >-
+    Hand-shaped filled regions with selective local-color drawing and
+    restrained raster surface treatment. Evidence is the diversity of
+    organic contours, the deliberate irregularity of diagram discs, and
+    directional patterning within plants and biological forms. A close-up
+    iris construction adds a concentrated, fine-line subsystem that should
+    be preserved as a special close-up mode.
+  practical_reconstruction: >-
+    Editable filled silhouettes plus a small family of raster mark
+    brushes: one for gently irregular contours, one for short fibrous
+    marks, and one for sparse material dots. This is an implementation
+    hypothesis, not a claim that exactly three brushes were used. The key
+    is to separate shape, structural pattern, and incidental texture so
+    that each can be controlled independently.
+  explicitly_not_established: "no vendor or brush engine identified"
+
+linework:
+  measured_edge_samples:
+    - anchor: C5
+      description: >-
+        On source row 1,029, the selected red-line scan gives a 10-pixel
+        run under the chosen red-color threshold.
+      status: measured
+      caveat: >-
+        The line is diagonal, so its perpendicular thickness is smaller
+        than its horizontal intersection unless the crossing is normal to
+        the stroke. This is a directly measured image event, while the
+        recommended brush widths below remain calibration starting points,
+        not a universal brush width.
+
+  brush_preset:
+    structural_mark_width_pct_of_art_width:
+      value: "0.12-0.30% of art width, with a wider hierarchy for large forms and fine close-up details"
+      status: prescribed
+    structural_mark_width_px_at_1920_wide:
+      value: "not computed in the study (a pixel equivalent at 1920 wide is given only for family A)"
+      status: prescribed
+    opacity_and_size_variation:
+      value: "0-15% controlled size variation and minimal opacity pressure for veins and structural contours"
+      status: prescribed
+    spacing:
+      value: "1-6% tip spacing for continuous lines; use a separate dispersed-tip brush for dots rather than increasing contour spacing until it breaks"
+      status: prescribed
+    scatter:
+      value: "near 0%; if an edge needs slight irregularity, perturb its path gently at a scale larger than single-pixel noise"
+      status: prescribed
+    taper:
+      value: "short or moderate for leaf veins and fiber endpoints, while keeping diagram connectors sufficiently even to preserve topology"
+      status: prescribed
+    stabilisation:
+      value: "not specified by the study for family C (only family A gives an explicit stabilisation percentage)"
+      status: prescribed
+    internal_to_outer_ratio:
+      value: "do not enforce one external-to-internal ratio across diagrams, plants, faces, and cellular structures; define it within each object class"
+      status: prescribed
+    additional_rules:
+      - "Construct major plants, hills, icons, and biological masses as filled shapes; add an outline only when the relevant object class demonstrates one."
+      - "Match line color to the local object role: darker green on leaves, red on the salmon form, dark marks around the close-up eyes."
+      - "Let small surface scratches cross broad pale fields sparingly. Keep critical small symbols and connections readable."
+      - "Test at final viewing size: a vein that disappears can be widened; a texture that rivals the subject should be reduced."
+    calibration_caveat: >-
+      These settings are starting recipes. They must be calibrated against
+      the anchor at a matched display scale. Software percentage controls
+      are not standardized, so numerical agreement between two brush panels
+      does not guarantee visual agreement. The acceptance criterion is the
+      reproduced edge, not the copied slider value.
+
+  boundary_colour_rule: >-
+    The family explicitly supports local-color drawing: red boundaries and
+    internal lines around a salmon internal form, related darker marks
+    inside vegetation, and black in hair and eye structures on the close-up
+    face. These are role-specific decisions; choose the line color by
+    object and function, preserving enough contrast for clarity without
+    treating black as either compulsory or forbidden. (status: observed)
+
+  internal_drawing_grammar: >-
+    The density of internal marks is strongly scale- and subject-dependent.
+    Leaf veins and wood growth rings are medium-density structural
+    descriptions; diagram icons simplify those structures inside small
+    discs; a close-up iris is densely filled with radial lines while the
+    surrounding face has only a few accents. The family supports a
+    localized high-detail focal region inside an otherwise economical
+    image. Patterns are not all stochastic noise: many carry directional
+    information about the object they occupy (a tree's grain follows the
+    trunk, a cut log's rings follow its cross-section, a leaf's vein
+    divides the leaf). (status: observed)
+
+rendering:
+  mode: >-
+    Mode-dependent. Select the rendering mode first -- botanical
+    environment, diagram plate, biological cutaway, or human close-up --
+    since each uses a different subset of the family palette and a
+    different depth/volume strategy. (status: observed, with a prescribed
+    mode-selection rule)
+
+  form_shadow_rule: >-
+    A botanical environment conveys depth largely through overlapping
+    filled planes, scale, and detail distribution (foreground trunks dark
+    and large, distant vegetation lighter or less structurally dense, water
+    as a broad intermediate field); there is no need to model every leaf as
+    a shaded three-dimensional surface. Scientific callouts intentionally
+    depart from environmental realism -- adding physically consistent
+    environmental shadows to comparison modules would make them less
+    diagrammatic. The close-up face uses large local-color regions with a
+    distinct warmer nose plane as a shape-based value and hue distinction,
+    not a fully modeled gradient; skin remains largely a broad flat region
+    even though eye detail is concentrated. An internal biological form's
+    apparent volume is conveyed by taper, internal longitudinal lines, and
+    overlap with its surroundings, not by rendering it as a glossy
+    translucent specimen. (status: observed)
+
+  cast_shadow_rule: >-
+    Grounding is frequently achieved by insertion into a soil band, overlap
+    behind vegetation, or a cutaway relationship; a stem entering the
+    ground can establish contact without a soft elliptical shadow. Diagram
+    discs do not need a floor or cast shadow at all -- their spatial frame
+    is informational, not literal physical space. Do not manufacture a
+    shadow merely to satisfy a checklist. (status: observed)
+
+  ambient_and_rim_rule: >-
+    No consistent ambient-bounce rule is supported across the collection.
+    The family's local-color organization does not require reflective
+    color bleed. (status: observed)
+
+  colorist_steps:
+    - step: 1
+      instruction: "Select the rendering mode first: botanical environment, diagram plate, biological cutaway, or human close-up. Each uses a different subset of the family palette."
+      status: prescribed
+    - step: 2
+      instruction: "Block major forms on Normal at full opacity, using local-color differences and overlap to establish structure."
+      status: prescribed
+    - step: 3
+      instruction: "Keep plant veins and internal contours related to the local fill, typically darker or more saturated within the same functional color family."
+      status: prescribed
+    - step: 4
+      instruction: "Use a quiet surface layer as needed, initially around 2-6%, without forcing visible wear into every small icon."
+      status: prescribed
+    - step: 5
+      instruction: "For diagram discs, preserve the cream-on-blue container system and dark-green icon contrast. Avoid drop shadows and bevels unless a new reference supports them."
+      status: prescribed
+    - step: 6
+      instruction: "For biological emphasis, allow orange, salmon, or red focal shapes. Keep these accents purposeful and spatially concentrated."
+      status: prescribed
+    - step: 7
+      instruction: "Use shape-based plane changes on the close-up face rather than continuous airbrush modeling. Retain detailed iris marks without making the skin photographic."
+      status: prescribed
+    - step: 8
+      instruction: "Subordinate environmental texture to silhouettes, pointer tips, and network connections. A correct color treatment must preserve information readability."
+      status: prescribed
+    - note: >-
+        The listed blending modes are reproducible options. The exact
+        combination of source color and opacity cannot be uniquely inferred
+        from a final pixel because multiple layer stacks can yield the same
+        result; a report that states an exact blend percentage without
+        access to layers would be presenting a fabrication as a
+        measurement.
+
+  forbidden:
+    canonical_recipe_exclusions:
+      - "universal heavy black outlines around every plant"
+      - "photographic leaf shading"
+      - "wet glossy surfaces on all biological forms"
+      - "metallic bevels around scientific discs"
+      - "rainbow-colored network connectors without semantic reason"
+      - "strong lens-flare effects"
+    scope_note: >-
+      These are production exclusions for the canonical recipe, not claims
+      that the entire unseen source video could never contain an
+      exceptional effect.
+    must_not_be_banned: >-
+      Pure black, orange, and red are not forbidden -- the close-up face's
+      hair is exactly black and its face and nose plane are strongly
+      orange, and a mushroom in a comparison-callout scene is visibly
+      intense orange; the inspected face and callouts make a universal
+      warm-color ban untenable. Likewise, nostril marks and detailed iris
+      construction must not be banned: "never draw nostrils" or an
+      A-family-style near-omitted nose would be demonstrably wrong for
+      this family's close-up mode, and a densely radial-lined iris is a
+      defining feature of that mode, not an exception to suppress.
+
+palette:
+  entries:
+  - role: "Pale environmental blue-green"
+    hex: "#94C0B9"
+    rgb: [148, 192, 185]
+    source_anchor: "C1 sky patch"
+    status: measured
+  - role: "Water plane"
+    hex: "#69A2A1"
+    rgb: [105, 162, 161]
+    source_anchor: "C1 water median; includes minor surface marks"
+    status: measured
+  - role: "Deep trunk mass"
+    hex: "#1E4146"
+    rgb: [30, 65, 70]
+    source_anchor: "C1 foreground trunk interior"
+    status: measured
+  - role: "Olive foliage"
+    hex: "#5D5E1E"
+    rgb: [93, 94, 30]
+    source_anchor: "C1 canopy interior"
+    status: measured
+  - role: "Diagram field"
+    hex: "#416C7B"
+    rgb: [65, 108, 123]
+    source_anchor: "C3 blue field"
+    status: measured
+  - role: "Diagram disc"
+    hex: "#DADFC9"
+    rgb: [218, 223, 201]
+    source_anchor: "C3 cream disc median, confirmed in a second patch"
+    status: measured
+  - role: "Diagram icon"
+    hex: "#34624D"
+    rgb: [52, 98, 77]
+    source_anchor: "C3 green icon interior"
+    status: measured
+  - role: "Close-up face"
+    hex: "#E9783C"
+    rgb: [233, 120, 60]
+    source_anchor: "C4 broad face patch"
+    status: measured
+  - role: "Close-up nose plane"
+    hex: "#ED6134"
+    rgb: [237, 97, 52]
+    source_anchor: "C4 nose plane"
+    status: measured
+  - role: "Close-up hair"
+    hex: "#000000"
+    rgb: [0, 0, 0]
+    source_anchor: "C4 sampled hair; exactly black"
+    status: measured
+  - role: "Internal-form salmon"
+    hex: "#EDA094"
+    rgb: [237, 160, 148]
+    source_anchor: "C5 salmon region median"
+    status: measured
+  - role: "Internal-form brown surround"
+    hex: "#A68A67"
+    rgb: [166, 138, 103]
+    source_anchor: "C5 brown surround median"
+    status: measured
+  excluded_measurement: >-
+    A comparison-callout scene's orange mushroom is visibly intense, but
+    its first selected patch intersects additional structure, so its
+    median is not treated as a clean paint recipe here (excluded from this
+    palette; see open_questions).
+  organizing_principle: >-
+    Blue-green fields support vegetation and scientific discs; olive and
+    brown establish plant and soil context; orange, red, salmon, and yellow
+    highlight biological activity or focal material. The palette is
+    related but not monotonously desaturated -- the orange face and intense
+    mushroom color demonstrate deliberate emphasis. A diagram plate is
+    especially economical (a blue field, cream containers and connectors,
+    green icons) -- a limited palette nested inside the broader family
+    palette; a new forest should not be reduced to the diagram's three-
+    color system unless that simplification is an intentional derivative
+    design.
+
+proportions:
+  definitions: >-
+    Head envelope vs. cranial-face unit is the same distinction used across
+    the study (visible outer head including hair, versus the estimated
+    scalp-to-chin construction excluding ornaments), but it is largely
+    inapplicable to this family, whose anchors are mostly plants, fungi,
+    biological forms, and scientific icons rather than a standard human
+    figure.
+  measured_landmarks: >-
+    Full-body human proportions are not observable in the selected
+    evidence. The close-up face anchor supplies no complete human body; the
+    exact adult body ratio for this family cannot responsibly be measured
+    from a cropped face image, and no missing legs or torso are invented.
+  template: >-
+    Object-class morphology instead of a person template. The central
+    morphological question for this family is how organic structures are
+    abstracted, not how many head-units tall a standard person is: trees
+    use thick or narrow branching trunks topped with rounded, lobed, or
+    disc-like canopies; a mushroom uses a broad cap over a narrow stem,
+    with smaller subordinate mushrooms repeating the construction at
+    reduced scale (a family resemblance in shape, not an exact clone);
+    diagram icons condense object identity into a small set of recognizable
+    masses that must remain legible within a disc; an internal biological
+    form is an elongated tapered spindle with longitudinal interior lines
+    reinforcing direction from broad body toward narrow end. (status:
+    observed; no single numeric head-unit template is prescribed for this
+    family)
+
+face_map:
+  close_up_rule: >-
+    Eyes occupy a large proportion of visible face width and dominate the
+    composition; the upper eye boundary is heavy and curved, the lower
+    boundary finer or more understated. Begin with an iris filling most of
+    the eye opening, a pupil roughly half to two-thirds of the iris
+    diameter, and sparse radial lines that remain separately legible at the
+    intended scale (status: prescribed reconstruction proportions, not
+    verified universal ratios). The nose is not a single contour mark: it
+    is a warmer tapered plane with small dark nostril strokes at the base
+    and a few additional marks along the bridge or side. Cheeks contain
+    small dots and short curved lines. The apparent T-zone is elongated
+    because of the nose's long vertical shape and the eyes' large
+    horizontal spread, but the top of the skull and lower chin are cropped,
+    so exact forehead and chin fractions cannot be measured responsibly;
+    skull top and chin must be treated as cropped so that no full head may
+    be extrapolated from this evidence alone. (status: observed for the
+    visible construction)
+  scene_content_caveat: >-
+    Small yellow particles overlap the face and eye areas in the anchor;
+    these are scene content and must not become permanent anatomical
+    freckles in every generated close-up face.
+
+articulation:
+  hands: >-
+    Not established. Human hands are not established by the close-up face
+    anchor, which shows only a face. Botanical branches and biological
+    tendrils are not substitutes for human hand evidence. A human-hand
+    construction rule for this family therefore remains unspecified from
+    the inspected anchors; additional complete-character references would
+    be required before claiming an on-model hand design.
+  feet: >-
+    No human feet are established either; the family's structural joints
+    are botanical instead. Plants articulate through branch junctions, leaf
+    stems, and cap-to-stalk connections -- a different kind of structural
+    joint from limbs. These intersections should remain clear and
+    purposeful: a leaf attaches to a stem, roots branch from a central
+    form, a mushroom cap sits on a stalk. Random tangencies can make these
+    structures look biologically incoherent even when the texture is
+    correct.
+  elbows_and_knees: >-
+    Not applicable in the anatomical sense; see the botanical attachment
+    logic under feet above. There is no human elbow/knee evidence in the
+    inspected anchors for this family.
+  line_of_action: >-
+    Often belongs to the environment or organism: a leaning trunk, a
+    rising stem, a tapering biological form, or a diagonal branch. The main
+    direction should organize subordinate branches and marks; a plant
+    whose veins contradict its main growth direction will feel less
+    coherent even if every individual stroke is attractive.
+  silhouette_readability: >-
+    Depends on the mode: a botanical environment reads through overlap,
+    scale, and detail distribution; a diagram reads through node hierarchy
+    and connector clarity; a close-up face reads through the eye/nose
+    relationship described in face_map. No general full-body silhouette
+    rule is established, consistent with the "hands/feet unspecified"
+    findings above.
+  foreshortening: >-
+    Strong photographic foreshortening is not implied by this family's
+    scale changes. The family changes scale for explanation, such as a
+    magnification callout, without implying that every enlargement is
+    camera perspective; a callout is a flat comparison window layered over
+    the scene, not a volumetric object hovering at giant scale.
+
+layout_modes:
+  - mode: "C botanical setting"
+    evidence_anchor: C1
+    primary_organization: "Foreground vegetation framing open middle distance"
+    prescribed_target: "Maintain a readable environmental opening"
+  - mode: "C comparison callouts"
+    evidence_anchor: C2
+    primary_organization: "Two large discs tied to source organisms"
+    prescribed_target: "Keep each pointer unambiguous and modules legible"
+  - mode: "C scientific network"
+    evidence_anchor: C3
+    primary_organization: "Unequal nodes and connecting edges"
+    prescribed_target: "Preserve node hierarchy and actual connection meaning"
+  - mode: "C extreme close-up"
+    evidence_anchor: C4
+    primary_organization: "Face fills the frame"
+    prescribed_target: "Deliberate crop, dominant eyes, no invented body"
+  - mode: "C internal form"
+    evidence_anchor: C5
+    primary_organization: "Strong diagonal biological structure"
+    prescribed_target: "Preserve taper direction and surrounding context"
+
+negative_space_targets:
+  network: { value: "20-40% connective breathing room", status: prescribed }
+  worked_example_reference:
+    anchor: A1
+    figure_rectangle_px: "128 x 361 = 46,208 square pixels"
+    art_field_px: "1,200 x 675 = 810,000 square pixels"
+    occupancy_pct: "5.70%"
+    status: measured
+    note: >-
+      This calculation is from family A's isolated-figure anchor, cited here
+      only as the study's worked demonstration of how a bounding rectangle
+      can overestimate occupancy; it is not a family-C measurement.
+  warning: >-
+    A diagram distributes discs and connectors across much of the frame;
+    the blue gaps between them are essential for reading the graph, but
+    thin connectors interrupt that quiet space. A segmentation that treats
+    thin connectors as negligible could report abundant empty area while
+    the graph still feels crowded -- information density must consider the
+    number of crossings and proximity of edges to icons, not just filled-
+    pixel percentage. Bounding-box calculations generally overestimate
+    occupancy relative to the true silhouette or connective mask.
+
+camera: >-
+  A botanical setting is a layered environmental plate: large cropped
+  trunks and low vegetation establish the near plane, a water opening
+  occupies the middle, and smaller trees or canopy shapes sit farther away;
+  depth reads from overlap, scale, and color relationships rather than
+  converging architectural lines. An approximate waterline or distant bank
+  can lie around the lower-middle portion of the art field, but this should
+  not be promoted to a universal horizon rule -- other modes have a flatter
+  strip with callouts, no physical horizon at all (a network diagram), or a
+  face filling the entire view. A single camera setting cannot represent
+  these modes. Magnification callouts are enlargements within a diagram,
+  not objects physically hovering at giant scale in the scene -- their
+  pointer shapes establish explanatory reference, and a prompt asking for
+  "giant floating molecular spheres" would misrepresent flat comparison
+  windows as volumetric objects. A diagonal close view into a biological
+  structure clarifies internal organization through overlap and taper
+  alone, without needing a photographic depth-of-field gradient or
+  realistic lens distortion. (status: observed, with an explicit refusal
+  to recover a numeric focal length or a universal horizon rule)
+
+scenography: >-
+  Uses patterned simplification: a forest contains many plants, but each
+  plant class uses a manageable vocabulary of leaf shapes, dots, veins, and
+  lobed masses; detail is distributed selectively, with the foreground
+  structurally rich while sky and water remain quieter. Depth-plane
+  handling: large dark foreground plant masses, middle-distance water and
+  shrubs, and lighter or smaller background foliage, with an asymmetrical
+  foreground framing (a heavier trunk mass on one side, lower vegetation
+  and more open sky on the other) that opens a visual path into the scene
+  -- mirroring the sides exactly would make a different composition. A
+  network diagram has an information hierarchy rather than literal depth
+  planes: a central node is prominent, surrounding discs vary in size, and
+  connectors sit behind icon containers; the equivalent of "foreground" is
+  the most important node, not an object nearest a camera. Diegetic vs.
+  non-diegetic: circular magnifications are explanatory overlays tied to
+  source organisms, not literal physical props in the forest; a network
+  diagram is itself an information graphic rather than a scene containing
+  a screen. A request for a "diegetic UI object" must be handled carefully
+  -- the source may support an explanatory graphic without supporting a
+  fictional floating computer interface. (status: observed)
+
+information_graphics: >-
+  Callouts and networks. For a callout, draw the pointer relationship
+  before filling the enlarged window with details -- each large disc needs
+  an unambiguous relationship to its source organism, since a pointer that
+  lands between two organisms changes the explanation. For a network,
+  specify every node and edge before styling the containers: topology
+  before styling, pointer target before disc contents. The reliable
+  production order is concept, topology, container geometry, icon content,
+  and surface treatment; this order prevents aesthetic details from
+  concealing a wrong diagram. The organic appearance is compatible with
+  precise information structure -- it does not excuse random connection
+  choices. (status: prescribed production order; observed diagram
+  construction)
+
+typography_and_padding: >-
+  Includes hand-drawn-looking scientific titles and small labels; the
+  network mode relies on pictograms rather than paragraphs, so the family
+  supports both labeled specimen presentations and largely text-free
+  diagrams -- choose the intended mode rather than decorating every disc
+  with arbitrary text. There is no measured universal padding value; for
+  diagram discs, retain a visible rim around the icon rather than pushing
+  branches into the edge. For any large label card, prescribe roughly
+  8-12% of card width as initial text-side padding (status: prescribed),
+  then adjust for lettering shape. Exact wording must be verified outside
+  image generation, independent of the image-generation process.
+
+acceptance_checklist:
+  - order: 1
+    check: "Identify the mode first, then judge it against the correct subsystem: a botanical environment needs coherent branching and layered masses; a network needs correct nodes and connections; a callout needs unambiguous pointers; a face close-up needs the observed eye and nose construction."
+  - order: 2
+    check: "A single generic \"organic paper illustration\" judgment is too weak to distinguish these outcomes -- always name the mode being judged."
+  - order: 3
+    check: "For every family: compare at the intended final size and inspect the most information-dense region separately; remove accidental interface elements from the acceptance set; preserve exact scientific or textual meaning; record any deliberate departure from the source grammar as a design decision."
+
+open_questions:
+  - question: "Exact vendor and brush engine used to produce the family."
+    settled_by: "Original artwork files (brush presets, vector-versus-raster construction, layer blend modes, exact source swatches)."
+  - question: "A full adult human body proportion standard for this family (only a face close-up is available)."
+    settled_by: "Additional complete Family C human figures, needed to define full-body anatomy rather than extrapolating from a face close-up."
+  - question: "Human hand construction for this family."
+    settled_by: "Additional complete-character references showing hands, since botanical branches and biological tendrils are not substitutes for human hand evidence."
+  - question: "The exact node/edge topology (the full connection list) of the scientific-network anchor."
+    settled_by: "A transcribed edge list from the source material; for a new factual diagram, the intended connections must be specified separately from style matching, which cannot establish scientific correctness."
+  - question: "A clean paint-recipe measurement for the comparison-callout mushroom's orange color (the sampled patch intersects additional structure)."
+    settled_by: "A cleanly selected interior patch from a frame where the mushroom color is not crossed by other structure."
+  - question: "Stabilisation percentage for family C brushes (not specified in the study's Section B rulebook, unlike family A)."
+    settled_by: "Direct calibration against multiple anchors at matched display scale in the chosen drawing application."
+  - question: "Refinements to occupancy, contour-distribution, and dataset-size claims for this family."
+    settled_by: "Manual silhouette masks, perpendicular stroke-width measurements across multiple objects, scene-group deduplication, and a complete accepted-frame manifest, none of which are represented as completed in this study."

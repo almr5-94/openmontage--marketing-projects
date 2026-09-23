@@ -2,7 +2,7 @@
   "fps_assumed": 24.0,
   "pixel_reference_width": 1920,
   "videos": {
-    "ted-ed1": {
+    "video1": {
       "pairs": 2497,
       "fps": 24.0,
       "player_ui_share": 0.203,
@@ -78,7 +78,7 @@
         "per_minute": 93.4
       }
     },
-    "ted-ed2": {
+    "video2": {
       "pairs": 936,
       "fps": 24.0,
       "player_ui_share": 0.691,
@@ -154,7 +154,7 @@
         "per_minute": 40.0
       }
     },
-    "ted-ed3": {
+    "video3": {
       "pairs": 4075,
       "fps": 24.0,
       "player_ui_share": 0.4,
@@ -232,8 +232,8 @@
     }
   },
   "pooled_from": [
-    "ted-ed1",
-    "ted-ed3"
+    "video1",
+    "video3"
   ],
   "pooled": {
     "boil_cadence_seconds": 0.083,

@@ -1,7 +1,7 @@
 """Measure how a hand-drawn reference keeps moving while a scene is "holding".
 
 Usage:
-    python -m scripts.style_refs.motion_analysis assets/references/ted-ed [--fps 24]
+    python -m scripts.style_refs.motion_analysis assets/references/handdrawn [--fps 24]
     python -m scripts.style_refs.motion_analysis <frames_dir> --flat --fps 30 --out <json>
 
 The first form reads <ref>/raw/<video>_frame_NNNN.png and the picture boxes
@@ -13,7 +13,7 @@ For every consecutive pair of frames it measures:
   - line change: how much of the black linework moved after removing camera motion
   - background change: flicker in the flat paper areas
   - where the change is concentrated (a blink is local, a boil is everywhere)
-and from those series derives the numbers the ted-ed-alive layer is driven by:
+and from those series derives the numbers the handdrawn-alive layer is driven by:
 boil cadence and amplitude, grain flicker, drift speed and easing, hold lengths,
 idle-motion rate and transition lengths. All pixel values are reported at a
 1920 px wide frame so they can be used directly in a 1920x1080 composition.

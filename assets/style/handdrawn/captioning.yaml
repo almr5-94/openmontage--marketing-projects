@@ -1,0 +1,163 @@
+# Captioning contract for the three illustration families.
+# Source: forensic-illustration-study.md, Part 5 Section A ("The LoRA Captioning Blueprint").
+# Trigger strings are project-specific substitutions for the study's proposed qzvra_* names;
+# everything else (boilerplate wording, field order, rules, negatives) follows the study's
+# constructions with the same role. Labels below mark study statements as
+# prescribed (a design rule proposed here), measured, observed, or inferred, per the
+# study's own four-way distinction (Scope section, "Four kinds of statements used throughout").
+
+master_core: "static illustration, deliberate shape hierarchy, controlled detail distribution"
+# status: prescribed - the study's single minimal shared string; deliberately
+# kept thin because "a single rich boilerplate cannot truthfully describe all three families."
+
+families:
+  A:
+    name: "paper folk"
+    trigger: "hdx_paperfolk"
+    boilerplate: >-
+      hdx_paperfolk, enclosed fine contour drawing, restrained contour-width variation,
+      differentiated local-color fills, quiet mottled paper field, sparse structural interior marks
+    # status: prescribed master boilerplate (study Part 5 Section A), trigger substituted.
+    environment_only_boilerplate: >-
+      hdx_paperfolk, enclosed fine contour drawing, restrained contour-width variation,
+      quiet mottled paper field, shallow overlapping paper arrangement
+    # status: prescribed here, constructed for this pipeline. The study requires a
+    # "mode-specific abbreviated form for environment-only plates" but gives no exact
+    # string; this drops "differentiated local-color fills" (clothing-specific) and
+    # "sparse structural interior marks" (figure-specific) since no clothed figure is
+    # present, keeping only traits that apply to an unpopulated paper-plate scene.
+    negative_extension: >-
+      black cutout face, white incised facial construction, realistic muscle modeling,
+      dense anatomical hatching, glossy facial highlights, strong cinematic rim light,
+      oversized detailed footwear, heavy universal drop shadows
+    # status: verbatim from study (Part 5 Section A, "A extension").
+
+  B:
+    name: "incised silhouette"
+    trigger: "hdx_incise"
+    boilerplate: >-
+      hdx_incise, opaque black silhouette construction, high-value incised interior structure,
+      designed geometric profiles, controlled separation of figure and environment treatments
+    # status: prescribed master boilerplate (study Part 5 Section A), trigger substituted.
+    environment_only_boilerplate: >-
+      hdx_incise, foreground-framed atmospheric landscape, localized environmental stippling,
+      soft-edged atmospheric surface fields, depth-separated environmental values
+    # status: prescribed here, constructed for this pipeline. The study explicitly warns
+    # that "a B environment with no figure should not claim that it contains a black
+    # silhouette," so this variant drops "opaque black silhouette construction" and
+    # "designed geometric profiles" and uses only environment-layer phrases from the
+    # linework and color lexicons.
+    negative_extension: >-
+      flesh-colored figure modeling, pale circular sclera construction, textured holes
+      throughout the black figure, soft plastic character shading, realistic skin gradients,
+      weak silhouette separation, indiscriminate black outlines around every white incision
+    # status: verbatim from study (Part 5 Section A, "B extension").
+
+  C:
+    name: "bio texture"
+    trigger: "hdx_biotext"
+    boilerplate: >-
+      hdx_biotext, organic filled-shape construction, selective structural drawing,
+      object-specific internal patterning, controlled surface irregularity, explanatory shape hierarchy
+    # status: prescribed master boilerplate (study Part 5 Section A), trigger substituted.
+    environment_only_boilerplate: >-
+      hdx_biotext, organic filled-shape construction, selective structural drawing,
+      explanatory shape hierarchy
+    # status: prescribed here, constructed for this pipeline. The study's own example:
+    # "a C network can use the family trigger and organic shape wording without claiming
+    # botanical surface patterns that are absent from its blue field." This variant drops
+    # "object-specific internal patterning" (vein/growth-ring wording) and "controlled
+    # surface irregularity" (botanical surface wear) for diagram-only plates such as C3.
+    negative_extension: >-
+      uniform heavy black contour around all plants, glossy scientific discs,
+      metallic interface panels, random network connections, decorative arrows with no target,
+      photographic leaf rendering, identical mechanically perfect organic shapes,
+      excessive texture obscuring small icons
+    # status: verbatim from study (Part 5 Section A, "C extension").
+
+universal_negative: >-
+  video player controls, playback progress bar, browser chrome, seek preview thumbnail,
+  mouse cursor, operating-system dock, capture notification, platform watermark,
+  accidental interface text, compression blocks, ringing halos, unintended blur,
+  photographic skin pores, glossy plastic rendering, metallic bevel effects,
+  incoherent object intersections, duplicated unintended objects
+# status: verbatim from study (Part 5 Section A, "Universal negative prompt and scoped
+# extensions"). Lists capture/rendering failures only; it must never ban valid traits
+# such as black, gradients, detailed irises, or saturated accents.
+
+caption_field_order:
+  - "[FRAMING AND MODE]"
+  - "[SUBJECT COUNT AND TYPE]"
+  - "[VISIBLE ACTION OR RELATIONSHIP]"
+  - "[IMPORTANT PROPS]"
+  - "[SPATIAL ARRANGEMENT]"
+  - "[VISIBLE VARIABLE ATTRIBUTES]"
+  - "[FAMILY BOILERPLATE]"
+  - "[OPTIONAL OBSERVED MODE TAGS]"
+# status: prescribed order from study Part 5 Section A, "Caption order and instance fields".
+# Framing comes first so mode is distinguished before fine style detail is introduced.
+
+annotator_rules:
+  - "1. Assign the family from the visual system, using the filename prefix only as supporting metadata; quarantine transitions, blank fields, browser pages, or heavily obscured frames instead of forcing a style caption."
+  - "2. Assign a mode - character plate, environment, physical prop, relationship board, scientific diagram, biological detail, or close-up face; a single family can contain several modes."
+  - "3. Write a literal content description before adding any style terms: count, action, prop interaction, and the most important spatial relationship."
+  - "4. Add only visible variable attributes that help distinguish instances, such as hair shape, garment type, plant structure, or object orientation; never a guessed profession or unseen personality."
+  - "5. Append the appropriate family boilerplate or its environment-only variant, and select optional lexicon phrases only when the image actually demonstrates them."
+  - "6. Check that no phrase contradicts the image - for example, never call B's atmospheric background gradient-free or C4's face nose-free."
+  - "7. Record uncertainty in metadata, outside the training caption; an uncertain finger count stays unspecified rather than becoming a confident tag."
+  - "8. Review the caption at thumbnail scale and full scale so it describes the same image at both levels without overemphasizing a tiny incidental artifact."
+# status: near-verbatim from study Part 5 Section A, "Annotator instruction manual",
+# condensed to one line each.
+
+caption_don_ts:
+  - "No psychological interpretation: describe what is visible (a worried expression, a compact mouth mark), never an inferred internal state such as a hidden feeling or motive."
+  - "No contradicting phrases: a caption must not assert a trait the image does not show (see annotator rule 6)."
+  - "Describe crop and occlusion when they matter, and distinguish a deliberate artistic crop (a tightly cropped face) from capture contamination (a playback control covering a foot); the latter is not a legitimate style choice."
+  - "Uncertainty goes into metadata, not the caption - an unclear finger count or ambiguous edge stays unspecified in the training caption itself (see annotator rule 7)."
+  - "Do not put the word 'text' into the universal negative when labels are actually wanted; use 'accidental interface text' instead and separately decide whether to reserve a blank label area."
+  - "Do not use 'extra fingers' as a universal negative; finger count is object- and view-dependent (plants, diagrams, and B's abbreviated hand shorthand are not anatomical failures), so validate per object rather than banning indiscriminately."
+# status: verbatim warnings drawn from study Part 5 Section A ("Caption order and instance
+# fields" and "Universal negative prompt and scoped extensions").
+
+examples:
+  - id: "A2"
+    caption: >-
+      Wide full-body comparison plate, six people standing on a shared baseline, five grouped
+      figures holding graded papers in front of their torsos and one separate figure at the right
+      with arms down, varied hairstyles and garments, hdx_paperfolk, enclosed fine contour drawing,
+      differentiated local-color fills, sparse structural interior marks, quiet mottled paper field.
+    why: >-
+      Names the group structure and the certificate interaction without inferring a shared emotion
+      or occupation; the deliberate gap before the separate figure is described because it is
+      compositional content that should remain controllable, not an accident to erase.
+
+  - id: "B1"
+    caption: >-
+      Full-body action plate in a landscape, one helmeted warrior leaning toward an extended sword,
+      thin legs in a wide stance, a large crested helmet and pointed feet, red-brown ground beneath
+      a pale cool sky, hdx_incise, opaque black silhouette construction, high-value incised interior
+      structure, localized environmental stippling.
+    why: >-
+      Separates the black figure construction from the colored setting and names the crest as an
+      accessory rather than as body height, avoiding a misleading head-to-body proportion claim.
+
+  - id: "C3"
+    caption: >-
+      Wide scientific network diagram, a large central mushroom pictogram surrounded by unequal
+      circular containers showing organisms and biological structures, pale connectors linking the
+      containers across a blue field, hdx_biotext, irregular hand-shaped diagram discs, dark-green
+      scientific icon fills, cream-on-blue diagram contrast, connectors behind pictogram containers.
+    why: >-
+      Does not specify an exact edge list because that list was not transcribed in the study; style
+      matching cannot establish scientific correctness, so a real network's connections must be
+      supplied separately from the style caption.
+
+  - id: "C4"
+    caption: >-
+      Extreme close-up of a human face, both large eyes and a long tapered nose filling the frame,
+      black hair crossing the upper edge, radial iris detail and small facial marks, yellow particles
+      overlapping the face, hdx_biotext, organic filled-shape construction, selective structural
+      drawing, shape-defined facial color planes.
+    why: >-
+      Explicitly treats the yellow particles as overlapping scene content rather than permanent eye
+      anatomy, so an adapter does not learn to attach dots to every generated face.

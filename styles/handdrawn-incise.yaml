@@ -1,0 +1,156 @@
+# Family B — "incised silhouette". One of three separate illustration systems; never
+# blend it with handdrawn-paperfolk or handdrawn-biotext.
+#
+# Colours are medians measured on reference video 2's frames and re-verified pixel by
+# pixel (docs/handdrawn-palette-verification.md). The near-white #F7F7F0 is a prescribed
+# working target, not an extracted swatch.
+# Motion: reference video 2 was recorded with the player controls on screen 69% of the
+# time, so its timing is not measurable. This style borrows family A's measured timing
+# until a clean recording exists - see docs/handdrawn-evidence-boundaries.md.
+# Drawing detail: assets/style/handdrawn/construction/b.yaml.
+identity:
+  name: "Hand-drawn Incised Silhouette"
+  category: cinematic
+  mood: theatrical, mythic, high-contrast
+  pace: deliberate
+  best_for: "Story and myth explainers where figures read as graphic silhouettes in staged scenery"
+
+visual_language:
+  color_palette:
+    primary: ["#000000", "#F7F7F0"]
+    accent: ["#E48529", "#7B0000", "#57905A", "#CBECCF"]
+    background: "#3B7673"
+    text: "#F7F7F0"
+    muted: "#E4EFE7"
+  composition: >-
+    A decisive silhouette against staged depth. Figures carry one dominant action
+    direction with clearance around the prop; landscapes separate near, middle and far
+    by overlap and contrast; a central monument composition organises convergence and
+    broad light around the object. Keep a readable gap around head, action hand and prop
+    so black masses never merge.
+  texture: >-
+    Opaque black figure masses with high-value incised interior marks, kept free of
+    grain. Texture belongs to the setting: granular coloured ground planes in front,
+    soft-edged atmospheric fields behind. Gradients and haze are part of this style, not
+    a defect to correct.
+
+typography:
+  headings:
+    font: "Cormorant Garamond"
+    weight: 600
+    tracking: "0.01em"
+    line_height: 1.2
+  body:
+    font: "Source Sans 3"
+    weight: 400
+    line_height: 1.45
+  code:
+    font: "IBM Plex Mono"
+    weight: 400
+  stat_card:
+    font: "Cormorant Garamond"
+    weight: 700
+    size_multiplier: 3.2
+  scale_system: "perfect_fourth"
+  weight_matrix:
+    title: 600
+    heading: 600
+    body: 400
+    caption: 400
+
+motion:
+  # borrowed from family A (measured) because this recording's own timing is unusable;
+  # any number here is provisional and must be re-measured from a clean capture
+  transitions: [cut, crossfade, morph]
+  animation_style: >-
+    On twos - 12 updates a second. The silhouette holds its shape; motion comes from one
+    dominant gesture, staged props and slow atmospheric drift. No line boil, no grain
+    flicker inside the figure.
+  pacing_rules:
+    min_scene_hold_seconds: 1.4
+    max_scene_hold_seconds: 8
+    text_card_hold_seconds: 2.5
+    stat_card_hold_seconds: 2.0
+    transition_duration_seconds: 0.6
+  entrance: "slide or rise into frame along the action direction, 0.4 s, stepped on twos"
+  exit: "exit along the same direction, or crossfade to the next depth arrangement"
+
+audio:
+  voice_style: "measured storyteller; weight on the verbs; comfortable with a pause"
+  music_mood: "sparse strings or low drone, scene-scaled, no percussion loops"
+  music_volume: 0.12
+  sfx_style: "one designed accent per reveal; nothing on ordinary cuts"
+  ducking_threshold_db: -6
+  voice_variation_allowed: true
+  hero_moment_voice_shift: "slower, lower, a beat of silence before the line lands"
+
+asset_generation:
+  image_prompt_prefix: >-
+    hdx_incise, opaque black silhouette construction, high-value incised interior
+    structure, designed geometric profiles, controlled separation of figure and
+    environment treatments,
+  image_negative_prompt: >-
+    flesh-colored figure modeling, pale circular sclera construction, textured holes
+    throughout the black figure, soft plastic character shading, realistic skin gradients,
+    weak silhouette separation, indiscriminate black outlines around every white incision,
+    video player controls, playback progress bar, browser chrome, seek preview thumbnail,
+    mouse cursor, platform watermark, accidental interface text, compression blocks
+  diagram_style: "graphic props with decisive silhouettes and incised marks; no bevels, no glossy panels"
+  consistency_anchors:
+    - "Figure interiors are opaque black (#000000) and stay clean of environmental speckle"
+    - "Interior structure is high-value marks at 0.18-0.35% of art width, never a pale filled sclera"
+    - "Scene colour is chosen per scene: warm props against cool fields, or the reverse"
+    - "Near planes stay crisp and granular; distant planes lose contrast toward the haze colour"
+    - "Proportions follow an archetype (compact 2.8-3.6 units, elongated 4.0-5.0), not one template"
+    - "Profile geometry - forehead, nose, chin, hem, feet - is designed as one silhouette system"
+
+overlays:
+  stat_card:
+    bg: "#123033"
+    border: "#F7F7F0"
+    radius: 8
+  key_term:
+    bg: "#13383A"
+    text: "#F7F7F0"
+    radius: 6
+  section_title:
+    bg: "#3B7673"
+    text: "#F7F7F0"
+  hero_title:
+    bg: "#123033"
+    text: "#F7F7F0"
+  stat_reveal:
+    bg: "#123033"
+    text: "#F0A24E"
+  provider_chip:
+    bg: "#123033"
+    text: "#CBECCF"
+    radius: 999
+  code_block:
+    bg: "#0C2224"
+    text: "#F7F7F0"
+    highlight: "#F0A24E"
+
+quality_rules:
+  - "Fill the figure mentally as one black shape: role and gesture must still read"
+  - "Check the profile, the negative-space openings, and the direction of the long prop or arm"
+  - "Then check the incised marks for deliberate spacing and taper - not random scratches"
+  - "Last, check that the setting gives atmosphere without contaminating the figure"
+  - "Gradients, haze and saturated colour are required here; do not ban them"
+  - "Keep the deepest figure black unlifted while environmental darks may be lifted or tinted"
+  - "Landscape keeps a 25-45% low-detail opening; depth reads through three separated planes"
+  - "A new dashboard or interface object is an extrapolation and needs separate approval"
+  - "No source-channel marks, characters or scenes may be reproduced"
+
+chart_palette:
+  - "#E48529"
+  - "#57905A"
+  - "#CBECCF"
+  - "#7B0000"
+  - "#3B7673"
+  - "#F7F7F0"
+
+color_rules:
+  harmony_type: "complementary"
+  contrast_validation: true
+  colorblind_safe: true

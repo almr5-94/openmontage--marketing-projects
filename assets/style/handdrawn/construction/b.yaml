@@ -1,0 +1,499 @@
+family:
+  key: B
+  name: "Incised Silhouette"
+  trigger: hdx_incise
+  source_video_role: "reference video 2"
+  summary: >-
+    Black silhouette figures with white incised detail in atmospheric
+    settings. Figures are black shape constructions articulated by white
+    interior marks; noses, hair, garments, and feet have a distinctive
+    graphic geometry. Settings use mist, broad illumination, intense
+    colors, scattered material texture, and strong contrasts between
+    foreground and distance. This is not simply Family A rendered darker.
+
+evidence_labels:
+  measured: >-
+    Calculated from specified pixels or file properties (for example a
+    patch median hex value or a percentage of exact-black pixels). This is
+    an actual property of the chosen captured region. It does not prove
+    what value an artist entered in the source application.
+  observed: >-
+    Visible in the inspected images without requiring a hidden production
+    history. Observations can have limited scope: a feature observed in one
+    close-up should not automatically be assigned to every distant figure.
+  inferred: >-
+    A plausible explanation of the image, such as separate texture layers
+    or vector-friendly construction. Several different workflows can
+    produce similar flattened pixels; an inference must remain
+    distinguishable from a fact.
+  prescribed: >-
+    A concrete reconstruction setting or design rule proposed by the study
+    (brush spacing, opacity ranges, proportion templates, margin targets,
+    caption formats). Prescriptions make reproduction testable; they are
+    not a claim that original project files were recovered.
+
+toolset_hypothesis:
+  status: inferred
+  summary: >-
+    Opaque graphic figure shapes with white interior drawing, composited
+    over separately textured and atmospherically softened scenery. A
+    near-pure-black figure interior and sweeping white hair marks are
+    unusually strong evidence for intentional separation between figure and
+    environment treatments. The white strokes are positive image marks that
+    resemble incisions; they need not be literal erasures through black
+    paint.
+  practical_reconstruction: >-
+    Vector paths for figure masses, editable white strokes for interior
+    detail, and raster brushes or texture masks for scenery. Filled tapered
+    shapes may be more reliable than pressure strokes for some pointed
+    nose, garment, and sword features. Atmospheric backgrounds can be built
+    with broad masks and textured edges.
+  explicitly_not_established: "no vendor or brush engine identified"
+
+linework:
+  measured_edge_samples:
+    - anchor: B1
+      description: >-
+        On source row 796, the selected eye-region scan contains bright
+        runs of 9, 5, 10, and 13 pixels, under a threshold requiring every
+        RGB channel to be above 180.
+      status: measured
+      caveat: >-
+        These runs cross different parts of curved white marks and cannot
+        be averaged into one brush diameter. They show that the internal
+        white drawing is visibly substantial relative to the captured
+        character, rather than hairline engraving -- not a universal stroke
+        width.
+
+  brush_preset:
+    exterior_stroke: >-
+      Build the main figure as an opaque filled silhouette. An exterior
+      black stroke is unnecessary where black fill already meets the
+      environment cleanly. (status: prescribed)
+    interior_mark_width_pct_of_art_width:
+      value: "0.18-0.35% of art width, adjusting with figure scale and intended detail density"
+      status: prescribed
+    interior_mark_width_px_at_1920_wide:
+      value: "not computed in the study (a pixel equivalent at 1920 wide is given only for family A)"
+      status: prescribed
+    opacity:
+      value: "100% for ordinary interior strokes, with 0% opacity jitter, so incised structure remains confident against black"
+      status: prescribed
+    spacing:
+      value: "0-3% spacing"
+      status: prescribed
+    scatter:
+      value: "0% scatter, restrained smoothing; large hair arcs should look deliberate and continuous"
+      status: prescribed
+    taper:
+      value: "stronger designed taper, approximately 10-30% of selected mark length, for hair curls, pointed folds, and ornamental endings"
+      status: prescribed
+    stabilisation:
+      value: "not specified by the study for family B (only family A gives an explicit stabilisation percentage)"
+      status: prescribed
+    internal_to_outer_ratio:
+      value: "not defined as a stroke-width ratio for family B; the family instead separates narrow lines from shaped wedge cutouts (a nose edge or armor slit may need a shaped polygon rather than a variable-width brush)"
+      status: prescribed
+    additional_rules:
+      - "Keep broad black interiors free of strong paper grain when matching the character anchors; concentrate material texture in scenery and props where visible."
+      - "Allow white detail to stop before the silhouette edge when the original form requires an enclosed dark boundary."
+      - "Avoid a universal dark outline around white incisions -- the contrast between white mark and black mass already performs the separation."
+      - "Use environmental stippling on dedicated material masks; do not let it randomly perforate the figure's face or garment."
+    calibration_caveat: >-
+      These settings are starting recipes. They must be calibrated against
+      the anchor at a matched display scale. Software percentage controls
+      are not standardized, so numerical agreement between two brush panels
+      does not guarantee visual agreement. The acceptance criterion is the
+      reproduced edge, not the copied slider value.
+
+  boundary_colour_rule: >-
+    The family reverses the usual outline relationship inside its figures:
+    high-value (white) marks articulate an already dark filled mass; the
+    exterior is often simply the edge of that mass. A conventional
+    instruction to apply a uniform black stroke around every feature is
+    inappropriate. Selected white marks can terminate in sharp wedges,
+    while other marks maintain rounded or smoothly tapered ends; their
+    shape must follow the particular feature rather than a universal cap
+    setting. (status: observed)
+
+  internal_drawing_grammar: >-
+    Internal drawing is the principal way a solid black shape reveals
+    facial and garment organization; white lines represent hair bands, eye
+    rings, drapery, armor, and fingers, and their absence can merge
+    adjacent black masses -- the drawing has a structural role, not an
+    incidental one. It should follow the surface or decorative organization
+    rather than randomly covering the silhouette with bright scratches. At
+    least three different mark families occur within the same silhouette
+    system: repeated curved marks for armor (not realistic shaded abdominal
+    anatomy), broad nested arcs that terminate and overlap selectively for
+    hair, and long sweeping subdivisions for robes. Calling all of them
+    "hatching" would be inaccurate: they usually describe pattern or
+    boundaries rather than a dense tonal field. (status: observed)
+
+rendering:
+  mode: >-
+    Binary figure + painted environment. Characters remain essentially
+    binary black-and-white graphic constructions; environments, atmospheric
+    fields, and some props carry gradients, broad light, and local tonal
+    subdivisions. A subject can appear in a luminous landscape without
+    receiving a physically consistent illuminated side -- this separation is
+    part of the design, not an error to be corrected with automatic
+    relighting. (status: observed)
+
+  form_shadow_rule: >-
+    No physically consistent illuminated side is applied to the character.
+    Volume in props (for example a food shape or a vessel) comes from a
+    small set of designed hard-edged color divisions, not photorealistic
+    reflection. Atmospheric perspective is handled by depth planes: distant
+    hills and architectural silhouettes have lower local contrast and
+    softer boundaries than the foreground, approaching the pale sky or haze
+    field -- a faithful background needs different treatment per plane, not
+    a single overall blur. A centered architectural composition can use a
+    luminous field and convergence for theatrical emphasis; it would be
+    inaccurate to infer one natural sun direction from that arrangement --
+    illumination is compositional as much as physical. (status: observed)
+
+  cast_shadow_rule: >-
+    One anchor includes a dark ground shape at the left edge consistent
+    with a cast or compositional shadow, but its full caster is outside the
+    sampled view; its opacity and source direction cannot be recovered
+    exactly. Another anchor places figures over a brightly illuminated
+    stage area without giving each figure a photorealistic shadow system --
+    graphic readability takes precedence over unified physical simulation.
+    Do not manufacture a shadow merely to satisfy a checklist. (status:
+    observed)
+
+  ambient_and_rim_rule: >-
+    No consistent ambient-bounce rule is supported across the collection.
+    The silhouette figures intentionally resist relighting; local-color
+    bleed or reflective tinting is not required. (status: observed)
+
+  colorist_steps:
+    - step: 1
+      instruction: "Establish a completely opaque black figure mask before painting the environment. Confirm that the main silhouette reads without internal detail."
+      status: prescribed
+    - step: 2
+      instruction: "Add white incised structure on Normal at full opacity. Do not globally glaze environmental color over the black-and-white character unless matching a specific observed exception."
+      status: prescribed
+    - step: 3
+      instruction: "Build the setting from depth-separated filled planes. Choose a scene-specific warm/cool arrangement from the relevant anchor."
+      status: prescribed
+    - step: 4
+      instruction: "Use textured masks for ground and foreground material. Begin with sparse dark and light speckle layers independently controlled; do not rely on one blend mode to produce both effects."
+      status: prescribed
+    - step: 5
+      instruction: "Apply broad background light with Normal or Screen as a reproduction option, initially around 10-25%, then assess whether the field has the intended luminous hierarchy."
+      status: prescribed
+    - step: 6
+      instruction: "Use a colored haze layer over distant planes, initially 10-30%, and reduce their edge contrast. Preserve the near figure's sharpness."
+      status: prescribed
+    - step: 7
+      instruction: "Shade selected props with a small number of hard-edged color regions. Reserve smooth transitions for atmosphere or a prop that explicitly shows them."
+      status: prescribed
+    - step: 8
+      instruction: "Reject the result if the figure acquires plastic highlights, skin-colored facial gradients, or random texture holes that weaken its graphic mass."
+      status: prescribed
+    - note: >-
+        The listed blending modes are reproducible options. The exact
+        combination of source color and opacity cannot be uniquely inferred
+        from a final pixel because multiple layer stacks can yield the same
+        result; a report that states an exact blend percentage without
+        access to layers would be presenting a fabrication as a
+        measurement.
+
+  forbidden:
+    canonical_recipe_exclusions:
+      - "naturalistic skin shading inside the black mass"
+      - "flesh-colored facial modeling"
+      - "glossy specular gradients across the silhouette"
+      - "Family A's pale eye-white discs"
+      - "indiscriminate environmental speckles over the figure"
+    scope_note: >-
+      These are production exclusions for the canonical figure recipe, not
+      claims that the entire unseen source video could never contain an
+      exceptional effect.
+    must_not_be_banned: >-
+      For the environment, gradients and saturated colour are expressly
+      allowed and are a defining component of this family: the scenery
+      supports orange, deep red, luminous yellow-green, and turquoise-
+      speckled near-black; "muted palette" is a misleading family-wide
+      description even though some distant hills are subdued. A universal
+      negative prompt saying "no gradients" would suppress a defining
+      component of the family, and an environmental gradient/haze ban is
+      not supported by the evidence.
+
+palette:
+  entries:
+  - role: "Figure mass"
+    hex: "#000000"
+    rgb: [0, 0, 0]
+    source_anchor: "B1 torso; almost entirely exact black (98.938% exact #000000 pixels in the sampled patch)"
+    status: measured
+  - role: "Pale green sky"
+    hex: "#CBECCF"
+    rgb: [203, 236, 207]
+    source_anchor: "B1 clear upper-field patch"
+    status: measured
+  - role: "Red-brown ground"
+    hex: "#73433E"
+    rgb: [115, 67, 62]
+    source_anchor: "B1 textured ground median"
+    status: measured
+  - role: "Orange vessel"
+    hex: "#E48529"
+    rgb: [228, 133, 41]
+    source_anchor: "B2 vessel interior median"
+    status: measured
+  - role: "Deep red food"
+    hex: "#7B0000"
+    rgb: [123, 0, 0]
+    source_anchor: "B2 exactly constant sampled region"
+    status: measured
+  - role: "Distant teal hill"
+    hex: "#3B7673"
+    rgb: [59, 118, 115]
+    source_anchor: "B3 hill patch with soft variation"
+    status: measured
+  - role: "Green plain"
+    hex: "#57905A"
+    rgb: [87, 144, 90]
+    source_anchor: "B3 landscape patch"
+    status: measured
+  - role: "White incision working target"
+    hex: "#F7F7F0"
+    rgb: [247, 247, 240]
+    source_anchor: "prescribed working target for reconstruction; then match the actual reference locally"
+    status: prescribed
+  organizing_principle: >-
+    A series of scene-specific contrast arrangements (warm red-brown ground
+    against cool pale sky; warm food and vessel colors against a green
+    field; cool atmospheric depth and brighter green lowland), with black
+    characters as stable graphic anchors across changing environments. The
+    deepest figure blacks are not lifted; environmental darks can be
+    lifted, tinted, textured, or hazy. If every dark patch is pushed to the
+    same absolute black, the scene loses its atmospheric organization; if
+    every character black is lifted to match the hills, the silhouette
+    loses its defining contrast.
+
+proportions:
+  definitions: >-
+    Head envelope: the visible outer head including ordinary hair, which
+    can be substantially increased by a helmet crest or tall ornament.
+    Cranial-face unit: the estimated scalp-to-chin construction excluding
+    large external ornaments. Measuring a helmeted head and a bare head as
+    identical anatomical units would create misleading precision.
+  measured_landmarks: >-
+    None. The study does not report a pixel-based head/body landmark
+    measurement for this family (unlike family A's two worked examples).
+    The family "does not support one universal adult head ratio" -- one
+    anchor deliberately contrasts a short broad figure, a tall narrow
+    central figure, and a smaller narrow figure, communicating role and
+    personality through proportion changes. Only prescribed archetype
+    ranges are given (see template).
+  template:
+    compact_archetype_head_units: "2.8-3.6"
+    elongated_archetype_head_units: "4.0-5.0"
+    warrior_with_crest: "evaluate the face unit separately from crest height, then assess the overall silhouette; the crest is an accessory extension that makes the silhouette tall without lengthening the body"
+    status: prescribed
+    caveat: >-
+      These are proposed template ranges organized as archetypes (compact
+      broad performer, elongated narrow performer, helmeted warrior), not
+      measurements claimed for every anchor. Assigning a rigid single-head
+      template to every figure would remove an observed design mechanism.
+
+face_map:
+  profile_first_rule: >-
+    The face is often part of the outer silhouette itself: profile noses
+    project decisively, chins can be angular, and forehead curves connect
+    into hair or headgear. White interior drawing then explains features
+    within the black mass. Moving only a pupil while leaving the head
+    silhouette generic will not reproduce the family -- the outer profile is
+    a primary facial feature. A single frontal T-zone map is inappropriate
+    because profile and three-quarter silhouette construction dominate;
+    place the eye within the head mass relative to the projecting nose,
+    preserve a legible forehead-to-nose-to-chin chain, and use internal
+    white marks to distinguish expression. Exact spacing must be set per
+    archetype and view. (status: observed, with a prescribed construction
+    order)
+  incised_ring_eye_construction: >-
+    One eye is built from nested white rings and a small white highlight-
+    like mark inside a dark center -- explicitly not a pale filled sclera
+    with a black pupil in family A's sense. Eyes can also reduce to curved
+    white marks consistent with a closed or lowered gaze; eye and mouth
+    treatment varies across figures within the family's flexible incised
+    symbol vocabulary. (status: observed)
+  nose_and_mouth: >-
+    The nose can be a large wedge or elongated projection, drawn as part of
+    the head contour before adding interior detail. The mouth can be an
+    internal white shape, a line, or an opening associated with the
+    profile; some teeth are represented as a segmented white block. These
+    are graphic signs, not anatomical renderings of lips and gums.
+  hair: >-
+    Defined through sweeping nested arcs rather than separate strands;
+    broad curved white divisions organize a large black mass, following the
+    head's overall construction with readable spacing. Random thin lines
+    would lose the decorative order and make the head look scratched
+    rather than designed.
+
+articulation:
+  hands: >-
+    Often a compact black mass with a few protruding digit shapes or white
+    separations; gesturing hands can be expressive despite their small
+    size, and an object-holding hand can be a bent silhouette gripping the
+    object. Finger count varies with visibility and shorthand -- B finger
+    counts are shorthand, not a census; the inspected views are not a
+    reliable universal anatomical count. Preserve action readability over
+    exact realistic segmentation.
+  feet: >-
+    Frequently pointed triangular shapes with narrow ankles. A warrior's
+    stance uses acute feet and thin legs to contrast with the head and
+    torso. Robe hems can conceal much of the upper leg; knees may be
+    implied by the silhouette or hidden entirely. Do not add realistic calf
+    anatomy to fill that intentional simplicity.
+  elbows_and_knees: >-
+    See feet: knees are frequently implied by silhouette rather than drawn.
+    Elbows are implied by the bend of the band-like arm shapes rather than
+    by a jointed anatomical structure.
+  line_of_action: >-
+    Supports stronger sweeping gestures than family A: a warrior's torso
+    leans toward the extended sword, and performers' arms open outward
+    from their robes; long arm curves and angular head projections
+    reinforce an overall directional statement. Use one dominant gesture
+    and a few counterbalancing shapes, not equal movement in every limb.
+  silhouette_readability: >-
+    Unusually important because black masses can merge. Keep a readable
+    gap around the sword arm, between open gestures and the torso, or
+    between a hand and the object it indicates. White interior marks can
+    clarify an overlap but should not compensate for every poor silhouette
+    decision -- the outer shape must carry the primary action.
+  foreshortening: >-
+    More graphic perspective appears in environments and selected props,
+    but limbs still often read as shaped bands rather than realistically
+    shortened cylinders.
+
+layout_modes:
+  - mode: "B action silhouette"
+    evidence_anchor: B1
+    primary_organization: "Figure and prop create a dominant diagonal"
+    prescribed_target: "Preserve full action silhouette and prop clearance"
+  - mode: "B landscape"
+    evidence_anchor: B3
+    primary_organization: "Foreground frame, middle plain, distant monuments"
+    prescribed_target: "Separate 3 or more depth planes by overlap and contrast"
+  - mode: "B central monument"
+    evidence_anchor: B4
+    primary_organization: "Bilateral framing around central object"
+    prescribed_target: "Main object near u = 0.5; convergence supports it"
+  - mode: "B theatrical trio"
+    evidence_anchor: B5
+    primary_organization: "Three figures on common stage zone"
+    prescribed_target: "Distinct silhouettes and purposeful height contrast"
+
+negative_space_targets:
+  landscape: { value: "25-45% low-detail opening", status: prescribed }
+  worked_example_reference:
+    anchor: A1
+    figure_rectangle_px: "128 x 361 = 46,208 square pixels"
+    art_field_px: "1,200 x 675 = 810,000 square pixels"
+    occupancy_pct: "5.70%"
+    status: measured
+    note: >-
+      This calculation is from family A's isolated-figure anchor, cited here
+      only as the study's worked demonstration of how a bounding rectangle
+      can overestimate occupancy; it is not a family-B measurement.
+  warning: >-
+    A large quiet sky is not the same as an isolated subject on a blank
+    canvas: distant monuments and hills create a continuous world. A strict
+    "70% empty" label would misrepresent the spatial function of a
+    landscape's upper region. For this family, depth-plane legibility is a
+    more useful target than a single empty-area percentage.
+
+camera: >-
+  Much more pronounced environmental staging than family A. A small figure
+  can sit in the lower-left foreground against large distant monuments,
+  with depth built through overlap and atmospheric separation; a horse and
+  a temple can occupy different positions in the middle distance, framed
+  by near rocks and winding dark forms. A centered composition can use
+  converging architectural lines and enlarged side structures around a
+  central column for a theatrically wide, monumental feel; it is
+  reasonable to prescribe a wide-perspective impression, but an exact
+  focal length such as 24mm would be a cinematic analogy, not a
+  measurement -- the art may not obey a physically consistent camera model
+  at all. A stage scene can use repeated curved seat lines that wrap around
+  performers, establishing a bowl-like space with a horizon or rear
+  landscape edge sitting high relative to the stage. A successful
+  environment coordinates flat graphic characters with spatially organized
+  scenery -- a deliberate mixed projection language; forcing realistic
+  foreshortening into every limb because the architecture recedes would
+  weaken the distinctive character system. (status: observed, with an
+  explicit refusal to recover a numeric focal length)
+
+scenography: >-
+  More literal than family A but still stylized: a warrior stands over
+  textured ground, a landscape contains hills and monuments, a theatrical
+  trio occupies a stage. Props and architecture are simplified into
+  graphic silhouettes and repeated forms; the setting supports a world
+  without rendering every stone, leaf, or surface crack. Depth-plane
+  handling: the family strongly benefits from a near-middle-far hierarchy
+  -- the near plane has darker, crisper, more textured material; the middle
+  plane contains the main environmental structures or action; the far
+  plane becomes lighter, softer, or closer to the atmospheric color. A
+  character can remain crisp even against a broad luminous field because
+  its graphic role is deliberately distinct. The family has fewer
+  conventional interface-like objects in the anchors; a book, vessel,
+  staff, sword, and architecture are physical (diegetic) scene props, while
+  playback controls and seek previews are external capture artifacts, not
+  art direction. (status: observed)
+
+information_graphics: >-
+  Physical props (book, vessel, staff, sword, architecture) built from the
+  family's silhouette and incised-mark language. Treat any new dashboard
+  or floating interface as an extrapolation requiring separate design
+  validation: a complex software dashboard would be a new design
+  extrapolation rather than a recovered source mode, since the anchors
+  contain no such object. (status: observed for the props; prescribed
+  caution for anything beyond them)
+
+typography_and_padding: >-
+  The study gives no family-specific typographic examples for this family
+  (unlike families A and C, which have labeled cards, board lettering, or
+  diagram pictograms in the anchors). If a new B information object
+  requires a label, apply the general prescriptions given elsewhere in the
+  study: roughly 8-12% of card width as initial text-side padding for a
+  large label card (status: prescribed), and verify exact wording outside
+  image generation, since no font or lettering evidence specific to this
+  family was inspected.
+
+acceptance_checklist:
+  - order: 1
+    check: "Fill the figure mentally as a single black shape and test whether its role and gesture remain clear."
+  - order: 2
+    check: "Check the profile, the negative-space openings, and the long prop or arm direction."
+  - order: 3
+    check: "Then inspect the white interior structure for deliberate spacing and taper."
+  - order: 4
+    check: "Finally, assess whether the setting supplies atmosphere without contaminating the figure with indiscriminate texture or naturalistic shading."
+  - order: 5
+    check: "For every family: compare at the intended final size and inspect the most information-dense region separately; remove accidental interface elements from the acceptance set; preserve exact scientific or textual meaning; record any deliberate departure from the source grammar as a design decision."
+
+open_questions:
+  - question: "Exact vendor and brush engine used to produce the family."
+    settled_by: "Original artwork files (brush presets, vector-versus-raster construction, layer blend modes, exact source swatches)."
+  - question: "The exact opacity and light-source direction of the B1 ground shadow; its full caster is outside the sampled view."
+    settled_by: "A wider capture or the original scene composition showing the shadow's caster."
+  - question: "A single mathematical noise distribution for the ground texture (Gaussian, fractal, scanned, or hand-painted speckle overlap visually after compositing and compression)."
+    settled_by: "Original texture source files rather than flattened, compressed captures."
+  - question: "An exact focal length or lens model for the environmental scenes."
+    settled_by: >-
+      Not recoverable from stylized two-dimensional art without known
+      geometry and camera assumptions; the study explicitly declines to
+      assign one.
+  - question: "A single universal head/body proportion ratio for the family."
+    settled_by: >-
+      Not established by design (the family deliberately uses multiple
+      archetypes); additional matched-scale figures across more scenes
+      would refine the three archetype ranges given here.
+  - question: "Reliable finger counts for B hands."
+    settled_by: "Additional clear, unobstructed hand references at matched scale; current shorthand marks are not a census."
+  - question: "Stabilisation percentage and an explicit internal-to-outer stroke ratio for family B (not specified in the study's Section B rulebook, unlike family A)."
+    settled_by: "Direct calibration against multiple anchors at matched display scale in the chosen drawing application."

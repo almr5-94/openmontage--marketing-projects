@@ -117,3 +117,5 @@ assets/references/*/dataset/
 assets/references/*/board/
 assets/references/*/motion/
 assets/references/*/raw-partial-pngs/
+assets/references/*/dataset-*/
+assets/references/*/quarantine/

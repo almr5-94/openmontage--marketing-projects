@@ -1,0 +1,276 @@
+# Fixed evaluation set for the three family adapters.
+# Source: forensic-illustration-study.md, Part 5.7 ("Validation set and acceptance criteria").
+# The five cases per family are exactly the cases the study lists. Prompt strings and their
+# "checks" are constructed here (prescribed) to make each case runnable; the study itself does
+# not supply literal prompt text or a scoring threshold for these cases - it explicitly says
+# "Define the exact sample size and scoring threshold before training begins" and refuses to
+# invent a pass percentage. Trigger strings are hdx_paperfolk / hdx_incise / hdx_biotext,
+# substituted for the study's proposed qzvra_* names.
+
+seeds:
+  fixed: [7, 101, 202, 303, 404]
+  # status: prescribed - a fixed seed set used "as one comparison aid" across checkpoints
+  # (study Part 5.7).
+  also_sample_additional_seeds: true
+  note: >-
+    Keep this fixed seed set for cross-checkpoint comparison, but also generate with
+    additional seeds beyond this list for every case; the fixed set alone is a comparison
+    aid, not the full evaluation.
+  caution: >-
+    One attractive image is not evidence that the model reliably follows the style. A model
+    can produce a good accidental match on a single seed and still fail most requested
+    actions or layouts across the rest of the fixed sample (study Part 5.7).
+
+review_dimensions:
+  - "structural family identity"
+  - "content compliance"
+  - "compositional clarity"
+  - "surface and palette behaviour"
+  - "contamination"
+# status: verbatim dimension names from study Part 5.7, "Review outputs against five
+# dimensions." Each case's checks below apply these five dimensions concretely.
+
+cases:
+
+  # --- Family A: paper folk ---
+
+  - id: "A-eval-1"
+    family: "A"
+    case: "new person holding a new everyday object"
+    prompt: >-
+      Full-body action plate, one new person carrying a folded umbrella with both hands, the
+      umbrella held clear of the face, both feet visible on an implied baseline, generous quiet
+      paper margins on both sides, hdx_paperfolk, enclosed fine contour drawing, restrained
+      contour-width variation, differentiated local-color fills, quiet mottled paper field, sparse
+      structural interior marks
+    checks:
+      - "structural family identity: circular pale eye enclosures with small directed pupils and a compact mouth mark; no black cutout face or incised ring-eye construction"
+      - "content compliance: the object is the requested umbrella, not a certificate or box carried over from training content; the person is a new character, not a repeated cast member"
+      - "compositional clarity: figure stays narrow and centered with generous quiet side margins; the umbrella stays clear of the face and hand-to-object contact is readable"
+      - "surface and palette behaviour: warm or pink-gray paper field with restrained material variation; garment reads as a stable, unmodeled local-color fill with no volumetric body shading"
+      - "contamination: no video-player controls, browser chrome, platform watermark, or accidental interface text"
+
+  - id: "A-eval-2"
+    family: "A"
+    case: "two-person comparison"
+    prompt: >-
+      Full-body comparison plate, two new people standing on a shared baseline facing forward, one
+      holding a small potted plant and one with arms down, distinct hairstyles and garments, a
+      deliberate grouping gap between the two figures, hdx_paperfolk, enclosed fine contour
+      drawing, restrained contour-width variation, differentiated local-color fills, quiet mottled
+      paper field, sparse structural interior marks
+    checks:
+      - "structural family identity: both figures use the same compact-adult construction and pale-eye grammar; no naturalistic anatomy or B/C construction leaking in"
+      - "content compliance: the potted plant is new content, not a certificate; each figure has distinct garment colors rather than a duplicated character"
+      - "compositional clarity: shared foot baseline is legible, and the deliberate grouping gap reads as intentional separation, not an accidental empty gap"
+      - "surface and palette behaviour: restrained chroma with readable value separation between the two figures' garments; no automatic warm-light/cool-shadow modeling"
+      - "contamination: no duplicated unintended objects, no playback progress bar or seek preview thumbnail"
+
+  - id: "A-eval-3"
+    family: "A"
+    case: "medium thoughtful pose"
+    prompt: >-
+      Medium action plate, one new person in a thoughtful pose with one hand near the chin and the
+      other arm bent at the hip, face and action hand clearly visible, lower body cropped by the
+      bottom of the frame, hdx_paperfolk, enclosed fine contour drawing, restrained contour-width
+      variation, differentiated local-color fills, quiet mottled paper field, sparse structural
+      interior marks
+    checks:
+      - "structural family identity: pupil placement and mouth angle carry the thoughtful expression rather than complex eyelid or lip anatomy"
+      - "content compliance: the crop is a medium plate with legs outside frame, described as intentional framing, not a missing-limb defect"
+      - "compositional clarity: a readable negative-space opening exists between the bent arm and the torso so the gesture does not disappear into one mass"
+      - "surface and palette behaviour: dark-cloth areas may show visible material variation, but eye whites and face stay calmer than hair and garment"
+      - "contamination: no capture-interface text or cursor mark anywhere in the crop"
+
+  - id: "A-eval-4"
+    family: "A"
+    case: "simple physical information prop"
+    prompt: >-
+      Isolated physical information prop, one certificate-like card held in front of a torso with a
+      reserved blank lettering area, shallow overlapping paper forms establish the hand-to-card
+      contact, hdx_paperfolk, enclosed fine contour drawing, shallow overlapping paper arrangement,
+      differentiated local-color fills, quiet mottled paper field
+    checks:
+      - "structural family identity: the hand is a small simplified mass with only the finger separations needed to hold the card edge"
+      - "content compliance: the card's text area is left blank/reserved rather than filled with generated pseudo-text"
+      - "compositional clarity: the card overlaps the torso through simple overlap, with no invented drop shadow behind it"
+      - "surface and palette behaviour: the card reads as a distinct local-color region from the paper field behind it, not identical values"
+      - "contamination: no accidental interface text substituted for the reserved label area"
+
+  - id: "A-eval-5"
+    family: "A"
+    case: "symbolic environment"
+    prompt: >-
+      Wide establishing illustration, a symbolic environment of disconnected rectangular stairs
+      arranged on diagonals, no populated foreground clutter, clear step-edge geometry left ready
+      for a figure to be added separately, generous quiet paper margins, hdx_paperfolk, enclosed
+      fine contour drawing, quiet mottled paper field, shallow overlapping paper arrangement
+    checks:
+      - "structural family identity: steps stay rectangular and diagrammatic rather than becoming a fully modeled, physically plausible building"
+      - "content compliance: no figure is invented into the scene since none was requested; the environment stands alone"
+      - "compositional clarity: the disconnected route geometry stays readable even though it is spatially impossible"
+      - "surface and palette behaviour: quiet mottled paper field with sparse blemishes only, no dramatic distressed texture competing with the steps"
+      - "contamination: no browser chrome, dock, or platform badge anywhere in the frame"
+
+  # --- Family B: incised silhouette ---
+
+  - id: "B-eval-1"
+    family: "B"
+    case: "new profile figure"
+    prompt: >-
+      Full-body action plate, one new profile figure with a projecting angular nose and narrow
+      band-like limbs, a single dominant gesture toward an extended arm, an opaque black silhouette
+      against a plain colored field, high-value incised marks defining hair and eye, hdx_incise,
+      opaque black silhouette construction, high-value incised interior structure, designed
+      geometric profiles, controlled separation of figure and environment treatments
+    checks:
+      - "structural family identity: the outer profile itself carries the nose and chin, not a generic silhouette with features painted inside it"
+      - "content compliance: the figure and gesture are new (not the B1 warrior or B2 vessel scene reused)"
+      - "compositional clarity: one dominant gesture direction organizes the pose; no competing equal movement in every limb"
+      - "surface and palette behaviour: the figure interior stays near-pure black and clean; no naturalistic skin shading or flesh tone leaks into the silhouette"
+      - "contamination: no pale circular sclera construction (Family A eye system) appears inside the black mass"
+
+  - id: "B-eval-2"
+    family: "B"
+    case: "different hand-held prop"
+    prompt: >-
+      Full-body action plate, one silhouette figure gripping a new hand-held prop such as a scroll
+      in a bent silhouette hand, high-value incised marks clarifying the grip and wrist, a clear
+      silhouette gap kept between the prop and the torso, hdx_incise, opaque black silhouette
+      construction, high-value incised interior structure, designed geometric profiles, controlled
+      separation of figure and environment treatments
+    checks:
+      - "structural family identity: the prop is built from a small number of designed hard-edged shapes, not a photorealistic rendered object"
+      - "content compliance: the prop is the requested scroll, not the sword or vessel from the source anchors"
+      - "compositional clarity: a readable gap separates the prop from the torso so the two masses do not merge"
+      - "surface and palette behaviour: white interior marks stay at full opacity and confident against the black mass, no soft plastic shading"
+      - "contamination: no indiscriminate black outline drawn around the white incisions"
+
+  - id: "B-eval-3"
+    family: "B"
+    case: "unequal-height group"
+    prompt: >-
+      Group action plate, three silhouette figures of unequal height on a common stage zone: a
+      compact broad performer, a tall narrow performer, and a smaller narrow performer, distinct
+      silhouettes and purposeful height contrast, a broad illuminated stage zone behind them,
+      hdx_incise, opaque black silhouette construction, high-value incised interior structure,
+      designed geometric profiles, controlled separation of figure and environment treatments
+    checks:
+      - "structural family identity: each performer uses a different legitimate archetype rather than one rigid shared head-ratio template"
+      - "content compliance: the three figures are visibly distinct in role/silhouette, not near-duplicates of one figure at different scales"
+      - "compositional clarity: height contrast is purposeful and the trio balances without needing identical cast shadows beneath every figure"
+      - "surface and palette behaviour: the stage field can be luminous and broadly lit while every figure interior stays graphic black-and-white"
+      - "contamination: no photorealistic shadow system or platform watermark added beneath the group"
+
+  - id: "B-eval-4"
+    family: "B"
+    case: "atmospheric landscape"
+    prompt: >-
+      Wide establishing illustration, an atmospheric landscape with a foreground-framed near plane,
+      a middle plain, and softened distant hills and architecture, depth-separated environmental
+      values fading toward a luminous cool sky, no figure present in this plate, hdx_incise,
+      foreground-framed atmospheric landscape, localized environmental stippling, soft-edged
+      atmospheric surface fields, depth-separated environmental values
+    checks:
+      - "structural family identity: at least three depth planes are separated by contrast and softness rather than one uniform blur over the whole scene"
+      - "content compliance: since no figure was requested, none is invented, and no black-silhouette claim is made for this environment-only plate"
+      - "compositional clarity: the near plane stays crisp and textured while distant elements lose local contrast and approach the sky/haze color"
+      - "surface and palette behaviour: the environment may be strongly chromatic and gradient-rich; this is expected here, not a defect"
+      - "contamination: no browser chrome, seek preview thumbnail, or duplicated unintended objects in the landscape"
+
+  - id: "B-eval-5"
+    family: "B"
+    case: "central architectural object"
+    prompt: >-
+      Wide establishing illustration, a central architectural column or monument at frame center
+      with converging architectural lines and broad theatrical illumination, enlarged side
+      structures in a more saturated color, no figure present in this plate, hdx_incise, centered
+      theatrical architectural convergence, foreground-framed atmospheric landscape, soft-edged
+      atmospheric surface fields, depth-separated environmental values
+    checks:
+      - "structural family identity: convergence and broad light are compositional/theatrical, not presented as a physically exact single-sun lighting model"
+      - "content compliance: the object is the requested column/monument, centered, with no unrequested figure added"
+      - "compositional clarity: the central object sits near the horizontal midline with convergence visibly supporting it"
+      - "surface and palette behaviour: pale vertical divisions on the column can coexist with more saturated side structures without becoming uniformly muted"
+      - "contamination: no metallic bevel effects or glossy plastic rendering on the architecture"
+
+  # --- Family C: bio texture ---
+
+  - id: "C-eval-1"
+    family: "C"
+    case: "new plant arrangement"
+    prompt: >-
+      Wide establishing illustration, a new botanical arrangement of layered plant masses with
+      coherent branch-and-stem attachments, directional veins and growth rings on selected trunks,
+      an open middle-distance opening framed by unequal foreground vegetation, hdx_biotext, organic
+      filled-shape construction, selective structural drawing, object-specific internal patterning,
+      controlled surface irregularity, explanatory shape hierarchy
+    checks:
+      - "structural family identity: veins and growth rings follow the object they occupy (trunk grain follows the trunk, leaf veins divide the leaf) rather than random noise"
+      - "content compliance: the plant arrangement is new, not a copy of the C1 forest composition"
+      - "compositional clarity: the foreground framing is asymmetrical and opens a visual path rather than mirroring both sides identically"
+      - "surface and palette behaviour: blue-green, olive, and earth relationships dominate; no rainbow or metallic accents"
+      - "contamination: no uniform heavy black contour wrapped around every plant mass"
+
+  - id: "C-eval-2"
+    family: "C"
+    case: "fungal icon"
+    prompt: >-
+      Small isolated icon, one fungal pictogram with a broad mushroom cap over a narrow stalk,
+      condensed into a legible disc-ready silhouette, restrained internal patterning, hdx_biotext,
+      organic filled-shape construction, selective structural drawing, object-specific internal
+      patterning, explanatory shape hierarchy
+    checks:
+      - "structural family identity: cap-to-stalk attachment logic is preserved even at icon scale"
+      - "content compliance: the icon is legible as a mushroom, not a generic blob mistaken for a different organism"
+      - "compositional clarity: the icon reads clearly within a small disc container, with interior margin preserved around it"
+      - "surface and palette behaviour: dark-green or object-appropriate icon fill; no glossy or metallic treatment"
+      - "contamination: no excessive texture obscuring the small icon's silhouette"
+
+  - id: "C-eval-3"
+    family: "C"
+    case: "magnification callout"
+    prompt: >-
+      Scientific comparison plate, one circular magnification callout tied to a source organism by
+      a single unambiguous pointer, the enlarged window showing a specified internal structure,
+      restrained surface irregularity inside the callout, hdx_biotext, organic filled-shape
+      construction, selective structural drawing, organism-linked magnification callouts,
+      explanatory shape hierarchy
+    checks:
+      - "structural family identity: the callout is a flat explanatory window, not rendered as a giant floating volumetric object in the scene"
+      - "content compliance: the pointer connects unambiguously to its source organism; a pointer landing between two organisms is a failure"
+      - "compositional clarity: the callout's internal structure is legible at both thumbnail and full scale"
+      - "surface and palette behaviour: the callout interior stays restrained enough that the diagrammatic clarity is not lost to distressed texture"
+      - "contamination: no lens-flare or photographic depth-of-field effect added to the callout"
+
+  - id: "C-eval-4"
+    family: "C"
+    case: "small specified network"
+    prompt: >-
+      Wide scientific network diagram, a small specified network of unequal hand-shaped cream discs
+      over a blue field, dark-green pictogram icons, pale connectors placed behind the disc
+      containers following a supplied edge list, hdx_biotext, organic filled-shape construction,
+      selective structural drawing, explanatory shape hierarchy
+    checks:
+      - "structural family identity: cream-on-blue container system and dark-green icon contrast are preserved without drop shadows or bevels"
+      - "content compliance: every node and edge matches the supplied edge list exactly; no extra plausible-looking connections are added"
+      - "compositional clarity: connectors sit behind the pictogram containers and node hierarchy (unequal disc sizes) is preserved"
+      - "surface and palette behaviour: the blue field stays quiet so the diagram's clarity is not subordinated to background variation"
+      - "contamination: no random network connections or decorative arrows with no target"
+
+  - id: "C-eval-5"
+    family: "C"
+    case: "close-up biological form"
+    prompt: >-
+      Diagonal internal-structure crop, one close-up biological form built as a tapered spindle
+      bounded by curved sides, longitudinal interior lines reinforcing the direction from a broad
+      body toward a narrow end, a brown surrounding context supplying scale and cutaway context,
+      hdx_biotext, organic filled-shape construction, selective structural drawing, object-specific
+      internal patterning, controlled surface irregularity, explanatory shape hierarchy,
+      longitudinal spindle-form organization
+    checks:
+      - "structural family identity: apparent volume comes from taper, internal longitudinal lines, and overlap, not a glossy translucent render"
+      - "content compliance: the colored boundary around the form is preserved rather than replaced with thick black ink, which would move it toward a different family"
+      - "compositional clarity: the diagonal taper direction is preserved and organizes the surrounding context"
+      - "surface and palette behaviour: salmon/warm focal color against a brown surround, with variance from any crossing internal line correctly read as structure, not grain"
+      - "contamination: no photographic leaf-style or metallic rendering applied to the biological surface"

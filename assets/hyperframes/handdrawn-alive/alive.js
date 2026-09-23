@@ -1,8 +1,8 @@
 /*
- * ted-ed-alive — keeps a hand-drawn HyperFrames scene moving while it "holds".
+ * handdrawn-alive — keeps a hand-drawn HyperFrames scene moving while it "holds".
  *
  * What the reference videos actually do while a shot holds (measured by
- * scripts/style_refs/motion_analysis.py, see assets/references/ted-ed/motion/):
+ * scripts/style_refs/motion_analysis.py, see the reference motion folder):
  *   - the main drawing stays still: no line boil, and the paper texture is fixed
  *   - small secondary props keep happening around it, roughly one every
  *     0.6-1.5 s: icons pop in one after another, bubbles rise out of a head,
@@ -24,7 +24,7 @@
  *   <div class="alive-grain"></div>          fixed paper texture, once per composition
  *
  *   const tl = gsap.timeline({ paused: true });
- *   TedEdAlive.apply(tl, document.getElementById("root"));
+ *   HandDrawnAlive.apply(tl, document.getElementById("root"));
  *   window.__timelines["main"] = tl;
  *
  * Determinism: no clocks, seeded PRNG, finite repeats, stepped eases are pure
@@ -61,7 +61,7 @@
   }
 
   function readProfile() {
-    var p = (typeof window !== "undefined" && window.TED_ED_ALIVE_PROFILE) || {};
+    var p = (typeof window !== "undefined" && window.HANDDRAWN_ALIVE_PROFILE) || {};
     var o = {};
     for (var k in DEFAULTS) o[k] = p[k] != null ? p[k] : DEFAULTS[k];
     return o;
@@ -249,5 +249,5 @@
     return cfg;
   }
 
-  window.TedEdAlive = { apply: apply, onTwos: onTwos, defaults: DEFAULTS };
+  window.HandDrawnAlive = { apply: apply, onTwos: onTwos, defaults: DEFAULTS };
 })();

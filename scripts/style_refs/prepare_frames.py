@@ -1,7 +1,7 @@
 """Turn screen-recorded reference frames into a clean, de-duplicated style set.
 
 Usage:
-    python -m scripts.style_refs.prepare_frames assets/references/ted-ed [--target 250]
+    python -m scripts.style_refs.prepare_frames assets/references/handdrawn [--target 250]
 
 Reads   <ref>/raw/<video>_frame_NNNN.png
 Writes  <ref>/work/boxes.json            picture box found in each video
