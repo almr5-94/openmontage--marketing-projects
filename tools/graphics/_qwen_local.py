@@ -54,18 +54,75 @@ INSTALL_INSTRUCTIONS = (
 _PIPELINE_CACHE: dict[tuple[str, str, str], Any] = {}
 
 
-def _evict_other_pipelines(keep: tuple[str, str, str]) -> None:
-    """Drop every cached pipeline except `keep` and hand the VRAM back."""
-    for key in [k for k in _PIPELINE_CACHE if k != keep]:
-        _PIPELINE_CACHE.pop(key, None)
+def _vram_note(tag: str) -> None:
+    """Print VRAM at a step when QWEN_VRAM_DEBUG is set. Silent otherwise."""
+    if not os.environ.get("QWEN_VRAM_DEBUG"):
+        return
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            print(f"[qwen vram] {tag}: {int(torch.cuda.memory_allocated() / 1e6)} MB", flush=True)
+    except Exception:
+        pass
+
+
+def _free_pipeline(pipe: Any) -> None:
+    """Release a pipeline's weights from the GPU.
+
+    Deleting the Python reference is not enough. `enable_model_cpu_offload`
+    installs accelerate hooks that hold their own references, and a pipeline
+    keeps its components in attributes, so both have to be let go before the
+    allocator will give the memory back.
+    """
+    if pipe is None:
+        return
+    for teardown in ("remove_all_hooks", "maybe_free_model_hooks"):
+        fn = getattr(pipe, teardown, None)
+        if callable(fn):
+            try:
+                fn()
+            except Exception:
+                pass
+    try:
+        for name in list(getattr(pipe, "components", {})):
+            try:
+                setattr(pipe, name, None)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
+def _reclaim_vram() -> None:
+    """Collect and hand the freed blocks back to the driver."""
     gc.collect()
     try:
         import torch
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+            torch.cuda.synchronize()
     except Exception:
         pass
+
+
+def _evict_other_pipelines(keep: tuple[str, str, str]) -> None:
+    """Drop every cached pipeline except `keep` and hand the VRAM back.
+
+    Dropping the dict entry is not enough: `enable_model_cpu_offload` installs
+    accelerate hooks that keep their own references to every component, so the
+    weights stay on the card until the hooks are removed. Without this the card
+    still held 14.8 GB when the next model asked for room.
+    """
+    for key in [k for k in _PIPELINE_CACHE if k != keep]:
+        entry = _PIPELINE_CACHE.pop(key, None)
+        if entry is None:
+            continue
+        pipe = entry[0] if isinstance(entry, tuple) else entry
+        _free_pipeline(pipe)
+        del pipe, entry
+    _reclaim_vram()
 
 
 def diffusers_available() -> bool:
@@ -263,6 +320,38 @@ def make_generator(seed: int | None) -> Any:
     return torch.Generator(device=device).manual_seed(int(seed))
 
 
+def _condition_images(images: list[Any]) -> list[Any]:
+    """Shrink the reference images to the size the text encoder expects.
+
+    QwenImageEditPlusPipeline.__call__ resizes every condition image to about
+    384x384 before it reaches the vision-language encoder, and only the VAE
+    sees the full-resolution frame. Calling `encode_prompt` directly skips that
+    step, and a 1024x1024 frame then drove the encoder to 14.8 GB and out of
+    memory. This reproduces the pipeline's own preprocessing.
+    """
+    try:
+        from diffusers.pipelines.qwenimage.pipeline_qwenimage_edit_plus import (
+            CONDITION_IMAGE_SIZE,
+            calculate_dimensions,
+        )
+    except Exception:
+        CONDITION_IMAGE_SIZE = 384 * 384
+
+        def calculate_dimensions(target_area, ratio):  # type: ignore[misc]
+            import math
+
+            width = int(round(math.sqrt(target_area * ratio)))
+            height = int(round(math.sqrt(target_area / ratio)))
+            return max(width - width % 32, 32), max(height - height % 32, 32)
+
+    resized = []
+    for img in images:
+        width, height = img.size
+        cond_w, cond_h = calculate_dimensions(CONDITION_IMAGE_SIZE, width / height)
+        resized.append(img.resize((cond_w, cond_h)))
+    return resized
+
+
 def run_two_phase_edit(
     repo_id: str,
     images: list[Any],
@@ -290,6 +379,12 @@ def run_two_phase_edit(
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
     os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
+    # Generating a frame and then editing it is one process, so a text-to-image
+    # pipeline from the earlier call is usually still resident. 6 GB of it plus
+    # an 11.5 GB transformer overflows the card, so clear the cache first.
+    _PIPELINE_CACHE.clear()
+    _evict_other_pipelines(("", "", ""))
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def _quant(components: list[str]) -> Any:
@@ -307,15 +402,22 @@ def run_two_phase_edit(
     if quant_encoder is not None:
         encoder_kwargs["quantization_config"] = quant_encoder
     encoder = DiffusionPipeline.from_pretrained(repo_id, **encoder_kwargs)
+    _vram_note("encoder loaded")
     prompt_embeds, prompt_embeds_mask = encoder.encode_prompt(
-        image=images, prompt=[prompt], device=device, num_images_per_prompt=1
+        image=_condition_images(images),
+        prompt=[prompt],
+        device=device,
+        num_images_per_prompt=1,
     )
+    # encode_prompt returns a None mask when every token is real — keep that.
     prompt_embeds = prompt_embeds.detach().clone()
-    prompt_embeds_mask = prompt_embeds_mask.detach().clone()
+    if prompt_embeds_mask is not None:
+        prompt_embeds_mask = prompt_embeds_mask.detach().clone()
+    _vram_note("after encode")
+    _free_pipeline(encoder)
     del encoder
-    gc.collect()
-    if device.type == "cuda":
-        torch.cuda.empty_cache()
+    _reclaim_vram()
+    _vram_note("encoder freed")
 
     # --- phase 2: the transformer and the VAE ---------------------------------
     denoiser_kwargs = dict(base, text_encoder=None)
@@ -323,6 +425,7 @@ def run_two_phase_edit(
     if quant_denoiser is not None:
         denoiser_kwargs["quantization_config"] = quant_denoiser
     denoiser = DiffusionPipeline.from_pretrained(repo_id, **denoiser_kwargs)
+    _vram_note("denoiser loaded")
     for enable in ("enable_tiling", "enable_slicing"):
         fn = getattr(getattr(denoiser, "vae", None), enable, None)
         if callable(fn):
@@ -344,8 +447,7 @@ def run_two_phase_edit(
     )
     image = denoiser(**kwargs).images[0]
 
+    _free_pipeline(denoiser)
     del denoiser
-    gc.collect()
-    if device.type == "cuda":
-        torch.cuda.empty_cache()
+    _reclaim_vram()
     return image
