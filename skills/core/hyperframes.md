@@ -455,3 +455,34 @@ the `deterministicFonts.ts` mapping table. Safe bets: `Outfit`,
 Proposal and compose directors for adopted pipelines describe runtime choice
 explicitly — see each pipeline's `proposal-director.md` and
 `compose-director.md`.
+
+## The face gate — always on, never optional
+
+Every generated or edited frame that could contain a person passes a face check
+before it is used in a composition, a render, a thumbnail or a hand-off. There is
+no flag to switch it off and no "just this once".
+
+What it checks, per image:
+
+1. Is there a person, face or character at all? If no, the image passes.
+2. Does every person have two eyes, each with a visible pupil?
+3. Is any face distorted — a missing eye, a missing pupil, a doubled or smeared
+   mouth, a melted jaw?
+
+A failure is a rejected seed, not a note: generate again, change the seed, and only
+then adjust the prompt. Never retouch a broken face by hand and call it a pass, and
+never ship the frame because "the rest of the shot is good" — a half-drawn stare is
+the first thing a viewer sees, and no other check catches it. The count check, the
+lettering check and the does-it-show-the-line check all pass happily on a face with
+one pupil.
+
+Reference implementation: `scripts/style_refs/generate_scene.py` → `face_is_whole()`
+in the OpenMontage repo, which asks a local vision model the three questions above
+and rejects the render when the answers are wrong. Any other generator — a provider
+tool, an MCP connector, a hand-written script — carries the same gate before its
+output is accepted. To audit frames that already exist, run the same function over
+them (`projects/pilot-paperfolk/audit_faces.py` is the worked example) and
+regenerate whatever it names.
+
+Where this came from: a pilot shipped with the closing shot showing a character with
+one blank eye. Everything else had been verified.
