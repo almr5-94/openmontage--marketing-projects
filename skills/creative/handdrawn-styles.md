@@ -24,8 +24,25 @@ own measured motion, its acceptance order and its failure map.
 | B incised silhouette | `handdrawn-incise` | `skills/creative/handdrawn-incise.md` |
 | C bio texture | `handdrawn-biotext` | `skills/creative/handdrawn-biotext.md` |
 
-Installed for Claude Code at `~/.claude/skills/handdrawn-{paperfolk,incise,biotext}/SKILL.md`,
-byte-identical to the copies above - edit the repo copy and reinstall, never only one side.
+Installed on both machines at `~/.claude/skills/handdrawn-{paperfolk,incise,biotext}/SKILL.md`,
+byte-identical to the repo copies above, which are the source of truth. Edit the repo copy and
+reinstall - never only one side.
+
+On abood (or any machine with a checkout):
+
+```bash
+bash skills/install_handdrawn_skills.sh            # install or refresh
+bash skills/install_handdrawn_skills.sh --check    # verify, change nothing
+```
+
+On the Mac, which holds no checkout, pull the same files through the handle folder:
+
+```bash
+for n in paperfolk incise biotext; do
+  mkdir -p ~/.claude/skills/handdrawn-$n
+  abcat skills/creative/handdrawn-$n.md > ~/.claude/skills/handdrawn-$n/SKILL.md
+done
+```
 
 Loading one family's skill instead of this file is the point: an agent that only carries the
 family it is drawing cannot average three contradictory grammars by accident.
