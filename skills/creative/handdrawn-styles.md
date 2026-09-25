@@ -12,6 +12,24 @@ that is almost right and unmistakably wrong.
 | **B — incised silhouette** | `hdx_incise` | `styles/handdrawn-incise.yaml` | `construction/b.yaml` | `profile-b.js` (borrowed) | solid black figures with white cut-in marks, saturated staged scenery, haze and gradients |
 | **C — bio texture** | `hdx_biotext` | `styles/handdrawn-biotext.yaml` | `construction/c.yaml` | `profile-c.js` | organic filled shapes, coloured outlines, drawn veins and rings, diagrams, big radial irises |
 
+## One skill per family - load the family, not this router
+
+This file is the router. The per-family detail is a skill of its own, and each one is
+self-contained: construction numbers, the face gate, the generate command, that family's
+own measured motion, its acceptance order and its failure map.
+
+| Family | Skill | Versioned copy in this repo |
+|---|---|---|
+| A paper folk | `handdrawn-paperfolk` | `skills/creative/handdrawn-paperfolk.md` |
+| B incised silhouette | `handdrawn-incise` | `skills/creative/handdrawn-incise.md` |
+| C bio texture | `handdrawn-biotext` | `skills/creative/handdrawn-biotext.md` |
+
+Installed for Claude Code at `~/.claude/skills/handdrawn-{paperfolk,incise,biotext}/SKILL.md`,
+byte-identical to the copies above - edit the repo copy and reinstall, never only one side.
+
+Loading one family's skill instead of this file is the point: an agent that only carries the
+family it is drawing cannot average three contradictory grammars by accident.
+
 ## Step 0 — pick the family, and say so
 
 Ask what the video is: people and ideas (A), story and myth (B), nature and science (C). If the
@@ -184,3 +202,34 @@ The reference material is a third party's copyrighted work. Learn the general gr
 reproduce their characters, scenes or marks, never put their name in a prompt, caption, trigger
 or filename, and never present the output as theirs. **This repository is public**: no reference
 frame, dataset image or derived GIF is ever committed. Only measured numbers and reports ship.
+
+## The face gate — always on, never optional
+
+Every generated or edited frame that could contain a person passes a face check
+before it is used in a composition, a render, a thumbnail or a hand-off. There is
+no flag to switch it off and no "just this once".
+
+What it checks, per image:
+
+1. Is there a person, face or character at all? If no, the image passes.
+2. Does every person have two eyes, each with a visible pupil?
+3. Is any face distorted — a missing eye, a missing pupil, a doubled or smeared
+   mouth, a melted jaw?
+
+A failure is a rejected seed, not a note: generate again, change the seed, and only
+then adjust the prompt. Never retouch a broken face by hand and call it a pass, and
+never ship the frame because "the rest of the shot is good" — a half-drawn stare is
+the first thing a viewer sees, and no other check catches it. The count check, the
+lettering check and the does-it-show-the-line check all pass happily on a face with
+one pupil.
+
+Reference implementation: `scripts/style_refs/generate_scene.py` → `face_is_whole()`
+in the OpenMontage repo, which asks a local vision model the three questions above
+and rejects the render when the answers are wrong. Any other generator — a provider
+tool, an MCP connector, a hand-written script — carries the same gate before its
+output is accepted. To audit frames that already exist, run the same function over
+them (`projects/pilot-paperfolk/audit_faces.py` is the worked example) and
+regenerate whatever it names.
+
+Where this came from: a pilot shipped with the closing shot showing a character with
+one blank eye. Everything else had been verified.
