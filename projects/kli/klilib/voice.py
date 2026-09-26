@@ -21,9 +21,12 @@ TAIL = 2.4  # end card after the last word
 ELEVENLABS_USD_PER_CHAR = 0.0003  # Creator tier estimate; the tool reports its own figure
 
 
+PROVISIONAL = {"on": False}  # set by kli_daily.py --provisional: machinery test, never publishable
+
+
 def voice_pick() -> dict:
     pick = read_json(SERIES_DIR / "voice" / "pick.json")
-    if not pick.get("signed_by"):
+    if not pick.get("signed_by") and not PROVISIONAL["on"]:
         raise RuntimeError("voice/pick.json is not signed by the owner — casting is not accepted yet")
     return pick
 

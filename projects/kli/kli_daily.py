@@ -514,8 +514,15 @@ def main() -> int:
     ap.add_argument("command", choices=["run", "stage", "judge", "revise", "status"])
     ap.add_argument("name", nargs="?")
     ap.add_argument("--date", default=kuwait_now().strftime("%Y-%m-%d"))
+    ap.add_argument("--provisional", action="store_true", help="machinery test: unsigned voice and gate-passed world refs allowed; the reel can never be published")
     a = ap.parse_args()
     pid = reel_id(a.date)
+    if a.provisional:
+        voice.PROVISIONAL["on"] = True
+        init_project(pid, title=f"Kuwait Legal Insider — {a.date} (provisional)", pipeline_type=PIPELINE)
+        marker = read_json(project_dir(pid) / "project.json")
+        marker["provisional"] = True
+        write_json(project_dir(pid) / "project.json", marker)
     if a.command == "run":
         return run(a.date)
     if a.command == "stage":

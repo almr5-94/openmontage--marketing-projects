@@ -79,6 +79,9 @@ def publish(date_str: str, dry_run: bool, force: bool) -> int:
     pid = reel_id(date_str)
     pdir = project_dir(pid)
     log_entry = {"platform": "instagram", "status": "draft", "timestamp": now_iso(), "visibility": "public"}
+    if read_json(pdir / "project.json", {}).get("provisional"):
+        log(f"{pid} is a provisional machinery-test reel — never published")
+        return 0
     sw = live_switch()
     if not sw and not dry_run:
         log("live_enabled.json absent, unsigned or expired — skipping (status skipped_disabled)")

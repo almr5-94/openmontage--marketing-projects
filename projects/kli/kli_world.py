@@ -59,16 +59,29 @@ def build() -> None:
             log(f"{spec['id']}: accepted, untouched")
             continue
         seed = SEED + i
+        origin = spec["origin"]
         if spec.get("regen_from"):
             log(f"{spec['id']}: regenerating from {spec['regen_from']}")
-            run_tool("qwen_image_edit_local", {"prompt": spec["regen_prompt"] + " " + stills.constants(), "image_paths": [str(REFS / spec["regen_from"])],
-                                               "negative_prompt": stills.negative(), "seed": seed, "quantization": "4bit", "offload": "two_phase", "output_path": str(out)})
+            try:
+                stills.qwen_edit_isolated({"prompt": spec["regen_prompt"] + " " + stills.constants(), "image_paths": [str(REFS / spec["regen_from"])],
+                                           "negative_prompt": stills.negative(), "seed": seed, "quantization": "4bit", "offload": "two_phase", "output_path": str(out)})
+            except Exception as exc:
+                log(f"{spec['id']}: qwen failed ({str(exc)[:120]}); falling back to imagen from text")
+                run_tool("google_imagen", {"prompt": spec["regen_prompt"] + " First-person phone photo, vertical. " + stills.constants(), "aspect_ratio": "9:16",
+                                           "model": "imagen-4.0-generate-001", "output_path": str(out)})
+                origin += " (imagen fallback)"
         elif spec.get("gen_prompt") and not out.exists():
             log(f"{spec['id']}: imagen then one qwen pass against the anchor")
             raw = REFS / f"{spec['id']}.imagen.png"
             run_tool("google_imagen", {"prompt": spec["gen_prompt"], "aspect_ratio": "9:16", "model": "imagen-4.0-generate-001", "output_path": str(raw)})
-            run_tool("qwen_image_edit_local", {"prompt": "Keep this scene exactly, but make the hands, the black leather watch on the left wrist, the silver cufflink and the phone case match the second image precisely. " + stills.constants(),
-                                               "image_paths": [str(raw), str(anchor)], "negative_prompt": stills.negative(), "seed": seed, "quantization": "4bit", "offload": "two_phase", "output_path": str(out)})
+            try:
+                stills.qwen_edit_isolated({"prompt": "Keep this scene exactly, but make the hands, the black leather watch on the left wrist, the silver cufflink and the phone case match the second image precisely. " + stills.constants(),
+                                           "image_paths": [str(raw), str(anchor)], "negative_prompt": stills.negative(), "seed": seed, "quantization": "4bit", "offload": "two_phase", "output_path": str(out)})
+            except Exception as exc:
+                log(f"{spec['id']}: qwen pass failed ({str(exc)[:120]}); keeping the imagen render")
+                raw.replace(out)
+                origin += " (imagen only)"
+        spec = {**spec, "origin": origin}
         rendered.append((spec, seed, out))
         save({**w, "settings": [existing[s["id"]] for s in SETTINGS if s["id"] in existing]})
     stills.free_gpu()

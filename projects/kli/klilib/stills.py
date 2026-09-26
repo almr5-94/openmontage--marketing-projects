@@ -32,6 +32,10 @@ def negative() -> str:
 
 
 def accepted_settings() -> list[dict]:
+    from .voice import PROVISIONAL
+
+    if PROVISIONAL["on"]:
+        return [s for s in world()["settings"] if s.get("accepted_by_owner") or s.get("gate", {}).get("ok")]
     return [s for s in world()["settings"] if s.get("accepted_by_owner")]
 
 
@@ -126,11 +130,32 @@ def render_still(out: Path, setting: dict, prompt: str, seed: int, tool_name: st
     if anchor.exists() and setting["ref"] != "home_desk.png":
         refs.append(str(anchor))
     log(f"{out.stem}: qwen edit seed {seed}")
-    run_tool("qwen_image_edit_local", {
+    qwen_edit_isolated({
         "prompt": full_prompt, "image_paths": refs, "negative_prompt": negative(), "seed": seed,
         "num_inference_steps": 40, "true_cfg_scale": 4.0, "quantization": "4bit", "offload": "two_phase",
         "output_path": str(out)})
     return {"tool": "qwen_image_edit_local", "seed": seed, "prompt": full_prompt}
+
+
+def qwen_edit_isolated(inputs: dict, timeout: int = 1500) -> None:
+    """Run the Qwen edit in a child process so an OOM kill loses one still, not the run. Raises on failure."""
+    import json as _json
+    import subprocess
+    import tempfile
+
+    from .common import OM_ROOT
+
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as f:
+        _json.dump(inputs, f, ensure_ascii=False)
+        spec = f.name
+    r = subprocess.run([str(OM_ROOT / ".venv" / "bin" / "python"), str(Path(__file__).with_name("qwen_worker.py")), spec],
+                       cwd=OM_ROOT, capture_output=True, text=True, timeout=timeout)
+    Path(spec).unlink(missing_ok=True)
+    tail = (r.stdout.strip().splitlines() or [""])[-1]
+    if r.returncode != 0 or not tail.startswith("{"):
+        raise RuntimeError(f"qwen worker exited {r.returncode} (killed={r.returncode < 0 or r.returncode == 137}): {(r.stderr or r.stdout)[-400:]}")
+    if not _json.loads(tail).get("success"):
+        raise RuntimeError("qwen worker reported failure")
 
 
 def generate_stills(project_dir: Path, jobs: list[dict]) -> dict[str, dict]:
@@ -153,10 +178,18 @@ def generate_stills(project_dir: Path, jobs: list[dict]) -> dict[str, dict]:
         for j in pending:
             if tool_name == "google_imagen":
                 budget.assert_can_spend(project_dir, 0.05, f"google_imagen {j['shot_id']}")
-            j["last"] = render_still(out_dir / f"{j['shot_id']}.png", j["setting"], j["prompt"], j["seed"] + seed_shift, tool_name)
+            try:
+                j["last"] = render_still(out_dir / f"{j['shot_id']}.png", j["setting"], j["prompt"], j["seed"] + seed_shift, tool_name)
+            except Exception as exc:  # a killed or failed render is a rejected attempt, not a crash
+                log(f"{j['shot_id']}: render failed in round {round_no + 1}: {str(exc)[:200]}")
+                j["last"] = {"tool": tool_name, "seed": j["seed"] + seed_shift, "prompt": still_prompt_for(j["setting"], j["prompt"]), "render_error": str(exc)[:200]}
         free_gpu()
         still_pending = []
         for j in pending:
+            if j["last"].get("render_error") or not (out_dir / f"{j['shot_id']}.png").exists():
+                j["attempts"].append({**j["last"], "ok": False})
+                still_pending.append(j)
+                continue
             gate = is_faceless_and_textless(out_dir / f"{j['shot_id']}.png")
             j["attempts"].append({**j["last"], **gate})
             if gate["ok"]:
