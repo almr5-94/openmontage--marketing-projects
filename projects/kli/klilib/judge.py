@@ -23,7 +23,7 @@ WEIGHTS = {"accuracy": 20, "usefulness": 20, "narration": 15, "hook": 10, "visua
 GATES = ["actual_video_inspected", "actual_audio_listened", "factual_claims_supported", "privacy_faceless_clear",
          "arabic_legible", "narration_natural", "useful_specific_takeaway", "duration_and_format_valid"]
 PASS_TOTAL = 85
-WER_MAX = 0.03
+WER_MAX = 0.08  # whole reel; specific mismatches go to the listening judge to adjudicate
 
 
 def score_review(scores: dict, gates: dict, issues: list) -> tuple[float, bool]:
@@ -54,11 +54,17 @@ def format_gate(path: Path) -> dict:
 
 
 def wer_gate(path: Path, lines: list[str]) -> dict:
+    import difflib
+
     words = voice.transcribe_words(path)
     heard = normalize_ar(" ".join(w for w, _, _ in words))
     ref = normalize_ar(" ".join(lines))
     e = wer(ref, heard)
-    return {"ok": e <= WER_MAX, "wer": round(e, 4), "heard": " ".join(w for w, _, _ in words)}
+    mismatches = []
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(a=ref, b=heard, autojunk=False).get_opcodes():
+        if tag != "equal":
+            mismatches.append({"script": " ".join(ref[i1:i2]), "heard": " ".join(heard[j1:j2]), "op": tag})
+    return {"ok": e <= WER_MAX, "wer": round(e, 4), "heard": " ".join(w for w, _, _ in words), "mismatches": mismatches[:12]}
 
 
 def faceless_gate(path: Path, out_dir: Path) -> dict:
@@ -76,11 +82,15 @@ def faceless_gate(path: Path, out_dir: Path) -> dict:
     return {"ok": not bad, "frames": len(frames), "bad": bad}
 
 
-def gemini_review(project_dir: Path, video: Path, script: dict, source_url: str) -> dict:
+def gemini_review(project_dir: Path, video: Path, script: dict, source_url: str, mismatches: list | None = None) -> dict:
     prompt = JUDGE.format(
         contract=kli_repo.judge_contract(),
         script_lines="\n".join(f"{s['id']}: {s['text']}" for s in script["sections"]),
         takeaway=script["metadata"].get("takeaway", ""), source_url=source_url)
+    if mismatches:
+        prompt += ("\n\nA speech recogniser transcribed the narration and disagreed with the script at these points. For each one, "
+                   "LISTEN and decide whether the narrator actually mispronounced or replaced the word (a defect with a timecode) or the "
+                   "recogniser merely spelled a dialect word differently (not a defect):\n" + json.dumps(mismatches, ensure_ascii=False))
     runs = [gemini.ask_json(prompt, model=gemini.PRO, project_dir=project_dir, purpose="judge", files=[video], temperature=0.2)
             for _ in range(2)]
     scores = {k: min(float(r.get("scores", {}).get(k, 0)) for r in runs) for k in WEIGHTS}
@@ -105,7 +115,7 @@ def judge(project_dir: Path, video: Path, script: dict, source_url: str, version
     log(f"WER gate: {w['wer']}")
     fl = faceless_gate(video, project_dir / "artifacts" / f"judge_frames_v{version}")
     log(f"faceless gate: ok={fl['ok']} frames={fl['frames']} bad={len(fl['bad'])}")
-    g = gemini_review(project_dir, video, script, source_url)
+    g = gemini_review(project_dir, video, script, source_url, w.get("mismatches"))
     gates = dict(g["gates"])
     # the driver overrides what it can measure
     gates["duration_and_format_valid"] = bool(fmt["ok"])

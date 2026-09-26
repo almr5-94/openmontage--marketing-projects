@@ -34,25 +34,39 @@ not robotic. Listen to the whole clip. Reply with JSON:
  "naturalness": 1-10, "warmth": 1-10, "glitches": ["..."], "mispronounced": ["..."], "verdict": "accept|maybe|reject", "why": "one sentence"}"""
 
 
+def _shared(h: dict, **params) -> list[dict]:
+    r = requests.get("https://api.elevenlabs.io/v1/shared-voices", headers=h, params={"page_size": 30, **params}, timeout=30)
+    return r.json().get("voices", []) if r.ok else []
+
+
 def candidates(max_n: int) -> list[dict]:
+    """Native Arabic male voices first: Kuwaiti by name/accent, then Gulf, then Saudi, then any
+    non-premade Arabic male voice already in the library. Stock English library voices are excluded —
+    round 1 showed they all score the same on accent and none is Kuwaiti."""
     key = os.environ["ELEVENLABS_API_KEY"]
     h = {"xi-api-key": key}
-    out = []
+    pools = [
+        [v for v in _shared(h, search="kuwait") if v.get("gender") == "male"],
+        [v for v in _shared(h, language="ar", gender="male", accent="gulf") if v.get("accent") == "gulf"],
+        sorted([v for v in _shared(h, language="ar", gender="male", accent="saudi")], key=lambda v: -(v.get("cloned_by_count") or 0))[:3],
+    ]
+    out, seen = [], set()
+    for pool in pools:
+        for v in sorted(pool, key=lambda v: -(v.get("cloned_by_count") or 0)):
+            if v["voice_id"] in seen:
+                continue
+            seen.add(v["voice_id"])
+            out.append({"key": "el_" + v["name"].split(" - ")[0].split(" – ")[0].lower().replace(" ", "_"), "voice_id": v["voice_id"], "name": v["name"],
+                        "labels": {"accent": v.get("accent"), "age": v.get("age")}, "source": "shared", "public_owner_id": v.get("public_owner_id")})
     mine = requests.get("https://api.elevenlabs.io/v1/voices", headers=h, timeout=30).json().get("voices", [])
     for v in mine:
         lab = {k.lower(): str(x).lower() for k, x in (v.get("labels") or {}).items()}
-        if lab.get("gender") == "male" or "arab" in json.dumps(lab):
-            out.append({"key": "el_" + v["name"].lower().replace(" ", "_"), "voice_id": v["voice_id"], "name": v["name"], "labels": lab, "source": "library"})
-    r = requests.get("https://api.elevenlabs.io/v1/shared-voices", headers=h, params={"language": "ar", "gender": "male", "page_size": 30, "sort": "cloned_by_count"}, timeout=30)
-    for v in (r.json().get("voices", []) if r.ok else []):
-        out.append({"key": "el_" + v["name"].lower().replace(" ", "_"), "voice_id": v["voice_id"], "name": v["name"], "labels": {"accent": v.get("accent"), "age": v.get("age")},
-                    "source": "shared", "public_owner_id": v.get("public_owner_id")})
-    seen, uniq = set(), []
-    for c in out:
-        if c["voice_id"] not in seen:
-            seen.add(c["voice_id"])
-            uniq.append(c)
-    return uniq[:max_n]
+        if v.get("category") == "premade" or v["voice_id"] in seen:
+            continue
+        if lab.get("gender") == "male" and ("arab" in json.dumps(lab) or "kuwait" in v["name"].lower() or "salem" in v["name"].lower()):
+            seen.add(v["voice_id"])
+            out.append({"key": "el_" + v["name"].split(" - ")[0].lower().replace(" ", "_"), "voice_id": v["voice_id"], "name": v["name"], "labels": lab, "source": "library"})
+    return out[:max_n]
 
 
 def run(max_n: int) -> None:
@@ -68,7 +82,7 @@ def run(max_n: int) -> None:
             try:
                 if not mp3.exists():
                     if c["source"] == "shared":  # shared voices must be added to the library first
-                        requests.post(f"https://api.elevenlabs.io/v1/voices/add/{c['public_owner_id']}/{c['voice_id']}", headers={"xi-api-key": os.environ["ELEVENLABS_API_KEY"]},
+                        _ = requests.post(f"https://api.elevenlabs.io/v1/voices/add/{c['public_owner_id']}/{c['voice_id']}", headers={"xi-api-key": os.environ["ELEVENLABS_API_KEY"]},
                                       json={"new_name": c["name"]}, timeout=30)
                     run_tool("elevenlabs_tts", {"text": " ".join(TEST_LINES), "voice_id": c["voice_id"], "model_id": model_id, "stability": 0.45,
                                                 "similarity_boost": 0.8, "style": 0.25, "output_path": str(mp3), "output_format": "mp3_44100_192"})
@@ -82,7 +96,8 @@ def run(max_n: int) -> None:
                 log(f"{key}: {exc}")
             results.append(row)
     ok = [r for r in results if "error" not in r and r["gemini"].get("sounds_adult_male") and r["gemini"].get("verdict") != "reject"]
-    ok.sort(key=lambda r: (-(r["gemini"].get("gulf_kuwaiti_accent", 0) * 2 + r["gemini"].get("naturalness", 0) + r["gemini"].get("warmth", 0)), r["wer"]))
+    # WER first (it is the only measurement that discriminated in round 1), then the listening scores
+    ok.sort(key=lambda r: (round(r["wer"], 2), -(r["gemini"].get("naturalness", 0) + r["gemini"].get("warmth", 0) + r["gemini"].get("gulf_kuwaiti_accent", 0))))
     (SERIES_DIR / "voice" / "casting.json").write_text(json.dumps({"cast_at": now_iso(), "test_lines": TEST_LINES, "results": results, "ranked": [r["key"] for r in ok]}, ensure_ascii=False, indent=1), encoding="utf-8")
     if ok:
         top = ok[0]

@@ -14,7 +14,7 @@ from lib.arabic_captions import normalize_ar, wer, chunks_from_words, to_latin_d
 from .common import SERIES_DIR, read_json, run_tool, media_duration, log
 from . import budget
 
-WER_MAX = 0.03
+WER_MAX = 0.10  # per line: at most one substitution in a 10-word line; the listening judge adjudicates the specific word
 GAP_DEFAULT = 0.55
 GAP_BEFORE_LAST = 0.85
 TAIL = 2.4  # end card after the last word
