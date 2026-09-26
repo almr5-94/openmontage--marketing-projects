@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -263,14 +264,14 @@ def stage_assets(pid: str) -> None:
     settings = {s["id"]: s for s in stills.world()["settings"]}
     world_seed = int(stills.world().get("seed", 4242))
     assets, fallbacks = [], 0
-    # 1. stills (GPU: Qwen), then the gate (GPU: Ollama), never concurrently
-    still_paths = {}
-    for i, sh in enumerate(shots):
-        p, gate = stills.generate_still(pdir, sh["id"], settings[sh["setting_id"]], sh["still_prompt"], world_seed + i)
-        still_paths[sh["id"]] = p
-        assets.append({"id": f"{sh['id']}_still", "type": "image", "path": str(p.relative_to(OM_ROOT)), "source_tool": gate["attempts"][-1]["tool"],
+    # 1. stills: render all (Qwen), free the card, gate all (Ollama), re-render failures — never both models at once
+    gates = stills.generate_stills(pdir, [{"shot_id": sh["id"], "setting": settings[sh["setting_id"]], "prompt": sh["still_prompt"], "seed": world_seed + i}
+                                          for i, sh in enumerate(shots)])
+    still_paths = {sh["id"]: pdir / "assets" / "images" / f"{sh['id']}.png" for sh in shots}
+    for sh in shots:
+        gate = gates[sh["id"]]
+        assets.append({"id": f"{sh['id']}_still", "type": "image", "path": str(still_paths[sh["id"]].relative_to(OM_ROOT)), "source_tool": gate["attempts"][-1]["tool"],
                        "scene_id": sh["id"], "prompt": gate["prompt"], "seed": gate["attempts"][-1].get("seed"), "resolution": "768x1376"})
-    stills.unload_vision()
     # 2. motion (network: Veo)
     clip_paths = {}
     for i, sh in enumerate(shots):
@@ -368,8 +369,9 @@ def stage_compose(pid: str, version: int | None = None) -> None:
         if r.returncode != 0:
             raise RuntimeError(f"{cmd[2]} failed: {r.stderr[-800:] or r.stdout[-800:]}")
     silent = pdir / "renders" / f"silent_v{version}.mp4"
-    r = subprocess.run(["npx", "hyperframes", "render", str(comp), "-o", str(silent), "-q", "delivery", "--quiet"], cwd=OM_ROOT,
-                       capture_output=True, text=True, timeout=2400)
+    env = {**os.environ, "NODE_OPTIONS": "--max-old-space-size=8192"}
+    r = subprocess.run(["npx", "hyperframes", "render", str(comp), "-o", str(silent), "-q", "delivery", "-w", "4", "--quiet"], cwd=OM_ROOT,
+                       capture_output=True, text=True, timeout=2400, env=env)
     if r.returncode != 0 or not silent.exists():
         raise RuntimeError(f"hyperframes render failed: {(r.stderr or r.stdout)[-1200:]}")
     vo = pdir / "assets" / "audio" / "vo" / "vo_master.wav"
@@ -450,8 +452,8 @@ def revise(pid: str) -> None:
             sh = next(s for s in plan["metadata"]["shots"] if s["id"] == sid)
             for f in (pdir / "assets" / "images" / f"{sid}.png", pdir / "assets" / "images" / f"{sid}.gate.json", pdir / "assets" / "video" / f"{sid}.mp4"):
                 f.unlink(missing_ok=True)
-            still, _ = stills.generate_still(pdir, sid, settings[sh["setting_id"]], sh["still_prompt"], world_seed)
-            stills.unload_vision()
+            stills.generate_stills(pdir, [{"shot_id": sid, "setting": settings[sh["setting_id"]], "prompt": sh["still_prompt"], "seed": world_seed}])
+            still = pdir / "assets" / "images" / f"{sid}.png"
             clip, _ = motion.generate_clip(pdir, sid, still, sh["motion_prompt"], world_seed)
             motion.fit_clip(clip, still, pdir / "assets" / "video" / f"{sid}_fit.mp4", manifest["metadata"]["spans"][sid][1])
         m = re.match(r"narration:(l\d\d|all)", t)

@@ -48,13 +48,14 @@ def save(w: dict) -> None:
 
 
 def build() -> None:
+    """Phase 1: every render with the GPU to itself. Phase 2: free the card, gate everything with the vision model."""
     w = load()
     existing = {s["id"]: s for s in w["settings"]}
     anchor = REFS / "home_desk.png"
+    rendered = []
     for i, spec in enumerate(SETTINGS):
         out = REFS / spec["ref"]
-        s = existing.get(spec["id"], {})
-        if s.get("accepted_by_owner"):
+        if existing.get(spec["id"], {}).get("accepted_by_owner"):
             log(f"{spec['id']}: accepted, untouched")
             continue
         seed = SEED + i
@@ -68,6 +69,10 @@ def build() -> None:
             run_tool("google_imagen", {"prompt": spec["gen_prompt"], "aspect_ratio": "9:16", "model": "imagen-4.0-generate-001", "output_path": str(raw)})
             run_tool("qwen_image_edit_local", {"prompt": "Keep this scene exactly, but make the hands, the black leather watch on the left wrist, the silver cufflink and the phone case match the second image precisely. " + stills.constants(),
                                                "image_paths": [str(raw), str(anchor)], "negative_prompt": stills.negative(), "seed": seed, "quantization": "4bit", "offload": "two_phase", "output_path": str(out)})
+        rendered.append((spec, seed, out))
+        save({**w, "settings": [existing[s["id"]] for s in SETTINGS if s["id"] in existing]})
+    stills.free_gpu()
+    for spec, seed, out in rendered:
         gate = stills.is_faceless_and_textless(out)
         log(f"{spec['id']}: gate {gate}")
         existing[spec["id"]] = {**{k: spec[k] for k in ("id", "ref", "description", "origin")}, "seed": seed, "sha256": sha256_file(out),

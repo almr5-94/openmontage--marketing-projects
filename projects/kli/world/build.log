@@ -1,89 +1,0 @@
-[02:04:27] home_desk: gate {'ok': True, 'face_answer': 'No.', 'text_answer': 'No.', 'opencv_faces': 0}
-[02:05:42] car: gate {'ok': False, 'face_answer': 'No.', 'text_answer': 'No.', 'opencv_faces': 1}
-[02:05:42] office_desk: regenerating from home_desk.png
-Loading pipeline components...:   0%|          | 0/4 [00:00<?, ?it/s]Loading pipeline components...:  25%|██▌       | 1/4 [00:00<00:00,  4.44it/s]Loading pipeline components...:  75%|███████▌  | 3/4 [00:00<00:00,  4.82it/s]
-Loading weights:   0%|          | 0/729 [00:00<?, ?it/s][A
-Loading weights:   0%|          | 1/729 [00:01<15:53,  1.31s/it][A
-Loading weights:   0%|          | 2/729 [00:02<14:22,  1.19s/it][A
-Loading weights:   1%|          | 4/729 [00:02<06:15,  1.93it/s][A
-Loading weights:   1%|          | 5/729 [00:02<04:53,  2.47it/s][A
-Loading weights:   1%|          | 6/729 [00:02<03:57,  3.05it/s][A
-Loading weights:   2%|▏         | 16/729 [00:03<00:56, 12.59it/s][A
-Loading weights:   2%|▏         | 18/729 [00:03<00:59, 12.05it/s][A
-Loading weights:   4%|▍         | 28/729 [00:03<00:32, 21.88it/s][A
-Loading weights:   4%|▍         | 31/729 [00:03<00:37, 18.78it/s][A
-Loading weights:   5%|▌         | 40/729 [00:04<00:27, 25.45it/s][A
-Loading weights:   6%|▌         | 43/729 [00:04<00:33, 20.49it/s][A
-Loading weights:   7%|▋         | 52/729 [00:04<00:25, 26.70it/s][A
-Loading weights:   8%|▊         | 56/729 [00:04<00:29, 22.61it/s][A
-Loading weights:   9%|▉         | 64/729 [00:04<00:25, 26.54it/s][A
-Loading weights:   9%|▉         | 67/729 [00:05<00:31, 21.16it/s][A
-Loading weights:  10%|█         | 76/729 [00:05<00:23, 27.31it/s][A
-Loading weights:  11%|█         | 80/729 [00:05<00:26, 24.27it/s][A
-Loading weights:  12%|█▏        | 88/729 [00:05<00:21, 29.48it/s][A
-Loading weights:  13%|█▎        | 92/729 [00:06<00:25, 24.75it/s][A
-Loading weights:  14%|█▎        | 100/729 [00:06<00:21, 29.23it/s][A
-Loading weights:  14%|█▍        | 104/729 [00:06<00:25, 24.29it/s][A
-Loading weights:  15%|█▌        | 112/729 [00:06<00:20, 29.80it/s][A
-Loading weights:  16%|█▌        | 116/729 [00:07<00:23, 25.54it/s][A
-Loading weights:  17%|█▋        | 124/729 [00:07<00:19, 31.19it/s][A
-Loading weights:  18%|█▊        | 128/729 [00:07<00:23, 25.66it/s][A
-Loading weights:  19%|█▊        | 136/729 [00:07<00:19, 29.88it/s][A
-Loading weights:  19%|█▉        | 140/729 [00:07<00:24, 23.91it/s][A
-Loading weights:  20%|██        | 148/729 [00:08<00:20, 28.44it/s][A
-Loading weights:  21%|██        | 152/729 [00:08<00:24, 23.67it/s][A
-Loading weights:  22%|██▏       | 160/729 [00:08<00:19, 29.00it/s][A
-Loading weights:  22%|██▏       | 164/729 [00:08<00:22, 25.04it/s][A
-Loading weights:  24%|██▎       | 172/729 [00:08<00:18, 30.15it/s][A
-Loading weights:  24%|██▍       | 176/729 [00:09<00:21, 25.20it/s][A
-Loading weights:  25%|██▌       | 184/729 [00:09<00:18, 29.44it/s][A
-Loading weights:  26%|██▌       | 188/729 [00:09<00:22, 24.59it/s][A
-Loading weights:  27%|██▋       | 196/729 [00:09<00:18, 28.49it/s][A
-Loading weights:  27%|██▋       | 200/729 [00:10<00:22, 23.68it/s][A
-Loading weights:  29%|██▊       | 208/729 [00:10<00:18, 27.67it/s][A
-Loading weights:  29%|██▉       | 211/729 [00:10<00:25, 20.67it/s][A
-Loading weights:  30%|███       | 220/729 [00:10<00:19, 25.99it/s][A
-Loading weights:  31%|███       | 223/729 [00:11<00:23, 21.39it/s][A
-Loading weights:  32%|███▏      | 232/729 [00:11<00:18, 26.57it/s][A
-Loading weights:  32%|███▏      | 235/729 [00:11<00:22, 21.89it/s][A
-Loading weights:  33%|███▎      | 244/729 [00:11<00:17, 28.17it/s][A
-Loading weights:  34%|███▍      | 248/729 [00:12<00:19, 24.38it/s][A
-Loading weights:  35%|███▌      | 256/729 [00:12<00:16, 28.77it/s][A
-Loading weights:  36%|███▌      | 260/729 [00:12<00:20, 23.08it/s][A
-Loading weights:  37%|███▋      | 268/729 [00:12<00:17, 26.72it/s][A
-Loading weights:  37%|███▋      | 271/729 [00:13<00:20, 21.96it/s][A
-Loading weights:  38%|███▊      | 280/729 [00:13<00:15, 28.24it/s][A
-Loading weights:  39%|███▉      | 284/729 [00:13<00:19, 22.75it/s][A
-Loading weights:  40%|████      | 292/729 [00:13<00:15, 28.04it/s][A
-Loading weights:  41%|████      | 296/729 [00:14<00:18, 23.03it/s][A
-Loading weights:  42%|████▏     | 304/729 [00:14<00:15, 27.50it/s][A
-Loading weights:  42%|████▏     | 308/729 [00:14<00:17, 23.70it/s][A
-Loading weights:  43%|████▎     | 316/729 [00:14<00:14, 28.74it/s][A
-Loading weights:  44%|████▍     | 320/729 [00:14<00:17, 23.75it/s][A
-Loading weights:  45%|████▍     | 328/729 [00:15<00:13, 28.80it/s][A
-Loading weights:  46%|████▌     | 332/729 [00:15<00:16, 23.75it/s][A
-Loading weights:  47%|████▋     | 341/729 [00:15<00:11, 33.19it/s][A
-Loading weights:  50%|█████     | 367/729 [00:15<00:04, 72.73it/s][A
-Loading weights:  54%|█████▍    | 393/729 [00:15<00:03, 104.64it/s][A
-Loading weights:  57%|█████▋    | 419/729 [00:15<00:02, 137.29it/s][A
-Loading weights:  61%|██████    | 445/729 [00:15<00:01, 163.60it/s][A
-Loading weights:  65%|██████▌   | 475/729 [00:16<00:01, 195.95it/s][A
-Loading weights:  68%|██████▊   | 499/729 [00:16<00:01, 204.76it/s][A
-Loading weights:  73%|███████▎  | 529/729 [00:16<00:00, 229.71it/s][A
-Loading weights:  77%|███████▋  | 559/729 [00:16<00:00, 245.65it/s][A
-Loading weights:  80%|████████  | 585/729 [00:16<00:00, 243.21it/s][A
-Loading weights:  84%|████████▍ | 613/729 [00:16<00:00, 250.24it/s][A
-Loading weights:  88%|████████▊ | 643/729 [00:16<00:00, 254.42it/s][A
-Loading weights:  92%|█████████▏| 673/729 [00:16<00:00, 261.57it/s][A
-Loading weights:  97%|█████████▋| 705/729 [00:16<00:00, 277.60it/s][ALoading weights: 100%|██████████| 729/729 [00:17<00:00, 42.74it/s] 
-Loading pipeline components...: 100%|██████████| 4/4 [00:18<00:00,  6.15s/it]Loading pipeline components...: 100%|██████████| 4/4 [00:18<00:00,  4.50s/it]
-/home/abood/work/openmontage--marketing-projects/.venv/lib/python3.12/site-packages/bitsandbytes/backends/cuda/ops.py:957: UserWarning: inner dimension (3420) is not aligned for fast kernel with blocksize=64, falling back to slower implementation.
-  warn(
-Loading pipeline components...:   0%|          | 0/5 [00:00<?, ?it/s]Loading pipeline components...:  20%|██        | 1/5 [00:00<00:00,  6.69it/s]Loading pipeline components...:  60%|██████    | 3/5 [00:00<00:00,  5.52it/s]
-Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s][A
-Loading checkpoint shards:  20%|██        | 1/5 [00:11<00:44, 11.19s/it][A
-Loading checkpoint shards:  40%|████      | 2/5 [00:21<00:32, 10.78s/it][A
-Loading checkpoint shards:  60%|██████    | 3/5 [00:32<00:21, 10.61s/it][A
-Loading checkpoint shards:  80%|████████  | 4/5 [00:42<00:10, 10.50s/it][A
-Loading checkpoint shards: 100%|██████████| 5/5 [00:43<00:00,  7.06s/it][ALoading checkpoint shards: 100%|██████████| 5/5 [00:43<00:00,  8.68s/it]
-Loading pipeline components...:  80%|████████  | 4/5 [00:44<00:15, 15.27s/it]Loading pipeline components...: 100%|██████████| 5/5 [00:44<00:00,  8.88s/it]

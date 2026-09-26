@@ -128,3 +128,6 @@ projects/kli/publish/
 projects/kli/metrics/
 projects/kli/live_enabled.json
 projects/kli/**/__pycache__/
+projects/kli/events.jsonl
+projects/kli/world/build.log
+projects/kli/world/refs/*.imagen.png
