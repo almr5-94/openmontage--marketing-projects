@@ -486,3 +486,24 @@ regenerate whatever it names.
 
 Where this came from: a pilot shipped with the closing shot showing a character with
 one blank eye. Everything else had been verified.
+
+## Arabic / RTL compositions
+
+Arabic reels shipped from this repo (the Sard September reels, Kuwait Legal Insider) follow
+one pattern; do not reinvent it per project.
+
+- Put `lang="ar"` on `<html>` and `direction: rtl` on the composition root. Text nodes then
+  shape and order correctly without per-element hacks.
+- Bundle the fonts locally under `composition/assets/` with `@font-face`: Tajawal for captions,
+  IBM Plex Sans Arabic 700 for headlines. Never rely on a system font — the render host and the
+  preview host differ.
+- **Latin digits only.** Arabic-Indic `٠-٩` never appear in a caption, an overlay or a filename.
+  `lib/arabic_captions.py::assert_caption_safe` enforces it; run every chunk through it.
+- Never animate per letter or per glyph — it breaks Arabic joining. Animate the chunk.
+- Caption timing comes from the narrator's own word timestamps (faster-whisper large-v3,
+  `word_timestamps=True`), not from a character-per-second estimate:
+  `lib/arabic_captions.py::chunks_from_words`.
+- Keep chunks at four words / 28 characters; the rule is the phone screen, not the sentence.
+- Verify with `hyperframes snapshot` at a caption timestamp and read the Arabic in the PNG before
+  trusting a render; libass-style subtitle filters dropped lam-alef ligatures in earlier tests,
+  which is why captions are typeset in the composition.

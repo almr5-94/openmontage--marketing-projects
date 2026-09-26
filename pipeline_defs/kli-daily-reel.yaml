@@ -1,0 +1,130 @@
+name: kli-daily-reel
+version: "1.0"
+description: >
+  Kuwait Legal Insider daily reel. One unattended Arabic 9:16 reel a day: topic picked from the
+  KLI idea bank, script written against a fetched primary source, realistic faceless POV shots
+  from a recurring world (local Qwen edits of accepted reference stills animated by Veo), one
+  signed male Kuwaiti ElevenLabs narrator, word-timed Arabic captions in a HyperFrames RTL
+  composition, Lyria bed, then an independent judge that watches and listens before the
+  owner-gated publish stage. Driven by projects/kli/kli_daily.py, not by an agent session.
+category: custom
+stability: beta
+
+default_checkpoint_policy: auto_noncreative
+
+extensions:
+  custom_scripts: true
+  custom_playbooks: false
+  custom_skills: false
+  custom_tools: false
+
+required_skills:
+  - core/hyperframes
+  - core/whisperx
+  - meta/checkpoint-protocol
+
+orchestration:
+  mode: python-driver
+  skill: core/hyperframes
+  budget_default_usd: 15.00
+  max_revisions_per_stage: 1
+  max_send_backs: 1
+  max_wall_time_minutes: 100
+
+compatible_playbooks: []
+
+stages:
+  - name: idea
+    produces: [brief, decision_log]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Topic is not in the KLI script ledger or rejection register
+      - Topic carries a primary source URL and a demonstration object
+    success_criteria:
+      - Schema-valid brief with target_platform instagram and 15-40 s duration
+
+  - name: script
+    required_artifacts_in: [brief]
+    produces: [script]
+    tools_available: [jev_judge]
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Every consequential claim is bounded by the fetched source passage
+      - Latin digits only; Kuwaiti register; consequence-first opening
+      - jev_judge script_check flags no legal-promise risk at or above threshold
+    success_criteria:
+      - Schema-valid script with 4-6 sections and sources in metadata
+
+  - name: scene_plan
+    required_artifacts_in: [script]
+    produces: [scene_plan]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Exactly 4 generated shots, each bound to an accepted world setting
+      - No face, no readable text, no logo requested in any prompt
+    success_criteria:
+      - Schema-valid scene_plan covering the whole script duration
+
+  - name: assets
+    required_artifacts_in: [scene_plan, script]
+    produces: [asset_manifest]
+    required_tools: [elevenlabs_tts, qwen_image_edit_local, veo_video]
+    optional_tools: [google_imagen, google_music]
+    tools_available: [elevenlabs_tts, qwen_image_edit_local, google_imagen, veo_video, google_music, transcriber]
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Narration WER against the script at or below 0.03
+      - Every still passed the no-face / no-text gate
+      - At most one shot fell back to its still
+      - Spend so far under the per-reel budget
+    success_criteria:
+      - Schema-valid asset_manifest; every path exists on disk
+
+  - name: edit
+    required_artifacts_in: [scene_plan, asset_manifest]
+    produces: [edit_decisions]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - render_runtime is hyperframes and the composition entry exists
+      - Caption chunks pass assert_caption_safe
+
+  - name: compose
+    required_artifacts_in: [edit_decisions, asset_manifest]
+    produces: [render_report]
+    required_tools: [audio_mixer]
+    tools_available: [audio_mixer]
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - hyperframes lint and validate pass before render
+      - Output is 1080x1920, 30 fps, h264/aac, 15-40 s
+
+  - name: judge
+    required_artifacts_in: [render_report, script]
+    produces: [final_review]
+    tools_available: [frame_sampler, transcriber]
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Independent judge watched the whole video and heard the audio
+      - PASS needs 85/100 and all eight KLI gates; verdict bound to sha256
+      - One revision at most; a second REJECT ends the day
+
+  - name: publish
+    required_artifacts_in: [render_report, final_review]
+    produces: [publish_log]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - projects/kli/live_enabled.json signed and unexpired
+      - Inside the 16:00-20:00 Asia/Kuwait window
+      - Verdict sha256 matches the file being published

@@ -26,7 +26,7 @@ pipeline/
 tests/qa/output/
 
 # Project workspaces (generated assets, renders — all regenerable)
-projects/
+projects/*
 
 # Corpus directories (downloaded stock clips, thumbnails, embeddings —
 # regenerable from source APIs via corpus_builder). Explicit rule even
@@ -119,3 +119,12 @@ assets/references/*/motion/
 assets/references/*/raw-partial-pngs/
 assets/references/*/dataset-*/
 assets/references/*/quarantine/
+
+# Kuwait Legal Insider factory code is tracked; its media, credentials-adjacent files and per-reel outputs are not
+!projects/kli/
+projects/kli/world/refs/
+projects/kli/voice/casting/
+projects/kli/publish/
+projects/kli/metrics/
+projects/kli/live_enabled.json
+projects/kli/**/__pycache__/
