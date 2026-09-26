@@ -1,0 +1,10 @@
+[Unit]
+Description=KLI metrics hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=kli-metrics.service
+
+[Install]
+WantedBy=timers.target

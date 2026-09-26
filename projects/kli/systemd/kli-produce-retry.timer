@@ -1,0 +1,10 @@
+[Unit]
+Description=KLI produce retry at 11:30 Kuwait time (resumes an interrupted run; exits 0 if judged)
+
+[Timer]
+OnCalendar=*-*-* 11:30:00
+Persistent=true
+Unit=kli-produce.service
+
+[Install]
+WantedBy=timers.target

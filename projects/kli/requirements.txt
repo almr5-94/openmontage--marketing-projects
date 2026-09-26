@@ -1,0 +1,4 @@
+# installed into the OpenMontage .venv with: uv pip install --python .venv/bin/python -r projects/kli/requirements.txt
+opencv-python-headless<5
+beautifulsoup4
+requests

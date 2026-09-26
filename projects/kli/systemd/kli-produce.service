@@ -1,0 +1,11 @@
+[Unit]
+Description=Kuwait Legal Insider — produce and judge today's reel
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/abood/work/openmontage--marketing-projects
+ExecStart=/home/abood/work/openmontage--marketing-projects/.venv/bin/python projects/kli/kli_daily.py run
+TimeoutStartSec=2h
+Nice=10
+Environment=PYTHONUNBUFFERED=1

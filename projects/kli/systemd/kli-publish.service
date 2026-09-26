@@ -1,0 +1,10 @@
+[Unit]
+Description=Kuwait Legal Insider — publish the judged reel (owner switch required)
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/abood/work/openmontage--marketing-projects
+ExecStart=/home/abood/work/openmontage--marketing-projects/.venv/bin/python projects/kli/kli_publish.py
+TimeoutStartSec=20m
+Environment=PYTHONUNBUFFERED=1

@@ -1,0 +1,10 @@
+[Unit]
+Description=KLI produce at 09:00 Kuwait time
+
+[Timer]
+OnCalendar=*-*-* 09:00:00
+Persistent=true
+Unit=kli-produce.service
+
+[Install]
+WantedBy=timers.target
