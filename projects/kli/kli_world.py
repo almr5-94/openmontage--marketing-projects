@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -63,24 +64,29 @@ def build() -> None:
         if spec.get("regen_from"):
             log(f"{spec['id']}: regenerating from {spec['regen_from']}")
             try:
+                if os.environ.get("KLI_IMAGEN_ONLY"):
+                    raise RuntimeError("KLI_IMAGEN_ONLY set: the machine cannot host the 20B editor right now")
                 stills.qwen_edit_isolated({"prompt": spec["regen_prompt"] + " " + stills.constants(), "image_paths": [str(REFS / spec["regen_from"])],
                                            "negative_prompt": stills.negative(), "seed": seed, "quantization": "4bit", "offload": "two_phase", "output_path": str(out)})
             except Exception as exc:
                 log(f"{spec['id']}: qwen failed ({str(exc)[:120]}); falling back to imagen from text")
-                run_tool("google_imagen", {"prompt": spec["regen_prompt"] + " First-person phone photo, vertical. " + stills.constants(), "aspect_ratio": "9:16",
-                                           "model": "imagen-4.0-generate-001", "output_path": str(out)})
-                origin += " (imagen fallback)"
+                run_tool("google_imagen", {"prompt": spec["regen_prompt"] + " Keep the same hands, watch, cufflink, phone and notebook as in the reference image. First-person phone photo, vertical. " + stills.constants(),
+                                           "aspect_ratio": "9:16", "model": stills.GEMINI_IMAGE_MODEL, "reference_image_paths": [str(REFS / spec["regen_from"])], "output_path": str(out)})
+                origin += f" ({stills.GEMINI_IMAGE_MODEL} from {spec['regen_from']})"
         elif spec.get("gen_prompt") and not out.exists():
             log(f"{spec['id']}: imagen then one qwen pass against the anchor")
             raw = REFS / f"{spec['id']}.imagen.png"
-            run_tool("google_imagen", {"prompt": spec["gen_prompt"], "aspect_ratio": "9:16", "model": "imagen-4.0-generate-001", "output_path": str(raw)})
+            run_tool("google_imagen", {"prompt": spec["gen_prompt"] + " The hands, watch, cufflink, phone case and notebook must match the reference image exactly.",
+                                       "aspect_ratio": "9:16", "model": stills.GEMINI_IMAGE_MODEL, "reference_image_paths": [str(anchor)], "output_path": str(raw)})
             try:
+                if os.environ.get("KLI_IMAGEN_ONLY"):
+                    raise RuntimeError("KLI_IMAGEN_ONLY set")
                 stills.qwen_edit_isolated({"prompt": "Keep this scene exactly, but make the hands, the black leather watch on the left wrist, the silver cufflink and the phone case match the second image precisely. " + stills.constants(),
                                            "image_paths": [str(raw), str(anchor)], "negative_prompt": stills.negative(), "seed": seed, "quantization": "4bit", "offload": "two_phase", "output_path": str(out)})
             except Exception as exc:
-                log(f"{spec['id']}: qwen pass failed ({str(exc)[:120]}); keeping the imagen render")
+                log(f"{spec['id']}: qwen pass failed ({str(exc)[:120]}); keeping the {stills.GEMINI_IMAGE_MODEL} render")
                 raw.replace(out)
-                origin += " (imagen only)"
+                origin += f" ({stills.GEMINI_IMAGE_MODEL} from home_desk reference)"
         spec = {**spec, "origin": origin}
         rendered.append((spec, seed, out))
         save({**w, "settings": [existing[s["id"]] for s in SETTINGS if s["id"] in existing]})

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import urllib.request
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from . import budget
 
 OLLAMA = "http://localhost:11434/api/generate"
 VISION_MODEL = "qwen2.5vl:7b"
+GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image"  # USD 0.039 per image; imagen-4.0-* return 404 on this key
 WORLD = SERIES_DIR / "world"
 
 
@@ -121,14 +123,15 @@ def render_still(out: Path, setting: dict, prompt: str, seed: int, tool_name: st
     """Render one still with Qwen (or Imagen as the last resort). No gate here — gates run in a batch."""
     out.parent.mkdir(parents=True, exist_ok=True)
     full_prompt = still_prompt_for(setting, prompt)
-    if tool_name == "google_imagen":
-        run_tool("google_imagen", {"prompt": full_prompt + " Vertical 9:16 phone photo.", "aspect_ratio": "9:16",
-                                   "model": "imagen-4.0-generate-001", "output_path": str(out)})
-        return {"tool": "google_imagen", "seed": None, "prompt": full_prompt}
     refs = [str(WORLD / "refs" / setting["ref"])]
     anchor = WORLD / "refs" / "home_desk.png"
     if anchor.exists() and setting["ref"] != "home_desk.png":
         refs.append(str(anchor))
+    if tool_name == "google_imagen":
+        # this key has no Imagen models; the Gemini image model takes the same references
+        run_tool("google_imagen", {"prompt": full_prompt + " Vertical 9:16 phone photo, same scene and hands as the reference images.",
+                                   "aspect_ratio": "9:16", "model": GEMINI_IMAGE_MODEL, "reference_image_paths": refs, "output_path": str(out)})
+        return {"tool": "google_imagen", "model": GEMINI_IMAGE_MODEL, "seed": None, "prompt": full_prompt}
     log(f"{out.stem}: qwen edit seed {seed}")
     qwen_edit_isolated({
         "prompt": full_prompt, "image_paths": refs, "negative_prompt": negative(), "seed": seed,
@@ -172,12 +175,15 @@ def generate_stills(project_dir: Path, jobs: list[dict]) -> dict[str, dict]:
             results[j["shot_id"]] = read_json(gate_path)
         else:
             pending.append({**j, "attempts": []})
-    for round_no, (tool_name, seed_shift) in enumerate((("qwen_image_edit_local", 0), ("qwen_image_edit_local", 1000), ("google_imagen", 0))):
+    rounds = (("qwen_image_edit_local", 0), ("qwen_image_edit_local", 1000), ("google_imagen", 0))
+    if os.environ.get("KLI_IMAGEN_ONLY"):  # the machine cannot host the 20B editor: go straight to the reference-conditioned Gemini image model
+        rounds = (("google_imagen", 0), ("google_imagen", 1000))
+    for round_no, (tool_name, seed_shift) in enumerate(rounds):
         if not pending:
             break
         for j in pending:
             if tool_name == "google_imagen":
-                budget.assert_can_spend(project_dir, 0.05, f"google_imagen {j['shot_id']}")
+                budget.assert_can_spend(project_dir, 0.04, f"google_imagen {j['shot_id']}")
             try:
                 j["last"] = render_still(out_dir / f"{j['shot_id']}.png", j["setting"], j["prompt"], j["seed"] + seed_shift, tool_name)
             except Exception as exc:  # a killed or failed render is a rejected attempt, not a crash

@@ -126,6 +126,15 @@ class GoogleImagen(BaseTool):
                 "(gemini-*) routed through generate_content. Use "
                 "gemini-2.5-flash-image when the project has no Imagen access.",
             },
+            "reference_image_paths": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "Up to 3 local images passed with the prompt as references "
+                    "(Gemini image models only; ignored by Imagen :predict). Use "
+                    "them to keep a character, hands, props or a setting consistent."
+                ),
+            },
             "number_of_images": {
                 "type": "integer",
                 "default": 1,
@@ -232,11 +241,20 @@ class GoogleImagen(BaseTool):
             image_config=types.ImageConfig(aspect_ratio=aspect_ratio),
         )
 
+        contents: list = []
+        for ref in (inputs.get("reference_image_paths") or [])[:3]:
+            ref_path = Path(ref)
+            if not ref_path.exists():
+                return ToolResult(success=False, error=f"Reference image not found: {ref}")
+            mime = "image/png" if ref_path.suffix.lower() == ".png" else "image/jpeg"
+            contents.append(types.Part.from_bytes(data=ref_path.read_bytes(), mime_type=mime))
+        contents.append(prompt)
+
         image_bytes: list[bytes] = []
         try:
             for _ in range(number_of_images):
                 response = client.models.generate_content(
-                    model=model, contents=prompt, config=config
+                    model=model, contents=contents, config=config
                 )
                 for part in response.candidates[0].content.parts or []:
                     inline = getattr(part, "inline_data", None)
