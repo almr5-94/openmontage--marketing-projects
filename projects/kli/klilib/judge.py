@@ -56,7 +56,9 @@ def format_gate(path: Path) -> dict:
 def wer_gate(path: Path, lines: list[str]) -> dict:
     import difflib
 
-    words = voice.transcribe_words(path)
+    wav = path.with_suffix(".judge.wav")  # transcribe the extracted audio, never the container
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(path), "-vn", "-ac", "1", "-ar", "16000", str(wav)], check=True)
+    words = voice.transcribe_words(wav)
     heard = normalize_ar(" ".join(w for w, _, _ in words))
     ref = normalize_ar(" ".join(lines))
     e = wer(ref, heard)
@@ -152,7 +154,7 @@ def final_review_artifact(project_dir: Path, verdict: dict, video: Path) -> dict
                                 "fps": fmt["fps"], "has_audio": fmt["audio_codec"] is not None, "codec": fmt["codec"] or "", "file_size_bytes": fmt["file_size_bytes"], "issues": []},
             "visual_spotcheck": {"frames_sampled": verdict["faceless"]["frames"], "black_frames_detected": False, "broken_overlays": False,
                                  "missing_assets": False, "unreadable_text": not verdict["gates"]["arabic_legible"], "issues": [i["evidence"] for i in verdict["issues"] if i.get("target", "").startswith("shot")]},
-            "audio_spotcheck": {"narration_present": True, "music_present": True, "unexpected_silence": False, "clipping_detected": False,
+            "audio_spotcheck": {"narration_present": True, "music_present": (project_dir / "assets" / "music" / "lyria.mp3").exists(), "unexpected_silence": False, "clipping_detected": False,
                                 "mix_intelligible": verdict["gates"]["narration_natural"], "issues": []},
             "promise_preservation": {"delivery_promise_honored": verdict["gates"]["privacy_faceless_clear"], "renderer_family_used": "kli-pov-reel",
                                      "render_runtime_used": "hyperframes", "runtime_swap_detected": False, "runtime_swap_check": "edit_decisions.render_runtime == hyperframes",

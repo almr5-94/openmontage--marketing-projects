@@ -75,6 +75,8 @@ def _art(pid: str, name: str) -> dict:
 
 
 def _save_art(pid: str, name: str, data: dict, validate: bool = True) -> dict:
+    if name == "asset_manifest":  # optional keys must be absent, not null, for the schema
+        data["assets"] = [{k: v for k, v in a.items() if v is not None} for a in data["assets"]]
     if validate:
         validate_artifact(name, data)
     write_json(project_dir(pid) / "artifacts" / f"{name}.json", data)
@@ -312,12 +314,27 @@ def stage_assets(pid: str) -> None:
                    "voice_performance": {"delivery_cues_applied": True, "provider_text_used": True, "sample_approved": True, "sample_path": str(SERIES_DIR / "voice" / "pick.json")}})
     # 4. music bed (network: Lyria) — music_library is empty and pixabay has no key (logged in the elections)
     music = pdir / "assets" / "music" / "lyria.mp3"
+    music_note = "cached"
     if not music.exists():
-        budget.assert_can_spend(pdir, 0.12, "google_music")
-        run_tool("google_music", {"prompt": ("Quiet minimal underscore for a 30-second Arabic spoken-word reel about law: soft felt piano, low warm pad, "
-                                            "very sparse, 72 BPM, generous headroom for a male voice, no drums, no melody hooks, no vocals, no abrupt ending."),
-                                  "duration_seconds": int(timeline["total"]) + 8, "output_path": str(music)})
-    assets.append({"id": "music", "type": "music", "path": str(music.relative_to(OM_ROOT)), "source_tool": "google_music", "scene_id": "all"})
+        prompts = [
+            "Quiet minimal underscore: soft felt piano with sparse chords, a low warm string pad, very sparse, 72 BPM, generous headroom "
+            "for a spoken voice, no drums, no melody hooks, no vocals, gentle ending.",
+            "Calm ambient piano and warm pad, slow, sparse, instrumental, soft, no percussion, no vocals.",
+        ]
+        music_note = "failed"
+        for i, prompt in enumerate(prompts):
+            budget.assert_can_spend(pdir, 0.12, "google_music")
+            try:
+                run_tool("google_music", {"prompt": prompt, "duration_seconds": int(timeline["total"]) + 8, "output_path": str(music)})
+                music_note = f"prompt {i + 1}"
+                break
+            except Exception as exc:  # Lyria policy blocks are opaque; a reel without a bed is still a reel
+                log(f"google_music attempt {i + 1} failed: {str(exc)[:160]}")
+    if music.exists():
+        assets.append({"id": "music", "type": "music", "path": str(music.relative_to(OM_ROOT)), "source_tool": "google_music", "scene_id": "all",
+                       "generation_summary": music_note})
+    else:
+        log("no music bed: composing narration only")
     # 5. fit each clip to its narration span
     spans = _spans(script, plan, timeline)
     for sh in shots:
@@ -329,7 +346,9 @@ def stage_assets(pid: str) -> None:
                 "metadata": {"fallbacks": fallbacks, "spans": spans, "wer_per_line": timeline["wer_per_line"], "total_seconds": timeline["total"]}}
     _save_art(pid, "asset_manifest", manifest)
     dl = _decisions(pid, *[_decision("assets", "fallback_decision", f"Shot {sid} motion", [("veo_video", 0.0, "failed twice", "provider failure"), ("still_push_in", 1.0, "slow push-in on the gated still", None)],
-                                     "still_push_in", "Veo failed twice; one still-fallback is allowed per reel") for sid, c in clip_paths.items() if c is None])
+                                     "still_push_in", "Veo failed twice; one still-fallback is allowed per reel") for sid, c in clip_paths.items() if c is None],
+                    *([] if music.exists() else [_decision("assets", "fallback_decision", "Music bed", [("google_music", 0.0, "Lyria refused both prompts (policy block)", "provider refusal"),
+                                                                                                          ("no_music", 1.0, "narration only", None)], "no_music", "Lyria refused; a reel without a bed is still a reel")]))
     _ckpt(pid, "assets", "completed", {"asset_manifest": manifest, **({"decision_log": dl} if dl["decisions"] else {})})
 
 
@@ -367,7 +386,8 @@ def stage_edit(pid: str) -> None:
           "cuts": [{"id": s["id"], "source": f"{s['id']}_fit", "in_seconds": 0.0, "out_seconds": s["duration"], "layer": "primary"} for s in shots],
           "subtitles": {"enabled": True, "style": "kli-word-timed", "source": "assets/audio/vo/timeline.json", "font": "Tajawal", "font_size": 58,
                         "color": "#ffffff", "position": "bottom-center", "max_words_per_line": 4},
-          "music": {"asset_id": "music", "volume": 0.16, "ducking": True, "fade_in_seconds": 1.0, "fade_out_seconds": 1.5},
+          **({"music": {"asset_id": "music", "volume": 0.16, "ducking": True, "fade_in_seconds": 1.0, "fade_out_seconds": 1.5}}
+             if any(a["id"] == "music" for a in manifest["assets"]) else {}),
           "render_runtime": "hyperframes", "composition_mode": "atelier",
           "bespoke": {"entry": str((comp / "index.html").relative_to(OM_ROOT)), "composition_id": pid,
                       "art_direction": "realistic faceless POV phone footage from the recurring world; captions typeset in the composition; end card with takeaway and handle"},
@@ -380,7 +400,9 @@ def stage_compose(pid: str, version: int | None = None) -> None:
     pdir = project_dir(pid)
     ed = _art(pid, "edit_decisions")
     comp = pdir / "composition"
-    version = version or (_latest_version(pid) + 1)
+    if version is None:  # re-running compose after a failed gate re-uses the version whose final was never judged
+        latest = _latest_version(pid)
+        version = latest if latest and not (pdir / "artifacts" / f"kli_verdict_v{latest}.json").exists() else latest + 1
     t0 = time.time()
     for cmd in (["npx", "hyperframes", "lint", str(comp)], ["npx", "hyperframes", "validate", str(comp)]):
         r = subprocess.run(cmd, cwd=OM_ROOT, capture_output=True, text=True, timeout=600)
@@ -388,21 +410,29 @@ def stage_compose(pid: str, version: int | None = None) -> None:
         if r.returncode != 0:
             raise RuntimeError(f"{cmd[2]} failed: {r.stderr[-800:] or r.stdout[-800:]}")
     silent = pdir / "renders" / f"silent_v{version}.mp4"
-    env = {**os.environ, "NODE_OPTIONS": "--max-old-space-size=8192"}
-    r = subprocess.run(["npx", "hyperframes", "render", str(comp), "-o", str(silent), "-q", "delivery", "-w", "4", "--quiet"], cwd=OM_ROOT,
-                       capture_output=True, text=True, timeout=2400, env=env)
-    if r.returncode != 0 or not silent.exists():
-        raise RuntimeError(f"hyperframes render failed: {(r.stderr or r.stdout)[-1200:]}")
+    if silent.exists() and silent.stat().st_mtime > (comp / "index.html").stat().st_mtime:
+        log(f"reusing {silent.name} (newer than the composition)")
+    else:
+        env = {**os.environ, "NODE_OPTIONS": "--max-old-space-size=8192"}
+        r = subprocess.run(["npx", "hyperframes", "render", str(comp), "-o", str(silent), "-q", "delivery", "-w", "4", "--quiet"], cwd=OM_ROOT,
+                           capture_output=True, text=True, timeout=2400, env=env)
+        if r.returncode != 0 or not silent.exists():
+            raise RuntimeError(f"hyperframes render failed: {(r.stderr or r.stdout)[-1200:]}")
     vo = pdir / "assets" / "audio" / "vo" / "vo_master.wav"
-    music = OM_ROOT / next(a["path"] for a in _art(pid, "asset_manifest")["assets"] if a["id"] == "music")
+    music_asset = next((a for a in _art(pid, "asset_manifest")["assets"] if a["id"] == "music"), None)
     mixed = pdir / "assets" / "audio" / f"mix_v{version}.wav"
-    run_tool("audio_mixer", {"operation": "duck", "primary_audio": str(vo), "secondary_audio": str(music), "duck_level": -14,
-                             "normalize": True, "loudnorm_target": ed["metadata"]["loudnorm_target"], "output_path": str(mixed)})
+    if music_asset:
+        run_tool("audio_mixer", {"operation": "duck", "primary_audio": str(vo), "secondary_audio": str(OM_ROOT / music_asset["path"]), "duck_level": -18,
+                                 "normalize": True, "loudnorm_target": ed["metadata"]["loudnorm_target"], "output_path": str(mixed)})
+    else:
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(vo), "-af", f"loudnorm=I={ed['metadata']['loudnorm_target']}:LRA=11:TP=-1.5",
+                        "-ar", "48000", str(mixed)], check=True)
     final = pdir / "renders" / f"final_v{version}.mp4"
     total = ed["metadata"]["total_seconds"]
+    target = ed["metadata"]["loudnorm_target"]
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(silent), "-i", str(mixed), "-filter_complex",
-                    f"[1:a]afade=t=out:st={total - 1.5:.2f}:d=1.5,atrim=0:{total:.2f}[a]", "-map", "0:v", "-map", "[a]",
-                    "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-t", f"{total:.2f}", "-movflags", "+faststart", str(final)], check=True)
+                    f"[1:a]afade=t=out:st={total - 1.5:.2f}:d=1.5,atrim=0:{total:.2f},loudnorm=I={target}:LRA=11:TP=-1.5[a]", "-map", "0:v", "-map", "[a]",
+                    "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-t", f"{total:.2f}", "-movflags", "+faststart", str(final)], check=True)
     fmt = judge_mod.format_gate(final)
     report = {"version": "1.0", "outputs": [{"path": str(final.relative_to(OM_ROOT)), "format": "mp4", "codec": fmt["codec"], "audio_codec": fmt["audio_codec"],
                                             "resolution": f"{fmt['width']}x{fmt['height']}", "fps": fmt["fps"], "duration_seconds": fmt["duration"],

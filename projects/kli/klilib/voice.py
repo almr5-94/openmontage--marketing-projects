@@ -121,7 +121,8 @@ def build_narration(project_dir: Path, lines: list[str], caption_chunks: list[li
         ins += ["-i", str(vo / f"l{i + 1:02d}.wav")]
         ms = int(st * 1000)
         flt.append(f"[{i}]adelay={ms}|{ms}[a{i}]")
-    flt.append("".join(f"[a{i}]" for i in range(n)) + f"amix=inputs={n}:normalize=0,apad=whole_dur={total}[o]")
+    # amix, then bring the master to a fixed loudness so the music balance is deterministic
+    flt.append("".join(f"[a{i}]" for i in range(n)) + f"amix=inputs={n}:normalize=0,apad=whole_dur={total},loudnorm=I=-16:LRA=7:TP=-2[o]")
     master = vo / "vo_master.wav"
     subprocess.run(["ffmpeg", "-v", "error", "-y", *ins, "-filter_complex", ";".join(flt), "-map", "[o]",
                     "-ar", "48000", "-ac", "1", str(master)], check=True)
