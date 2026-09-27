@@ -1,0 +1,515 @@
+{
+ "cast_at": "2026-09-26T23:51:46.853952+00:00",
+ "test_lines": [
+  "تحس إن العقد واضح؟ الشرط اللي يغيّر كل شي مو مكتوب بالصفحة الأولى.",
+  "المادة 1 تعطيك القاعدة، بس المادة 12 تحدد متى ما تنطبق.",
+  "شوف التاريخ اللي بداخل الملف، مو التاريخ اللي مكتوب على الغلاف."
+ ],
+ "results": [
+  {
+   "key": "el_abu_salem__multilingual",
+   "voice_id": "G1QUjBCuRBbLbAmYlTgl",
+   "name": "Abu Salem - Professional and Impactful",
+   "model_id": "eleven_multilingual_v2",
+   "wer": 0.1212,
+   "gemini": {
+    "gulf_kuwaiti_accent": 10,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a clear, confident, and natural Kuwaiti accent that is perfect for explaining concepts in an engaging and accessible way."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_abu_salem__multilingual.mp3",
+   "sample_sha256": "44533d62995e8b8c7fa6d2fb72402a7c3020fc2f14fa4b9b7af575deba75c6ab"
+  },
+  {
+   "key": "el_abu_salem__v3",
+   "voice_id": "G1QUjBCuRBbLbAmYlTgl",
+   "name": "Abu Salem - Professional and Impactful",
+   "model_id": "eleven_v3",
+   "wer": 0.5455,
+   "gemini": {
+    "gulf_kuwaiti_accent": 10,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 7,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a clear, confident, and natural Gulf accent that is perfect for explaining complex topics in an accessible, conversational manner."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_abu_salem__v3.mp3",
+   "sample_sha256": "1a35d9e7cc4e15c5ee9e97fb400122555641ab7a93caf4ab0a9f9f902552c248"
+  },
+  {
+   "key": "el_hasan__multilingual",
+   "voice_id": "6wsXez7Nsh9HQSbtqwIK",
+   "name": "Hasan - Natural and Clear",
+   "model_id": "eleven_multilingual_v2",
+   "wer": 0.0606,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 8,
+    "warmth": 7,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a clear, confident, and natural Gulf accent that is perfectly suited for explaining concepts in a conversational yet authoritative manner."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_hasan__multilingual.mp3",
+   "sample_sha256": "c801be3b1909367a7ed9c648ee2e8046748490742cd3d27539d3bd56e46f52f7"
+  },
+  {
+   "key": "el_hasan__v3",
+   "voice_id": "6wsXez7Nsh9HQSbtqwIK",
+   "name": "Hasan - Natural and Clear",
+   "model_id": "eleven_v3",
+   "wer": 0.0606,
+   "gemini": {
+    "gulf_kuwaiti_accent": 10,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator's confident, warm, and natural conversational delivery is a perfect fit for the requested style."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_hasan__v3.mp3",
+   "sample_sha256": "fca85b303379b0000b11da840e1443d55e5af4d64ffe1c1857393fa8383b92af"
+  },
+  {
+   "key": "el_mustafa_abdulla__multilingual",
+   "voice_id": "TbzNVcMOFmKd8tUT5liY",
+   "name": "Mustafa Abdulla",
+   "model_id": "eleven_multilingual_v2",
+   "wer": 0.0909,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 7,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The speaker is a natural-sounding adult male with an authentic Gulf accent and a confident, clear delivery perfect for the content."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_mustafa_abdulla__multilingual.mp3",
+   "sample_sha256": "65c207a54992991fbf1b3555bb36c9381a849753712645333431ac54adc74c01"
+  },
+  {
+   "key": "el_mustafa_abdulla__v3",
+   "voice_id": "TbzNVcMOFmKd8tUT5liY",
+   "name": "Mustafa Abdulla",
+   "model_id": "eleven_v3",
+   "wer": 0.0909,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "mixed",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 7,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a clear, confident, and natural Gulf accent that is perfect for explaining concepts without sounding robotic or overly formal."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_mustafa_abdulla__v3.mp3",
+   "sample_sha256": "7a9f72c79cb5afd99c7d1fa9f2dfa218e58401135de8523a462b3e6f02084e20"
+  },
+  {
+   "key": "el_mohamed__multilingual",
+   "voice_id": "KJe6YIQ4MHI94EGaDZC7",
+   "name": "Mohamed - Warm Arabic Business Narrator",
+   "model_id": "eleven_multilingual_v2",
+   "wer": 0.0303,
+   "gemini": {
+    "gulf_kuwaiti_accent": 10,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a confident, warm, and natural Kuwaiti delivery that is perfect for explaining complex topics in an engaging way."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_mohamed__multilingual.mp3",
+   "sample_sha256": "de2f3103b13427e9a29ad0182f354e5100db98188a5ac3340e7b3816471439a4"
+  },
+  {
+   "key": "el_mohamed__v3",
+   "voice_id": "KJe6YIQ4MHI94EGaDZC7",
+   "name": "Mohamed - Warm Arabic Business Narrator",
+   "model_id": "eleven_v3",
+   "wer": 0.0909,
+   "gemini": {
+    "gulf_kuwaiti_accent": 10,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 7,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a clear, confident, and natural Kuwaiti accent that is perfect for explaining complex topics in an accessible way."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_mohamed__v3.mp3",
+   "sample_sha256": "877c033c51d758568ce8be4e812412c047661297fd2e0470d110934def974fbc"
+  },
+  {
+   "key": "el_ghawi__multilingual",
+   "voice_id": "DANw8bnAVbjDEHwZIoYa",
+   "name": "Ghawi - Professional and Dynamic",
+   "model_id": "eleven_multilingual_v2",
+   "wer": 0.0909,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "mixed",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator is a confident and natural-sounding adult male Gulf speaker with a warm, clear delivery that is perfectly suited for explaining complex topics conversationally."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_ghawi__multilingual.mp3",
+   "sample_sha256": "907024722ccd1e8105fd39c5e5ed90798dbd299738d03c39e7296d614b42a73d"
+  },
+  {
+   "key": "el_ghawi__v3",
+   "voice_id": "DANw8bnAVbjDEHwZIoYa",
+   "name": "Ghawi - Professional and Dynamic",
+   "model_id": "eleven_v3",
+   "wer": 0.0606,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator's confident, warm, and natural Gulf delivery is perfectly suited for explaining complex topics in an accessible and engaging manner."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_ghawi__v3.mp3",
+   "sample_sha256": "81c2817072a90b74009cf9e479a474103eba117140537061d8deeebd2783fe23"
+  },
+  {
+   "key": "el_sultan__multilingual",
+   "voice_id": "rUaPbzcZIu8df8iNL9WZ",
+   "name": "Sultan",
+   "model_id": "eleven_multilingual_v2",
+   "wer": 0.1212,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "mixed",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 7,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator is a perfect fit, with a natural, confident, and clear Gulf accent that makes complex legal topics easily understandable."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_sultan__multilingual.mp3",
+   "sample_sha256": "4a318b8c0ee3f1976af8e8b288b77f46bd01dc7257e612559c3884c50211a832"
+  },
+  {
+   "key": "el_sultan__v3",
+   "voice_id": "rUaPbzcZIu8df8iNL9WZ",
+   "name": "Sultan",
+   "model_id": "eleven_v3",
+   "wer": 0.0909,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a confident, warm, and natural Gulf accent that is perfect for explaining complex topics in an approachable way."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_sultan__v3.mp3",
+   "sample_sha256": "158d5c038807fc9247309c8f9f2b5e6c5f0755ca068c407f3857d65d25503ee0"
+  },
+  {
+   "key": "el_sahl__multilingual",
+   "voice_id": "TfevL8tqOhb9PBTrfU9u",
+   "name": "Sahl - Moderate and Clear",
+   "model_id": "eleven_multilingual_v2",
+   "wer": 0.0909,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "mixed",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 7,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a clear, confident, and natural Gulf accent that is perfect for explaining legal concepts in an accessible way."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_sahl__multilingual.mp3",
+   "sample_sha256": "44daea454a6766010904bdafbecd8fc37657d9c3ffab6246d84fe168e34298de"
+  },
+  {
+   "key": "el_sahl__v3",
+   "voice_id": "TfevL8tqOhb9PBTrfU9u",
+   "name": "Sahl - Moderate and Clear",
+   "model_id": "eleven_v3",
+   "wer": 0.1515,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 7,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a confident, natural, and clear delivery with a perfect Gulf accent for explaining legal concepts to a general audience."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_sahl__v3.mp3",
+   "sample_sha256": "d715b808a09f3af868daaed812871138bc9d9eca9c7d8d1786bfafc3e690d496"
+  },
+  {
+   "key": "el_khalifa_emirati__multilingual",
+   "voice_id": "pu898dCezKb5nwKM5RJV",
+   "name": "Khalifa Emirati",
+   "model_id": "eleven_multilingual_v2",
+   "wer": 0.0606,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 7,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a natural, confident, and clear conversational Gulf accent that is perfect for explaining concepts."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_khalifa_emirati__multilingual.mp3",
+   "sample_sha256": "f4247ef8b90556f998eee305774a7a6629850851e8d94d056483e72dcc250271"
+  },
+  {
+   "key": "el_khalifa_emirati__v3",
+   "voice_id": "pu898dCezKb5nwKM5RJV",
+   "name": "Khalifa Emirati",
+   "model_id": "eleven_v3",
+   "wer": 0.1515,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "mixed",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a confident, warm, and natural Gulf accent that is perfect for explaining complex topics in an accessible way."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_khalifa_emirati__v3.mp3",
+   "sample_sha256": "2b8a150e86b104257801b672b28f73e79d467c9b4ff9a8a90f409a7d8ca1d2e0"
+  },
+  {
+   "key": "el_fares__multilingual",
+   "voice_id": "5Spsi3mCH9e7futpnGE5",
+   "name": "Fares - Comforting, Balanced and Clear",
+   "model_id": "eleven_multilingual_v2",
+   "wer": 0.0303,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "mixed",
+    "sounds_adult_male": true,
+    "naturalness": 8,
+    "warmth": 6,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a natural, confident delivery and a clear Gulf accent that is perfect for explaining complex topics in an accessible way."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_fares__multilingual.mp3",
+   "sample_sha256": "82ae689ae4302503fe203f837e33728e296f0e4608c82a914026bf80cd31c75b"
+  },
+  {
+   "key": "el_fares__v3",
+   "voice_id": "5Spsi3mCH9e7futpnGE5",
+   "name": "Fares - Comforting, Balanced and Clear",
+   "model_id": "eleven_v3",
+   "wer": 0.0303,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a natural, warm, and confident conversational Gulf accent that is perfect for explaining concepts clearly."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_fares__v3.mp3",
+   "sample_sha256": "85a94cbd7d45e68ecafd99ca0ef3a17d341f522c53626af714e9c57bb5983a2c"
+  },
+  {
+   "key": "el_yousuf__multilingual",
+   "voice_id": "WcswLmU3iGeMrhxfWXKN",
+   "name": "Yousuf - Cinematic Emirati Narrator",
+   "model_id": "eleven_multilingual_v2",
+   "wer": 0.0606,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "mixed",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 7,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a confident, natural delivery and an authentic Gulf accent, making him an excellent fit for the role."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_yousuf__multilingual.mp3",
+   "sample_sha256": "0157fa7d0c6fb7894a78a292bfdac989ecaac499779ffb20913730c3bbe269c1"
+  },
+  {
+   "key": "el_yousuf__v3",
+   "voice_id": "WcswLmU3iGeMrhxfWXKN",
+   "name": "Yousuf - Cinematic Emirati Narrator",
+   "model_id": "eleven_v3",
+   "wer": 0.0909,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a warm, confident, and natural Gulf accent that is perfectly suited for explaining concepts clearly to a general audience."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_yousuf__v3.mp3",
+   "sample_sha256": "cbb6cef379df1144bd9d3b526eb9c2af40992f3263d59ff2e4c68c438a55069f"
+  },
+  {
+   "key": "el_mohammed__multilingual",
+   "voice_id": "cWKuRwIA5GW57OPMLC3A",
+   "name": "Mohammed - Emirati ",
+   "model_id": "eleven_multilingual_v2",
+   "wer": 0.0303,
+   "gemini": {
+    "gulf_kuwaiti_accent": 10,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 7,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator is a confident, natural-sounding adult male with an authentic Gulf accent, perfectly matching the requirements for the role."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_mohammed__multilingual.mp3",
+   "sample_sha256": "b6e158d3f2834d00e72074bdbf2d20764c0ba06d6533d4a502d8827dd33e019c"
+  },
+  {
+   "key": "el_mohammed__v3",
+   "voice_id": "cWKuRwIA5GW57OPMLC3A",
+   "name": "Mohammed - Emirati ",
+   "model_id": "eleven_v3",
+   "wer": 0.0303,
+   "gemini": {
+    "gulf_kuwaiti_accent": 8,
+    "register": "mixed",
+    "sounds_adult_male": true,
+    "naturalness": 4,
+    "warmth": 3,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "reject",
+    "why": "The delivery is too formal and lacks the requested warmth and natural conversational style, sounding more like a standard documentary narrator."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_mohammed__v3.mp3",
+   "sample_sha256": "89d0d443901be8e0074931f2d793d2c1dcb0a68daff8d8163581fdcad05f5ff0"
+  },
+  {
+   "key": "el_jeddawi__multilingual",
+   "voice_id": "yXEnnEln9armDCyhkXcA",
+   "name": "Jeddawi - Calm, Confident, and Deep",
+   "model_id": "eleven_multilingual_v2",
+   "wer": 0.0606,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a natural, warm, and confident Gulf accent that is perfect for making complex legal topics accessible and engaging."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_jeddawi__multilingual.mp3",
+   "sample_sha256": "6c402a7050877293317f78b2bc0b0767009ff990ffa6cabf44ec0fe2427b3035"
+  },
+  {
+   "key": "el_jeddawi__v3",
+   "voice_id": "yXEnnEln9armDCyhkXcA",
+   "name": "Jeddawi - Calm, Confident, and Deep",
+   "model_id": "eleven_v3",
+   "wer": 0.1212,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a natural, warm, and confident delivery in a clear Kuwaiti/Gulf accent, perfectly matching the requirements for an engaging legal-understanding reel."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_jeddawi__v3.mp3",
+   "sample_sha256": "17e078fe2ffc13a63b8c3b8fca1f79d4f8e8e6b45e9c412411de8e336b9be7a4"
+  }
+ ],
+ "ranked": [
+  "el_mohamed__multilingual",
+  "el_fares__v3",
+  "el_mohammed__multilingual",
+  "el_fares__multilingual",
+  "el_hasan__v3",
+  "el_ghawi__v3",
+  "el_jeddawi__multilingual",
+  "el_khalifa_emirati__multilingual",
+  "el_yousuf__multilingual",
+  "el_hasan__multilingual",
+  "el_mohamed__v3",
+  "el_ghawi__multilingual",
+  "el_sultan__v3",
+  "el_yousuf__v3",
+  "el_mustafa_abdulla__multilingual",
+  "el_mustafa_abdulla__v3",
+  "el_sahl__multilingual",
+  "el_abu_salem__multilingual",
+  "el_jeddawi__v3",
+  "el_sultan__multilingual",
+  "el_khalifa_emirati__v3",
+  "el_sahl__v3",
+  "el_abu_salem__v3"
+ ]
+}

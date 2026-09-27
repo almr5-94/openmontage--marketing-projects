@@ -1,0 +1,348 @@
+{
+ "cast_at": "2026-09-26T23:24:49.931162+00:00",
+ "test_lines": [
+  "تحس إن العقد واضح؟ الشرط اللي يغيّر كل شي مو مكتوب بالصفحة الأولى.",
+  "المادة 1 تعطيك القاعدة، بس المادة 12 تحدد متى ما تنطبق.",
+  "شوف التاريخ اللي بداخل الملف، مو التاريخ اللي مكتوب على الغلاف."
+ ],
+ "results": [
+  {
+   "key": "el_roger_-_laid-back,_casual,_resonant__multilingual",
+   "voice_id": "CwhRBWXzGAHq8TQ4Fs17",
+   "name": "Roger - Laid-Back, Casual, Resonant",
+   "model_id": "eleven_multilingual_v2",
+   "wer": 0.0606,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 8,
+    "warmth": 6,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a clear, confident, and natural Kuwaiti accent that is perfect for explaining complex topics conversationally."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_roger_-_laid-back,_casual,_resonant__multilingual.mp3",
+   "sample_sha256": "a44c005daf881251d88ce687310c04d74e34a1a1d991d9f8aa5fe15dfcec16da"
+  },
+  {
+   "key": "el_roger_-_laid-back,_casual,_resonant__v3",
+   "voice_id": "CwhRBWXzGAHq8TQ4Fs17",
+   "name": "Roger - Laid-Back, Casual, Resonant",
+   "model_id": "eleven_v3",
+   "wer": 0.1212,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "mixed",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 7,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a confident, clear, and natural Gulf delivery that is well-suited for explaining complex topics."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_roger_-_laid-back,_casual,_resonant__v3.mp3",
+   "sample_sha256": "0b600e31bc560920e5c8ae96697fde094c21a53e4e3784928b4b836ac216be41"
+  },
+  {
+   "key": "el_charlie_-_deep,_confident,_energetic__multilingual",
+   "voice_id": "IKne3meq5aSn9XLyUdCD",
+   "name": "Charlie - Deep, Confident, Energetic",
+   "model_id": "eleven_multilingual_v2",
+   "wer": 0.0606,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a warm, confident, and natural delivery with an authentic Gulf accent, perfectly matching the requirements for the role."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_charlie_-_deep,_confident,_energetic__multilingual.mp3",
+   "sample_sha256": "a9d38804612045a0e1747feed00f213f084b5f2bd2553a11ee1596e9a623196b"
+  },
+  {
+   "key": "el_charlie_-_deep,_confident,_energetic__v3",
+   "voice_id": "IKne3meq5aSn9XLyUdCD",
+   "name": "Charlie - Deep, Confident, Energetic",
+   "model_id": "eleven_v3",
+   "wer": 0.0909,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a natural, warm, and confident Kuwaiti delivery that is perfectly suited for explaining complex topics in an accessible way."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_charlie_-_deep,_confident,_energetic__v3.mp3",
+   "sample_sha256": "c41bd426a3dd597c1a614617d8fa291b7547e191df6307f867d384b3cbc8ad06"
+  },
+  {
+   "key": "el_george_-_warm,_captivating_storyteller__multilingual",
+   "voice_id": "JBFqnCBsd6RMkjVDRZzb",
+   "name": "George - Warm, Captivating Storyteller",
+   "model_id": "eleven_multilingual_v2",
+   "wer": 0.0303,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator's confident, warm, and natural conversational Gulf delivery is perfectly suited for an educational social media reel."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_george_-_warm,_captivating_storyteller__multilingual.mp3",
+   "sample_sha256": "bf8980ec93ddcb1b2cd2e4a68473163d9cc33c038fecdeb5cf3887fe02692a1e"
+  },
+  {
+   "key": "el_george_-_warm,_captivating_storyteller__v3",
+   "voice_id": "JBFqnCBsd6RMkjVDRZzb",
+   "name": "George - Warm, Captivating Storyteller",
+   "model_id": "eleven_v3",
+   "wer": 0.0606,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a warm, natural, and confident delivery in a clear Gulf accent, making him an excellent fit for explaining legal concepts conversationally."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_george_-_warm,_captivating_storyteller__v3.mp3",
+   "sample_sha256": "e90b4206d90ffb35e37d858009441b1bcac2d357902df5ed68db2038537f1c73"
+  },
+  {
+   "key": "el_callum_-_husky_trickster__multilingual",
+   "voice_id": "N2lVS1w4EtoT3dr4eOWO",
+   "name": "Callum - Husky Trickster",
+   "model_id": "eleven_multilingual_v2",
+   "wer": 0.0606,
+   "gemini": {
+    "gulf_kuwaiti_accent": 10,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a confident, warm, and natural Kuwaiti conversational style that is perfect for explaining complex topics clearly."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_callum_-_husky_trickster__multilingual.mp3",
+   "sample_sha256": "436da50c1e10465bea45c02406b775a30c7f9279964c7f6867a2d7acae7bba04"
+  },
+  {
+   "key": "el_callum_-_husky_trickster__v3",
+   "voice_id": "N2lVS1w4EtoT3dr4eOWO",
+   "name": "Callum - Husky Trickster",
+   "model_id": "eleven_v3",
+   "wer": 0.0909,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "mixed",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 6,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a confident, natural delivery and a clear Gulf accent, making him an excellent fit for explaining legal concepts."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_callum_-_husky_trickster__v3.mp3",
+   "sample_sha256": "e2626268c59b97e6a1931fc6ca980261121a6ff21e88f49756197a29f7483cb9"
+  },
+  {
+   "key": "el_harry_-_fierce_warrior__multilingual",
+   "voice_id": "SOYHLrjzK2X1ezoPC6cr",
+   "name": "Harry - Fierce Warrior",
+   "model_id": "eleven_multilingual_v2",
+   "wer": 0.0303,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a natural, warm, and confident Gulf accent that perfectly suits the conversational and educational style required."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_harry_-_fierce_warrior__multilingual.mp3",
+   "sample_sha256": "d1594ca9e8a382e29e4acdf2ee5df0dc11dbf0d2af74e492e3073c5c35c1410d"
+  },
+  {
+   "key": "el_harry_-_fierce_warrior__v3",
+   "voice_id": "SOYHLrjzK2X1ezoPC6cr",
+   "name": "Harry - Fierce Warrior",
+   "model_id": "eleven_v3",
+   "wer": 0.1818,
+   "gemini": {
+    "gulf_kuwaiti_accent": 10,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a natural, confident, and warm delivery in an authentic Kuwaiti accent, perfectly matching the requirements for the role."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_harry_-_fierce_warrior__v3.mp3",
+   "sample_sha256": "9b80fc54711bf8739cb6381d4e453d0cc9fd40b7c3ee56721d2769184436c31e"
+  },
+  {
+   "key": "el_liam_-_energetic,_social_media_creator__multilingual",
+   "voice_id": "TX3LPaxmHKxFdv7VOQHJ",
+   "name": "Liam - Energetic, Social Media Creator",
+   "model_id": "eleven_multilingual_v2",
+   "wer": 0.0909,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a natural, warm, and confident conversational Gulf accent that is perfect for explaining concepts clearly."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_liam_-_energetic,_social_media_creator__multilingual.mp3",
+   "sample_sha256": "fe3a4f03803bd6c6dc347d5e500bb781546b2b64c271859ae6a67a30050fe3dd"
+  },
+  {
+   "key": "el_liam_-_energetic,_social_media_creator__v3",
+   "voice_id": "TX3LPaxmHKxFdv7VOQHJ",
+   "name": "Liam - Energetic, Social Media Creator",
+   "model_id": "eleven_v3",
+   "wer": 0.0606,
+   "gemini": {
+    "gulf_kuwaiti_accent": 10,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a clear, confident, and natural Gulf accent that is perfect for explaining concepts in a warm and engaging way."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_liam_-_energetic,_social_media_creator__v3.mp3",
+   "sample_sha256": "99716ece446363bc2f917a8804785c0ad4eba532e2759c18b371bae926dbeca0"
+  },
+  {
+   "key": "el_will_-_relaxed_optimist__multilingual",
+   "voice_id": "bIHbv24MWmeRgasZH58o",
+   "name": "Will - Relaxed Optimist",
+   "model_id": "eleven_multilingual_v2",
+   "wer": 0.0606,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a natural, confident, and warm conversational style with an authentic Kuwaiti accent, making him ideal for the role."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_will_-_relaxed_optimist__multilingual.mp3",
+   "sample_sha256": "885ebeda36b8f8587f02d5b08d246e77aee578419ec0f84757e297bbd781ef0d"
+  },
+  {
+   "key": "el_will_-_relaxed_optimist__v3",
+   "voice_id": "bIHbv24MWmeRgasZH58o",
+   "name": "Will - Relaxed Optimist",
+   "model_id": "eleven_v3",
+   "wer": 0.0909,
+   "gemini": {
+    "gulf_kuwaiti_accent": 9,
+    "register": "mixed",
+    "sounds_adult_male": true,
+    "naturalness": 7,
+    "warmth": 6,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a clear, confident, and professional Gulf accent that is well-suited for explaining legal concepts."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_will_-_relaxed_optimist__v3.mp3",
+   "sample_sha256": "a4b8b336e228d4b85cb8146d6800114385342f9c23f1e9e9999dcb1fcf3c63d4"
+  },
+  {
+   "key": "el_eric_-_smooth,_trustworthy__multilingual",
+   "voice_id": "cjVigY5qzO86Huf0OWal",
+   "name": "Eric - Smooth, Trustworthy",
+   "model_id": "eleven_multilingual_v2",
+   "wer": 0.1212,
+   "gemini": {
+    "gulf_kuwaiti_accent": 10,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a clear, confident, and natural Kuwaiti accent and delivery that is perfect for the requested content."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_eric_-_smooth,_trustworthy__multilingual.mp3",
+   "sample_sha256": "44806bbfe04c2049dd70c95818d52c1ce2775d286502249ae24ce7d364110d04"
+  },
+  {
+   "key": "el_eric_-_smooth,_trustworthy__v3",
+   "voice_id": "cjVigY5qzO86Huf0OWal",
+   "name": "Eric - Smooth, Trustworthy",
+   "model_id": "eleven_v3",
+   "wer": 0.0606,
+   "gemini": {
+    "gulf_kuwaiti_accent": 10,
+    "register": "kuwaiti_conversational",
+    "sounds_adult_male": true,
+    "naturalness": 9,
+    "warmth": 8,
+    "glitches": [],
+    "mispronounced": [],
+    "verdict": "accept",
+    "why": "The narrator has a confident, warm, and natural conversational Kuwaiti delivery that is perfect for explaining concepts clearly."
+   },
+   "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_eric_-_smooth,_trustworthy__v3.mp3",
+   "sample_sha256": "579c4a1b93affd5dff93de25cc8f56b923a44f351cf801e0acf66e1d96cab3ac"
+  }
+ ],
+ "ranked": [
+  "el_callum_-_husky_trickster__multilingual",
+  "el_liam_-_energetic,_social_media_creator__v3",
+  "el_eric_-_smooth,_trustworthy__v3",
+  "el_eric_-_smooth,_trustworthy__multilingual",
+  "el_harry_-_fierce_warrior__v3",
+  "el_george_-_warm,_captivating_storyteller__multilingual",
+  "el_harry_-_fierce_warrior__multilingual",
+  "el_charlie_-_deep,_confident,_energetic__multilingual",
+  "el_george_-_warm,_captivating_storyteller__v3",
+  "el_will_-_relaxed_optimist__multilingual",
+  "el_charlie_-_deep,_confident,_energetic__v3",
+  "el_liam_-_energetic,_social_media_creator__multilingual",
+  "el_roger_-_laid-back,_casual,_resonant__v3",
+  "el_callum_-_husky_trickster__v3",
+  "el_roger_-_laid-back,_casual,_resonant__multilingual",
+  "el_will_-_relaxed_optimist__v3"
+ ]
+}

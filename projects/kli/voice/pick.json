@@ -1,0 +1,29 @@
+{
+ "voice_key": "el_mohamed__multilingual",
+ "voice_id": "KJe6YIQ4MHI94EGaDZC7",
+ "name": "Mohamed - Warm Arabic Business Narrator",
+ "model_id": "eleven_multilingual_v2",
+ "settings": {
+  "stability": 0.45,
+  "similarity_boost": 0.8,
+  "style": 0.25,
+  "speed": 1.0
+ },
+ "wer": 0.0303,
+ "scores": {
+  "gulf_kuwaiti_accent": 10,
+  "register": "kuwaiti_conversational",
+  "sounds_adult_male": true,
+  "naturalness": 9,
+  "warmth": 8,
+  "glitches": [],
+  "mispronounced": [],
+  "verdict": "accept",
+  "why": "The narrator has a confident, warm, and natural Kuwaiti delivery that is perfect for explaining complex topics in an engaging way."
+ },
+ "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_mohamed__multilingual.mp3",
+ "sample_sha256": "de2f3103b13427e9a29ad0182f354e5100db98188a5ac3340e7b3816471439a4",
+ "signed_by": null,
+ "signed_at": null,
+ "note": "unsigned proposal — the owner signs with kli_cast.py sign"
+}

@@ -1,0 +1,29 @@
+{
+ "voice_key": "el_callum_-_husky_trickster__multilingual",
+ "voice_id": "N2lVS1w4EtoT3dr4eOWO",
+ "name": "Callum - Husky Trickster",
+ "model_id": "eleven_multilingual_v2",
+ "settings": {
+  "stability": 0.45,
+  "similarity_boost": 0.8,
+  "style": 0.25,
+  "speed": 1.0
+ },
+ "wer": 0.0606,
+ "scores": {
+  "gulf_kuwaiti_accent": 10,
+  "register": "kuwaiti_conversational",
+  "sounds_adult_male": true,
+  "naturalness": 9,
+  "warmth": 8,
+  "glitches": [],
+  "mispronounced": [],
+  "verdict": "accept",
+  "why": "The narrator has a confident, warm, and natural Kuwaiti conversational style that is perfect for explaining complex topics clearly."
+ },
+ "sample": "/home/abood/work/openmontage--marketing-projects/projects/kli/voice/casting/el_callum_-_husky_trickster__multilingual.mp3",
+ "sample_sha256": "436da50c1e10465bea45c02406b775a30c7f9279964c7f6867a2d7acae7bba04",
+ "signed_by": null,
+ "signed_at": null,
+ "note": "unsigned proposal — the owner signs with kli_cast.py sign"
+}

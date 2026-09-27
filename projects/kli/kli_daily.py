@@ -173,9 +173,13 @@ def stage_idea(pid: str) -> None:
     pick = gemini.ask_json(IDEA_PICK.format(pack=kli_repo.reading_pack()[:60000],
                                             shortlist=json.dumps([{**t, "source_excerpt": excerpts[t["topic_id"]][:3000]} for t in fetched], ensure_ascii=False)),
                            model=gemini.PRO, project_dir=pdir, purpose="idea_pick")
-    chosen = next((t for t in fetched if t["topic_id"] == pick.get("topic_id")), fetched[0])
-    if pick.get("supported_by_passage") is False:
-        chosen = fetched[0] if fetched[0]["topic_id"] != pick.get("topic_id") else (fetched[1] if len(fetched) > 1 else fetched[0])
+    chosen = next((t for t in fetched if t["topic_id"] == pick.get("topic_id")), None)
+    pick_reason = str(pick.get("reason", ""))
+    if chosen is None or pick.get("supported_by_passage") is False:
+        # the editor pass rejected every supportable topic: say so, take the top-ranked one, let the judge decide
+        chosen = fetched[0]
+        pick_reason = f"editor pass did not endorse any shortlisted topic ({pick_reason[:160]}); proceeded with the top-ranked supportable topic — the judge decides"
+    pick["reason"] = pick_reason
     brief = {
         "version": "1.0", "title": f"KLI {pid[4:]} — {chosen['topic_id']}", "hook": chosen["claim"],
         "key_points": [chosen["claim"]], "core_message": chosen["claim"], "tone": "warm, direct, insider, high FOMO without deception",
