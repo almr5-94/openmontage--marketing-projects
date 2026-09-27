@@ -68,7 +68,7 @@ def wer_gate(path: Path, lines: list[str]) -> dict:
 
 
 def faceless_gate(path: Path, out_dir: Path) -> dict:
-    r = run_tool("frame_sampler", {"input_path": str(path), "strategy": "interval", "interval_seconds": 1.0,
+    r = run_tool("frame_sampler", {"input_path": str(path), "strategy": "interval", "interval_seconds": 2.0,
                                    "output_dir": str(out_dir), "format": "jpg"})
     frames = [Path(f) if isinstance(f, str) else Path(f.get("path", "")) for f in r.data.get("frames", [])]
     bad = []

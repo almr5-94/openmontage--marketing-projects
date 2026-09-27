@@ -1,0 +1,108 @@
+{
+  "version": "2026-09-27",
+  "seed": 4242,
+  "settings": [
+    {
+      "id": "home_desk",
+      "ref": "home_desk.png",
+      "description": "home desk by a window, laptop, notebook, coffee cup, phone",
+      "origin": "runway 2026-09-19",
+      "seed": 4242,
+      "sha256": "a70af0f15a38c8045fac019ae930c54dd342c1aa4e42e973e4f702f0f8d35a18",
+      "gate": {
+        "ok": true,
+        "face_answer": "No.",
+        "text_answer": "No.",
+        "opencv_candidates": 0,
+        "confirmed_faces": []
+      },
+      "accepted_by_owner": false,
+      "built_at": "2026-09-26T23:48:24.933154+00:00"
+    },
+    {
+      "id": "car",
+      "ref": "car.png",
+      "description": "passenger seat of a parked car in daylight, notebook on the lap, phone in hand",
+      "origin": "runway 2026-09-19",
+      "seed": 4243,
+      "sha256": "74104e773bc7ef902362cf7fc9ce41bc18874d79b15a1bb56c7192e88464e17c",
+      "gate": {
+        "ok": true,
+        "face_answer": "No.",
+        "text_answer": "No.",
+        "opencv_candidates": 1,
+        "confirmed_faces": []
+      },
+      "accepted_by_owner": false,
+      "built_at": "2026-09-26T23:50:58.326469+00:00"
+    },
+    {
+      "id": "office_desk",
+      "ref": "office_desk.png",
+      "description": "office desk, navy suit sleeve with white cuff, laptop and printed pages",
+      "origin": "regenerated 2026-09-27 (logo) (gemini-2.5-flash-image from home_desk.png)",
+      "seed": 4244,
+      "sha256": "f96f5f0699eef778affad37a035a4e88f5ab8a8a01809fcd4833fe1e0ad32475",
+      "gate": {
+        "ok": true,
+        "face_answer": "No.",
+        "text_answer": "No.",
+        "opencv_candidates": 0,
+        "confirmed_faces": []
+      },
+      "accepted_by_owner": false,
+      "built_at": "2026-09-26T23:52:21.748393+00:00"
+    },
+    {
+      "id": "library",
+      "ref": "library.png",
+      "description": "university library table, open law book, notebook, pen",
+      "origin": "generated 2026-09-27 (gemini-2.5-flash-image from home_desk reference)",
+      "seed": 4245,
+      "sha256": "a1dba04eb02fb7b392432300b56bf4903fddc38f3fa6eb7e2d7603d5bbd4e0c9",
+      "gate": {
+        "ok": true,
+        "face_answer": "No.",
+        "text_answer": "No.",
+        "opencv_candidates": 0,
+        "confirmed_faces": []
+      },
+      "accepted_by_owner": false,
+      "built_at": "2026-09-26T23:53:40.348959+00:00"
+    },
+    {
+      "id": "cafe",
+      "ref": "cafe.png",
+      "description": "cafe table, small coffee cup, phone in hand, laptop half open",
+      "origin": "generated 2026-09-27 (gemini-2.5-flash-image from home_desk reference)",
+      "seed": 4246,
+      "sha256": "0f12802dec03960f4f36f7cdefaafc605b8c0b346755ad33049874aab635c797",
+      "gate": {
+        "ok": true,
+        "face_answer": "No.",
+        "text_answer": "No.",
+        "opencv_candidates": 0,
+        "confirmed_faces": []
+      },
+      "accepted_by_owner": false,
+      "built_at": "2026-09-26T23:54:57.733148+00:00"
+    },
+    {
+      "id": "night_car",
+      "ref": "night_car.png",
+      "description": "parked car at night, dashboard glow, phone in hand",
+      "origin": "generated 2026-09-27 (gemini-2.5-flash-image from home_desk reference)",
+      "seed": 4247,
+      "sha256": "efe839246d1eac5dc8aa559e1d69455124edb6d89d3894553cac444694e4cbe5",
+      "gate": {
+        "ok": true,
+        "face_answer": "No.",
+        "text_answer": "No.",
+        "opencv_candidates": 0,
+        "confirmed_faces": []
+      },
+      "accepted_by_owner": false,
+      "built_at": "2026-09-26T23:56:13.851016+00:00"
+    }
+  ]
+}

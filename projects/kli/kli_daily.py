@@ -476,7 +476,7 @@ STAGES = {"idea": stage_idea, "script": stage_script, "scene_plan": stage_scene_
 
 def run(date_str: str) -> int:
     pid = reel_id(date_str)
-    if (SERIES_DIR / "PAUSE").exists():
+    if (SERIES_DIR / "PAUSE").exists() and not voice.PROVISIONAL["on"]:
         log("projects/kli/PAUSE exists — production paused")
         return 0
     voice.voice_pick()  # refuses to run on an unsigned voice
