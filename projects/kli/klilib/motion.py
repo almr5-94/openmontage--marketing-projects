@@ -7,8 +7,8 @@ from pathlib import Path
 from .common import run_tool, media_duration, log
 from . import budget, stills
 
-CLIP_SECONDS = 6
-VEO_USD_PER_SECOND_SILENT = 0.40  # tools/video/veo_video.py 1080p base rate; the tool reports actual
+CLIP_SECONDS = 8  # the Developer API forces 8 s for image_to_video
+VEO_USD_PER_SECOND = 0.20  # tools/video/veo_video.py 720p-with-audio rate, which is what the ledger records
 MAX_SLOWDOWN = 1.6
 
 
@@ -22,13 +22,14 @@ def generate_clip(project_dir: Path, shot_id: str, still: Path, motion_prompt: s
               f"No face, no person entering the frame, no text.")
     negative = stills.negative() + ", cinematic grade, camera cuts, zoom, morphing, extra fingers"
     errors = []
-    for s in (seed, seed + 1):
-        budget.assert_can_spend(project_dir, CLIP_SECONDS * VEO_USD_PER_SECOND_SILENT, f"veo_video {shot_id}")
+    for s in (seed, seed + 1):  # two attempts; the seed is only a label on this API
+        budget.assert_can_spend(project_dir, CLIP_SECONDS * VEO_USD_PER_SECOND, f"veo_video {shot_id}")
         log(f"{shot_id}: veo image_to_video seed {s}")
         r = run_tool_safe("veo_video", {
             "prompt": prompt, "backend": "google", "operation": "image_to_video", "image_path": str(still),
-            "duration": f"{CLIP_SECONDS}s", "aspect_ratio": "9:16", "resolution": "1080p", "generate_audio": False,
-            "negative_prompt": negative, "seed": s, "output_path": str(out)})
+            "duration": f"{CLIP_SECONDS}s", "aspect_ratio": "9:16", "resolution": "720p",
+            "model_variant": "veo-3.1-fast-generate-preview",
+            "negative_prompt": negative, "output_path": str(out)})  # Developer API: no seed, no generate_audio flag, 8 s; audio is discarded at fit time
         if r is None:
             errors.append(f"seed {s} failed")
             continue
