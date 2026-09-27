@@ -41,7 +41,7 @@ def accepted_settings() -> list[dict]:
     return [s for s in world()["settings"] if s.get("accepted_by_owner")]
 
 
-def ask_vision(image: Path, question: str, timeout: int = 180, keep_alive: str = "5m") -> str:
+def ask_vision(image: Path, question: str, timeout: int = 600, keep_alive: str = "5m") -> str:
     body = json.dumps({
         "model": VISION_MODEL, "prompt": question,
         "images": [base64.b64encode(image.read_bytes()).decode()],

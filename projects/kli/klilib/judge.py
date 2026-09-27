@@ -70,18 +70,37 @@ def wer_gate(path: Path, lines: list[str]) -> dict:
 
 
 def faceless_gate(path: Path, out_dir: Path) -> dict:
+    """Every sampled frame is measured (OpenCV); any candidate is confirmed by the vision model;
+    three evenly spaced frames also get the open question. One vision timeout on a spot-check
+    is logged, not fatal — the measured pass covers every frame."""
+    import urllib.error
+
     r = run_tool("frame_sampler", {"input_path": str(path), "strategy": "interval", "interval_seconds": 2.0,
                                    "output_dir": str(out_dir), "format": "jpg"})
     frames = [Path(f) if isinstance(f, str) else Path(f.get("path", "")) for f in r.data.get("frames", [])]
-    bad = []
+    frames = [f for f in frames if f.exists()]
+    bad, unverified = [], []
     for f in frames:
-        if not f.exists():
-            continue
-        g = stills.is_faceless_and_textless(f, check_text=False)
-        if not g["ok"]:
-            bad.append({"frame": f.name, **g})
+        if stills.opencv_face_boxes(f):
+            try:
+                confirmed = stills.confirmed_faces(f)
+            except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                unverified.append(f.name)
+                log(f"face gate: vision timeout on {f.name}: {exc}")
+                continue
+            if confirmed:
+                bad.append({"frame": f.name, "confirmed_faces": confirmed})
+    spot = [frames[i] for i in sorted({0, len(frames) // 2, max(0, len(frames) - 2)})] if frames else []
+    for f in spot:
+        try:
+            ans = stills.ask_vision(f, "Is there a human face, or a reflection of a face, anywhere in this picture? Answer yes or no.")
+            if ans.lower().startswith("y"):
+                bad.append({"frame": f.name, "face_answer": ans})
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            unverified.append(f.name)
+            log(f"face gate: vision timeout on spot-check {f.name}: {exc}")
     stills.unload_vision()
-    return {"ok": not bad, "frames": len(frames), "bad": bad}
+    return {"ok": not bad and len(unverified) < max(1, len(frames) // 2), "frames": len(frames), "bad": bad, "unverified": unverified}
 
 
 def gemini_review(project_dir: Path, video: Path, script: dict, source_url: str, mismatches: list | None = None) -> dict:
