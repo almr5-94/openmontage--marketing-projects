@@ -94,6 +94,13 @@ def _fetch_source(url: str) -> str:
         return ""
     r = requests.get(url, timeout=25, headers={"User-Agent": "Mozilla/5.0 (KLI editorial fetch)"})
     r.raise_for_status()
+    if "pdf" in r.headers.get("content-type", "").lower() or url.lower().endswith(".pdf"):
+        import io
+        from pypdf import PdfReader
+
+        reader = PdfReader(io.BytesIO(r.content))
+        pages = [(p.extract_text() or "") for p in reader.pages[:25]]
+        return re.sub(r"\s+", " ", " ".join(pages)).strip()[:14000]
     soup = BeautifulSoup(r.text, "html.parser")
     for t in soup(["script", "style", "nav", "footer", "header"]):
         t.decompose()
@@ -113,21 +120,33 @@ WHY: <one sentence on what that page states>
 If no primary page supports the claim, answer: URL: none"""
 
 
-def _research_source(project_dir: Path, topic: dict) -> tuple[str, str]:
-    """Return (url, passage). Grounded search for a specific page, else the topic's route page."""
+def _research_source(project_dir: Path, topic: dict) -> tuple[str, str, str]:
+    """Return (url, passage, note). A topic without a SPECIFIC primary page gets ('', '', why):
+    the script is never written against a homepage or a navigation menu."""
     try:
         ans = gemini.ask_grounded(RESEARCH.format(claim=topic["claim"], pillar=topic["pillar"], route=topic["source_ref"]),
                                   model=gemini.FLASH, project_dir=project_dir, purpose="source_research")
-        m = re.search(r"URL:\s*(https?://\S+)", ans)
-        if m:
-            url = m.group(1).rstrip(").,")
-            text = _fetch_source(url)
-            if len(text) > 400:
-                return url, text
-            log(f"research url fetched too little text ({len(text)}): {url}")
     except Exception as exc:
-        log(f"grounded research failed: {exc}")
-    return topic["source_ref"], _fetch_source(topic["source_ref"])
+        log(f"{topic['topic_id']}: grounded research failed: {exc}")
+        return "", "", f"research error: {str(exc)[:120]}"
+    m = re.search(r"URL:\**\s*\**\s*(https?://[^\s*)\]]+)", ans)
+    if not m:
+        log(f"{topic['topic_id']}: no primary page found ({ans.strip()[:100]!r})")
+        return "", "", "no primary page: " + ans.strip()[:160]
+    url = m.group(1).rstrip(").,")
+    if url.rstrip("/") == topic["source_ref"].rstrip("/") or url.count("/") <= 2:
+        log(f"{topic['topic_id']}: research returned a homepage, not a page: {url}")
+        return "", "", f"homepage only: {url}"
+    try:
+        text = _fetch_source(url)
+    except Exception as exc:
+        log(f"{topic['topic_id']}: fetch failed for {url}: {exc}")
+        return "", "", f"fetch failed: {url}"
+    if len(text) < 600:
+        log(f"{topic['topic_id']}: page too thin ({len(text)} chars): {url}")
+        return "", "", f"thin page ({len(text)} chars): {url}"
+    log(f"{topic['topic_id']}: source page {url} ({len(text)} chars)")
+    return url, text, "ok"
 
 
 # ---------------------------------------------------------------------------
@@ -136,19 +155,19 @@ def _research_source(project_dir: Path, topic: dict) -> tuple[str, str]:
 def stage_idea(pid: str) -> None:
     pdir = project_dir(pid)
     kli_repo.verify_min_commit()
-    shortlist = topics.rank(5)
+    shortlist = topics.rank(10)
     if not shortlist:
         raise RuntimeError("idea bank has no unused candidate topics")
-    excerpts, urls = {}, {}
-    for t in shortlist:
-        try:
-            urls[t["topic_id"]], excerpts[t["topic_id"]] = _research_source(pdir, t)
-        except Exception as exc:
-            urls[t["topic_id"]], excerpts[t["topic_id"]] = t["source_ref"], ""
-            log(f"source fetch failed for {t['topic_id']}: {exc}")
-    fetched = [t for t in shortlist if len(excerpts[t["topic_id"]]) > 400]
+    excerpts, urls, notes = {}, {}, {}
+    fetched = []
+    for t in shortlist:  # walk the ranking until three topics have a real primary page
+        urls[t["topic_id"]], excerpts[t["topic_id"]], notes[t["topic_id"]] = _research_source(pdir, t)
+        if excerpts[t["topic_id"]]:
+            fetched.append(t)
+        if len(fetched) >= 3:
+            break
     if not fetched:
-        raise RuntimeError("no shortlisted topic has a fetchable source passage")
+        raise RuntimeError(f"no shortlisted topic has a specific primary source page: {notes}")
     pick = gemini.ask_json(IDEA_PICK.format(pack=kli_repo.reading_pack()[:60000],
                                             shortlist=json.dumps([{**t, "source_excerpt": excerpts[t["topic_id"]][:3000]} for t in fetched], ensure_ascii=False)),
                            model=gemini.PRO, project_dir=pdir, purpose="idea_pick")
@@ -163,7 +182,7 @@ def stage_idea(pid: str) -> None:
         "metadata": {"topic_id": chosen["topic_id"], "pillar": chosen["pillar"], "stage": chosen["stage"], "hook_family": chosen["hook_family"],
                      "source_ref": urls[chosen["topic_id"]], "source_route": chosen["source_ref"], "demo_object": chosen["demo_object"], "score": chosen.get("score"),
                      "source_excerpt": excerpts[chosen["topic_id"]], "pick_reason": pick.get("reason", ""),
-                     "shortlist": [t["topic_id"] for t in shortlist], "kli_repo_commit": kli_repo.head_commit()},
+                     "shortlist": [t["topic_id"] for t in shortlist], "research_notes": notes, "kli_repo_commit": kli_repo.head_commit()},
     }
     _save_art(pid, "brief", brief)
     dl = _decisions(pid,

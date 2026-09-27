@@ -2,3 +2,4 @@
 opencv-python-headless<5
 beautifulsoup4
 requests
+pypdf
