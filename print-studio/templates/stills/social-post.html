@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Still template -- OpenMontage image studio</title>
+<!--
+  Starter still for the image-studio pipeline. Rendered by page_render in
+  "still" mode at an exact pixel size (default instagram_post, 1080 x 1350).
+  Type is sized in var(--u), a unit that follows the shorter side, so the same
+  file renders well at 1:1, 4:5, 9:16 and 16:9: render once per size preset.
+-->
+<link rel="stylesheet" href="../../css/print-base.css">
+<style>
+  :root { --accent: #f97316; --paper: #111014; --ink: #ffffff;
+    /* One type unit that follows the shorter side, so wide (16:9) and tall (9:16)
+       formats keep the same visual weight. Size text in var(--u), never raw vw. */
+    --u: min(1vw, 0.75vh); }
+  html, body { background: var(--paper); padding: 0; }
+  .still .bleed { filter: brightness(.82); }
+  .still .shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,.85) 100%); }
+  .still .copy { position: absolute; left: 6vw; right: 6vw; bottom: 7vh; color: var(--ink); }
+  .still .kicker { font-size: calc(var(--u) * 2.2); color: var(--accent); }
+  .still h1 { font-family: var(--font-display); font-size: calc(var(--u) * 8.4); line-height: 1; margin: 1.2vh 0 2vh; }
+  .still p { font-family: var(--font-sans); font-size: calc(var(--u) * 2.9); line-height: 1.35; margin: 0; max-width: 80vw; opacity: .92; }
+  .still .tag { position: absolute; top: 4vh; left: 6vw; padding: calc(var(--u) * .8) calc(var(--u) * 1.6); border: calc(var(--u) * .25) solid var(--ink); color: var(--ink); font-family: var(--font-sans); font-size: calc(var(--u) * 2); letter-spacing: .14em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+  <div class="still">
+    <img class="bleed" src="../../../assets/showcase.jpg" alt="">
+    <div class="shade"></div>
+    <div class="tag">New issue</div>
+    <div class="copy frame">
+      <div class="kicker">Out now</div>
+      <h1>Every frame is a decision</h1>
+      <p>Inside a four-person studio: one brief, one week, one finished issue.</p>
+    </div>
+  </div>
+</body>
+</html>

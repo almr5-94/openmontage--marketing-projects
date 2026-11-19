@@ -141,6 +141,9 @@ Pipeline type skills provide production guidance for specific video formats, ind
 | 3D World Generation | `creative/3d-world-generation.md` | Continuous Three.js terrain worlds with semantic regions, explicit blockout/production tiers, licensed GLTF/PBR assets, diagnostics, and deterministic camera paths |
 | Character Animation Pipeline | `pipelines/character-animation/` | Rigged local cartoon characters, pose libraries, action timelines, SVG/Canvas/Remotion/HyperFrames rendering |
 | Cinematic | `creative/cinematic.md` | Letterbox, film pacing, layered audio, color grading |
+| Print Production (shared) | `meta/print-production.md` | Rules for both print pipelines: page_render, project layout, proof checks, Arabic/RTL, Latin digits |
+| Image Studio Pipeline | `pipelines/image-studio/` | Still images at exact sizes: brief, concept, layout, assets, render, review, publish |
+| Magazine Pipeline | `pipelines/magazine/` | Multi-page publications: brief, concept, editorial, layout (flatplan), assets, render (PDF), review, publish |
 
 ## Pipeline Stage Director Skills
 

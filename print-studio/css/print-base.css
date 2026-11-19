@@ -1,0 +1,294 @@
+/*
+ * OpenMontage print studio -- base stylesheet for magazines, brochures and stills.
+ *
+ * A project copies this file into projects/<id>/layout/ (or links it) and
+ * overrides the tokens in :root. It never edits the copy in print-studio/.
+ *
+ * Rules the page_render checks rely on:
+ *   - every page is a .page (or carries data-page="<n>") with a fixed size and
+ *     overflow: hidden, so a spilling page is detected;
+ *   - every text box that must not overflow is a .frame (overflow: hidden);
+ *   - images are plain <img> or CSS url() references relative to the HTML.
+ */
+
+:root {
+  /* Trim size. Change both here and in @page below. */
+  --page-w: 230mm;
+  --page-h: 300mm;
+  --margin-inner: 18mm;
+  --margin-outer: 16mm;
+  --margin-top: 18mm;
+  --margin-bottom: 20mm;
+  --gutter: 5mm;
+
+  /* Colour tokens. A project overrides these from its brand or playbook. */
+  --paper: #fbfaf7;
+  --ink: #16151a;
+  --ink-soft: #55525c;
+  --accent: #c2410c;
+  --accent-ink: #ffffff;
+  --rule: #d9d5cc;
+
+  /* Type. Local fonts only by default, so a render never depends on the network.
+     Drop .woff2/.ttf files in assets/fonts/ and add @font-face to use others. */
+  --font-display: "FreeSerif", "Noto Serif", Georgia, serif;
+  --font-text: "FreeSerif", "Noto Serif", Georgia, serif;
+  --font-sans: "DejaVu Sans", "Noto Sans", Arial, sans-serif;
+  --font-arabic-text: "Noto Naskh Arabic", "Noto Sans Arabic", serif;
+  --font-arabic-display: "Noto Kufi Arabic", "Noto Sans Arabic", sans-serif;
+
+  --size-body: 9.6pt;
+  --leading-body: 1.42;
+  --size-dek: 13pt;
+  --size-headline: 40pt;
+  --size-kicker: 7.5pt;
+  --size-caption: 7.2pt;
+  --size-folio: 7pt;
+}
+
+@page {
+  size: 230mm 300mm;
+  margin: 0;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #8a8a8a; /* only visible on screen between pages, never in the PDF */
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+body {
+  font-family: var(--font-text);
+  font-size: var(--size-body);
+  line-height: var(--leading-body);
+  color: var(--ink);
+  font-variant-numeric: lining-nums proportional-nums;
+  font-kerning: normal;
+  text-rendering: geometricPrecision;
+}
+
+/* ---------- Page box ---------- */
+
+.page {
+  position: relative;
+  width: var(--page-w);
+  height: var(--page-h);
+  overflow: hidden;
+  background: var(--paper);
+  break-after: page;
+  page-break-after: always;
+  margin: 0 auto;
+}
+.page:last-child { break-after: auto; page-break-after: auto; }
+
+@media screen {
+  body { padding: 10mm 0; }
+  .page { margin-bottom: 10mm; box-shadow: 0 2mm 8mm rgba(0, 0, 0, 0.35); }
+}
+
+/* Live area: inside the margins. Left/right pages mirror inner and outer. */
+.live {
+  position: absolute;
+  top: var(--margin-top);
+  bottom: var(--margin-bottom);
+  left: var(--margin-outer);
+  right: var(--margin-inner);
+}
+.page.right .live, .page[data-side="right"] .live {
+  left: var(--margin-inner);
+  right: var(--margin-outer);
+}
+
+.frame { overflow: hidden; }
+
+/* Full-bleed picture filling the page. */
+.bleed {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---------- Grid and columns ---------- */
+
+.grid-12 {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  column-gap: var(--gutter);
+}
+
+.cols-2, .cols-3 {
+  column-gap: var(--gutter);
+  column-fill: balance;
+}
+/* A text frame with a fixed height fills column by column instead of balancing. */
+.cols-fill { column-fill: auto; overflow: hidden; }
+.cols-2 { column-count: 2; }
+.cols-3 { column-count: 3; }
+.cols-2 > p, .cols-3 > p { margin: 0 0 0.6em; text-align: justify; hyphens: auto; }
+.cols-2 > p + p, .cols-3 > p + p { text-indent: 1.2em; margin-top: -0.6em; }
+
+/* ---------- Editorial type ---------- */
+
+.kicker {
+  font-family: var(--font-sans);
+  font-size: var(--size-kicker);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+}
+.headline {
+  font-family: var(--font-display);
+  font-size: var(--size-headline);
+  line-height: 1.02;
+  letter-spacing: -0.01em;
+  margin: 0.15em 0 0.25em;
+  font-weight: 700;
+}
+.dek {
+  font-size: var(--size-dek);
+  line-height: 1.3;
+  color: var(--ink-soft);
+  margin: 0 0 0.8em;
+}
+.byline {
+  font-family: var(--font-sans);
+  font-size: 7.5pt;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.dropcap::first-letter {
+  float: left;
+  font-family: var(--font-display);
+  font-size: 4.1em;
+  line-height: 0.82;
+  padding: 0.04em 0.08em 0 0;
+  color: var(--accent);
+  font-weight: 700;
+}
+.pullquote {
+  font-family: var(--font-display);
+  font-size: 17pt;
+  line-height: 1.18;
+  border-top: 1.2pt solid var(--accent);
+  border-bottom: 0.5pt solid var(--rule);
+  padding: 0.5em 0;
+  margin: 0.4em 0 0.8em;
+  break-inside: avoid;
+}
+.caption {
+  font-family: var(--font-sans);
+  font-size: var(--size-caption);
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+.credit { font-size: 6pt; opacity: 0.8; }
+.rule { border: 0; border-top: 0.5pt solid var(--rule); margin: 3mm 0; }
+
+/* Running foot: section name + page number. */
+.folio {
+  position: absolute;
+  bottom: 9mm;
+  left: var(--margin-outer);
+  right: var(--margin-outer);
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-sans);
+  font-size: var(--size-folio);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+/* ---------- Cover ---------- */
+
+.cover .masthead {
+  position: absolute;
+  top: 12mm;
+  left: 12mm;
+  right: 12mm;
+  font-family: var(--font-display);
+  font-size: 78pt;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+  color: var(--accent-ink);
+  text-align: center;
+}
+.cover .issue-line {
+  position: absolute;
+  top: 40mm;
+  left: 12mm;
+  right: 12mm;
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-sans);
+  font-size: 7.5pt;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+}
+.cover .coverline {
+  position: absolute;
+  color: var(--accent-ink);
+  font-family: var(--font-display);
+  text-shadow: 0 0.4mm 2mm rgba(0, 0, 0, 0.35);
+}
+
+/* ---------- Contents ---------- */
+
+.toc-item {
+  display: grid;
+  grid-template-columns: 12mm 1fr;
+  column-gap: 4mm;
+  padding: 3mm 0;
+  border-top: 0.5pt solid var(--rule);
+  break-inside: avoid;
+}
+.toc-item .num {
+  font-family: var(--font-display);
+  font-size: 20pt;
+  line-height: 1;
+  color: var(--accent);
+}
+.toc-item h3 { margin: 0 0 1mm; font-family: var(--font-display); font-size: 12pt; }
+.toc-item p { margin: 0; color: var(--ink-soft); }
+
+/* ---------- Right-to-left (Arabic) ---------- */
+
+[dir="rtl"], .rtl {
+  direction: rtl;
+  font-family: var(--font-arabic-text);
+  /* Latin digits stay Latin: never switch to Arabic-Indic numbering. */
+  font-variant-numeric: lining-nums;
+}
+[dir="rtl"] .headline, .rtl .headline,
+[dir="rtl"] .pullquote, .rtl .pullquote { font-family: var(--font-arabic-display); letter-spacing: 0; }
+[dir="rtl"] .kicker, [dir="rtl"] .byline, [dir="rtl"] .folio { letter-spacing: 0; text-transform: none; font-family: var(--font-arabic-display); }
+[dir="rtl"] .cols-2 > p, [dir="rtl"] .cols-3 > p { hyphens: manual; }
+[dir="rtl"] .dropcap::first-letter { float: none; font-size: inherit; padding: 0; color: inherit; }
+
+/* Number groups inside Arabic text ("230 × 300", "15 January 2027"): keep them
+   on one line. Do NOT force direction here -- the browser's own bidi order is
+   the natural reading order for an Arabic reader. */
+.nowrap { white-space: nowrap; }
+/* A Latin word, URL, code or brand name inside Arabic text: isolate it so its
+   own characters stay left to right. Not for number groups (see .nowrap). */
+.ltr { direction: ltr; unicode-bidi: isolate; }
+
+/* ---------- Stills (social posts, posters) ---------- */
+
+.still {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--paper);
+}

@@ -48,9 +48,9 @@ If a model misses this distinction, it will often fall back to plain search + gu
 
 ## Rule Zero — All Production Goes Through a Pipeline
 
-**Every video production request MUST go through the pipeline system. No exceptions.**
+**Every production request — video, still image or publication — MUST go through the pipeline system. No exceptions.**
 
-When the user asks to make, create, produce, or generate any video content — a trailer, explainer, clip, animation, or any other video — the agent must:
+When the user asks to make, create, produce, or generate any video content (a trailer, explainer, clip, animation) or any still or print piece (an image, post, poster, carousel, magazine, brochure, report), the agent must:
 
 1. **Identify the pipeline.** Match the request to one of the pipelines in `pipeline_defs/`. If unclear, ask the user.
 2. **Read the pipeline manifest.** `pipeline_defs/<pipeline>.yaml` — know the stages, tools, and quality gates.
@@ -256,9 +256,31 @@ If the folder has tracks, the proposal and asset stages should present them as o
 | `hybrid` | Source footage plus support visuals | production |
 | `avatar-spokesperson` | Presenter-led avatar or lip-sync videos | production |
 | `localization-dub` | Subtitle, dub, and translated variants | beta |
+| `image-studio` | Still images: posts, carousels, posters, ad sets, thumbnails | beta |
+| `magazine` | Magazines, zines, brochures, catalogs, reports (PDF + page PNGs) | beta |
 | `framework-smoke` | Test: minimal 2-stage smoke test | test |
 
 > **Beta pipelines** have not been fully audited. They work, but expect rough edges. Mention this when the user selects one.
+
+### Print Studio — images and magazines
+
+OpenMontage is also a studio for **still images** and **publications**. When the user asks for
+an image, a post, a carousel, a poster, an ad still, a thumbnail, a magazine, a brochure, a
+catalog or a report — anything that is not motion — route to `image-studio` or `magazine`
+instead of a video pipeline. Rule Zero applies unchanged: go through the pipeline, read the
+stage director, elect every paid tool out loud.
+
+- **Read first:** `skills/meta/print-production.md` (shared rules, project layout, proof checks).
+- **Engine:** `page_render` (`tools/graphics/page_render.py`, capability `layout_render`) sets
+  pages in HTML and renders exact-size PNG/JPG stills or a print PDF with page previews. It is
+  free and local (headless Chromium) and fails the render on cut-off text, missing images,
+  wrong page count/size, unembedded fonts, or Arabic-Indic digits.
+- **Pictures** come from the existing `image_generation` family (or stock, or the user's
+  photos); **words** are never baked into generated pictures — they are typeset in HTML.
+- **Starters:** `print-studio/css/print-base.css`, `print-studio/templates/magazine/issue.html`,
+  `print-studio/templates/stills/social-post.html`.
+- These pipelines have no `video_compose` stage, so the Remotion/HyperFrames runtime rule does
+  not apply to them.
 
 ## Mandatory Preflight
 
@@ -703,6 +725,7 @@ The `.agents/skills/` directory is large. When you're not coming in through a to
 | How does a tool actually work? | the tool's `usage_location` from the registry |
 | How should this pipeline stage behave? | `skills/pipelines/<pipeline>/...` |
 | What is the checkpoint/review policy? | `skills/meta/` |
+| How do I make images or a magazine? | `skills/meta/print-production.md`, then `pipeline_defs/image-studio.yaml` or `pipeline_defs/magazine.yaml` |
 
 ## What Not To Do
 

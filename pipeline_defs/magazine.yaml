@@ -1,0 +1,212 @@
+name: magazine
+version: "1.0"
+description: >
+  Multi-page publications: magazines, zines, brochures, catalogs and illustrated reports, in
+  English, Arabic or both. The agent plans the issue (flatplan), writes the copy to length,
+  sources or generates the pictures with the tools the user elects, sets every page in HTML on
+  a real grid, and renders a print PDF with page-size, overflow, missing-image, font-embedding
+  and digit checks, plus a PNG preview of every page.
+category: print
+stability: beta
+
+default_checkpoint_policy: guided
+
+extensions:
+  custom_scripts: false
+  custom_playbooks: true
+  custom_skills: true
+  custom_tools: false
+
+required_skills:
+  - pipelines/magazine/executive-producer
+  - pipelines/magazine/brief-director
+  - pipelines/magazine/concept-director
+  - pipelines/magazine/editorial-director
+  - pipelines/magazine/layout-director
+  - pipelines/magazine/asset-director
+  - pipelines/magazine/render-director
+  - pipelines/magazine/review-director
+  - pipelines/magazine/publish-director
+  - meta/reviewer
+  - meta/checkpoint-protocol
+
+orchestration:
+  mode: executive-producer
+  skill: pipelines/magazine/executive-producer
+  budget_default_usd: 5.00
+  max_revisions_per_stage: 3
+  max_send_backs: 3
+  max_wall_time_minutes: 90
+
+compatible_playbooks:
+  recommended:
+    - clean-professional
+  also_works:
+    - minimalist-diagram
+  custom_allowed: true
+
+stages:
+  - name: brief
+    skill: pipelines/magazine/brief-director
+    produces:
+      - print_brief
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Kind, trim size, page count (a multiple of 4 for saddle-stitched print) and languages fixed
+      - Audience and purpose specific enough to reject a story idea
+      - Mandatory copy and user-supplied material listed
+    success_criteria:
+      - Schema-valid print_brief with page_count
+      - User confirmed the brief
+
+  - name: concept
+    skill: pipelines/magazine/concept-director
+    required_artifacts_in:
+      - print_brief
+    produces:
+      - studio_proposal
+      - decision_log
+    tools_available: [image_selector, page_render]
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - At least two design directions that differ in typography, grid and image strategy
+      - Every paid tool elected by the user from a menu of real registry tools
+      - Itemized cost (images per page x retries) and honest time estimate
+    success_criteria:
+      - Schema-valid studio_proposal approved by the user
+      - decision_log records the image-source election with every offered option
+
+  - name: editorial
+    skill: pipelines/magazine/editorial-director
+    required_artifacts_in:
+      - print_brief
+      - studio_proposal
+    produces:
+      - editorial_copy
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Every piece written to its target length (within 10%)
+      - Facts sourced; claims about real people, laws or prices checked
+      - Arabic copy in Modern Standard Arabic unless the brief says otherwise, Latin digits only
+      - Headlines, deks, captions and pull quotes written, not left for layout
+    success_criteria:
+      - Schema-valid editorial_copy covering every content page in the flatplan
+      - User approved the copy
+
+  - name: layout
+    skill: pipelines/magazine/layout-director
+    required_artifacts_in:
+      - print_brief
+      - studio_proposal
+      - editorial_copy
+    produces:
+      - layout_plan
+    tools_available: [page_render]
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - One frame per page; page count equals the brief; covers and spreads paired correctly
+      - Every image slot has a minimum pixel size for sharp print at 300 dpi (or 150 dpi screen PDF)
+      - A wireframe render (grey boxes) proves the copy fits before any image is paid for
+    success_criteria:
+      - Schema-valid layout_plan with units=pages
+      - Wireframe page_render pass with no overflow
+
+  - name: assets
+    skill: pipelines/magazine/asset-director
+    required_artifacts_in:
+      - layout_plan
+      - studio_proposal
+    produces:
+      - asset_manifest
+    tools_available:
+      - image_selector
+      - flux_image
+      - google_imagen
+      - openai_image
+      - recraft_image
+      - grok_image
+      - seedream_image
+      - minimax_image
+      - dashscope_image
+      - hunyuan_image
+      - kling_official_image
+      - atlas_image
+      - comfyui_image
+      - local_diffusion
+      - qwen_image_local
+      - qwen_image_edit_local
+      - pexels_image
+      - pixabay_image
+      - upscale
+      - bg_remove
+      - color_grade
+      - face_restore
+      - diagram_gen
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Only elected tools used; sample image approved before the batch
+      - Cover image approved separately (it sells the issue)
+      - Every image meets its slot's minimum pixel size
+      - Rejected takes kept in assets/images/components/, never deleted
+    success_criteria:
+      - Schema-valid asset_manifest; scene_id of each asset is a layout_plan page id
+      - Every image slot filled
+
+  - name: render
+    skill: pipelines/magazine/render-director
+    required_artifacts_in:
+      - layout_plan
+      - editorial_copy
+      - asset_manifest
+    produces:
+      - print_render
+    tools_available: [page_render]
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Single issue HTML under projects/<id>/layout/ with one .page per flatplan page
+      - page_render pdf checks pass (page count, page size, overflow, missing images, embedded fonts, Latin digits)
+      - Page previews generated for review
+    success_criteria:
+      - Schema-valid print_render with checks_pass true
+
+  - name: review
+    skill: pipelines/magazine/review-director
+    required_artifacts_in:
+      - print_render
+      - print_brief
+      - editorial_copy
+    produces:
+      - print_review
+    tools_available: [page_render]
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Every page preview opened and looked at; frames_viewed lists them all
+      - Widows, orphans, rivers, awkward breaks and bidi errors checked page by page
+      - Folios, running heads and contents page numbers match the real pages
+    success_criteria:
+      - Schema-valid print_review with status pass
+      - User approved the proof
+
+  - name: publish
+    skill: pipelines/magazine/publish-director
+    required_artifacts_in:
+      - print_review
+    produces:
+      - publish_log
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Screen PDF and print PDF (if ordered) plus cover PNG delivered
+      - Files handed to the user, not just listed
+    success_criteria:
+      - Schema-valid publish_log

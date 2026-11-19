@@ -31,6 +31,13 @@ ARTIFACT_NAMES = [
     "final_review",
     "character_qa_report",
     "video_analysis_brief",
+    # Print studio (image-studio and magazine pipelines)
+    "print_brief",
+    "studio_proposal",
+    "editorial_copy",
+    "layout_plan",
+    "print_render",
+    "print_review",
 ]
 
 

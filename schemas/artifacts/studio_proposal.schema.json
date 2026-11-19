@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/studio_proposal",
+  "title": "Studio Proposal",
+  "description": "Concept options, the elected tool plan and an honest cost estimate for a print or image job. The approval gate: no paid generation before approval.status is approved.",
+  "type": "object",
+  "required": [
+    "version",
+    "concept_options",
+    "selected_concept",
+    "tool_plan",
+    "cost_estimate",
+    "approval"
+  ],
+  "properties": {
+    "version": {
+      "type": "string"
+    },
+    "concept_options": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "visual_approach",
+          "typography",
+          "palette",
+          "why_this_works"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "visual_approach": {
+            "type": "string"
+          },
+          "typography": {
+            "type": "string"
+          },
+          "palette": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "image_strategy": {
+            "type": "string",
+            "enum": [
+              "generated",
+              "stock",
+              "user_supplied",
+              "typographic_only",
+              "mixed"
+            ]
+          },
+          "why_this_works": {
+            "type": "string"
+          },
+          "risks": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "selected_concept": {
+      "type": "object",
+      "required": [
+        "concept_id",
+        "rationale"
+      ],
+      "properties": {
+        "concept_id": {
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string"
+        }
+      }
+    },
+    "tool_plan": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "capability",
+          "tool",
+          "reason"
+        ],
+        "properties": {
+          "capability": {
+            "type": "string",
+            "description": "e.g. image_generation, layout_render, upscale, bg_remove"
+          },
+          "tool": {
+            "type": "string",
+            "description": "Exact registry tool name the user elected"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "alternatives_offered": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "cost_estimate": {
+      "type": "object",
+      "required": [
+        "total_estimated_usd",
+        "line_items"
+      ],
+      "properties": {
+        "total_estimated_usd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "line_items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "item",
+              "tool",
+              "quantity",
+              "unit_usd"
+            ],
+            "properties": {
+              "item": {
+                "type": "string"
+              },
+              "tool": {
+                "type": "string"
+              },
+              "quantity": {
+                "type": "number"
+              },
+              "unit_usd": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "budget_verdict": {
+          "type": "string",
+          "enum": [
+            "within_budget",
+            "over_budget",
+            "no_budget_set"
+          ]
+        }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "approved",
+            "approved_with_changes",
+            "rejected"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        },
+        "approved_at": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

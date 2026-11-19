@@ -76,6 +76,10 @@ assert ALL_MANIFESTS, "No pipeline manifests found"
 # an explicit reason. Everything else is required to follow the contract.
 _EXCLUDED_PIPELINES = {
     "framework-smoke": "minimal 2-stage smoke test, no compose stage",
+    # Print pipelines never call video_compose: their render stage is page_render
+    # (HTML -> PNG/PDF), so there is no Remotion/HyperFrames runtime to present.
+    "image-studio": "print pipeline, renders stills with page_render, no video compose",
+    "magazine": "print pipeline, renders PDFs with page_render, no video compose",
 }
 
 

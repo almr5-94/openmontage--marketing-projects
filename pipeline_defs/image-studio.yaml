@@ -1,0 +1,190 @@
+name: image-studio
+version: "1.0"
+description: >
+  Finished still images: single images, image sets, carousels, posters, ad stills and thumbnails.
+  Pictures come from any image provider the user elects (or stock, or the user's own photos);
+  typography and layout are set in HTML and rendered to exact pixel sizes by page_render, so
+  text is crisp, correctly spelled and correctly shaped in Arabic and English. One frame can be
+  delivered in several formats (post, story, banner) from the same source.
+category: print
+stability: beta
+
+default_checkpoint_policy: guided
+
+extensions:
+  custom_scripts: false
+  custom_playbooks: true
+  custom_skills: true
+  custom_tools: false
+
+required_skills:
+  - pipelines/image-studio/executive-producer
+  - pipelines/image-studio/brief-director
+  - pipelines/image-studio/concept-director
+  - pipelines/image-studio/layout-director
+  - pipelines/image-studio/asset-director
+  - pipelines/image-studio/render-director
+  - pipelines/image-studio/review-director
+  - pipelines/image-studio/publish-director
+  - meta/reviewer
+  - meta/checkpoint-protocol
+
+orchestration:
+  mode: executive-producer
+  skill: pipelines/image-studio/executive-producer
+  budget_default_usd: 1.00
+  max_revisions_per_stage: 3
+  max_send_backs: 2
+  max_wall_time_minutes: 20
+
+compatible_playbooks:
+  recommended:
+    - clean-professional
+  also_works:
+    - flat-motion-graphics
+    - minimalist-diagram
+  custom_allowed: true
+
+stages:
+  - name: brief
+    skill: pipelines/image-studio/brief-director
+    produces:
+      - print_brief
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Purpose is one sentence a stranger could judge the image against
+      - Every deliverable format named with exact pixel size
+      - Language and direction recorded for every language on the image
+      - Mandatory copy (prices, dates, legal lines) captured verbatim
+    success_criteria:
+      - Schema-valid print_brief
+      - User confirmed the brief
+
+  - name: concept
+    skill: pipelines/image-studio/concept-director
+    required_artifacts_in:
+      - print_brief
+    produces:
+      - studio_proposal
+      - decision_log
+    tools_available: [image_selector, page_render]
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - At least two genuinely different concepts (not colour swaps)
+      - Every paid tool in tool_plan was elected by the user from a menu of real registry tools
+      - Cost estimate itemized per image and per retry
+      - decision_log lists every offered tool in options_considered
+    success_criteria:
+      - Schema-valid studio_proposal with approval.status approved or approved_with_changes
+      - decision_log has a provider_selection entry for image generation (or records that no generation is needed)
+
+  - name: layout
+    skill: pipelines/image-studio/layout-director
+    required_artifacts_in:
+      - print_brief
+      - studio_proposal
+    produces:
+      - layout_plan
+    tools_available: [page_render]
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Every frame has a format from the brief and every image slot a minimum pixel size
+      - Text hierarchy fits the format (headline length tested, not guessed)
+      - Safe zones respected for the platform (story UI, thumbnail timestamp)
+    success_criteria:
+      - Schema-valid layout_plan with one frame per deliverable image
+
+  - name: assets
+    skill: pipelines/image-studio/asset-director
+    required_artifacts_in:
+      - layout_plan
+      - studio_proposal
+    produces:
+      - asset_manifest
+    tools_available:
+      - image_selector
+      - flux_image
+      - google_imagen
+      - openai_image
+      - recraft_image
+      - grok_image
+      - seedream_image
+      - minimax_image
+      - dashscope_image
+      - hunyuan_image
+      - kling_official_image
+      - atlas_image
+      - comfyui_image
+      - local_diffusion
+      - qwen_image_local
+      - qwen_image_edit_local
+      - pexels_image
+      - pixabay_image
+      - upscale
+      - bg_remove
+      - color_grade
+      - face_restore
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Only tools elected at the concept stage were called
+      - Sample first, then batch -- the user saw one image before the rest were generated
+      - Every image meets its slot's minimum pixel size (upscaled if not)
+      - Rejected takes kept in assets/images/components/, never deleted
+    success_criteria:
+      - Schema-valid asset_manifest; scene_id of each asset is the layout_plan frame id
+      - Every image slot in layout_plan is filled
+
+  - name: render
+    skill: pipelines/image-studio/render-director
+    required_artifacts_in:
+      - layout_plan
+      - asset_manifest
+    produces:
+      - print_render
+    tools_available: [page_render]
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - One HTML per frame under projects/<id>/layout/, linked to a project copy of print-base.css
+      - page_render checks pass on every output (no overflow, no missing images, Latin digits)
+      - Every format in the brief rendered at its exact pixel size
+    success_criteria:
+      - Schema-valid print_render; every output has checks_pass true
+
+  - name: review
+    skill: pipelines/image-studio/review-director
+    required_artifacts_in:
+      - print_render
+      - print_brief
+    produces:
+      - print_review
+    tools_available: [page_render]
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Every output image was actually opened and looked at
+      - Text legible at the platform's real display size
+      - Brief promise and mandatory copy present and exact
+    success_criteria:
+      - Schema-valid print_review with status pass
+      - User approved the images
+
+  - name: publish
+    skill: pipelines/image-studio/publish-director
+    required_artifacts_in:
+      - print_review
+    produces:
+      - publish_log
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Deliverables copied to renders/ with clear names (frame, format)
+      - Files handed to the user, not just listed
+    success_criteria:
+      - Schema-valid publish_log

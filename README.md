@@ -361,7 +361,7 @@ Want more? See the full **[Prompt Gallery](PROMPT_GALLERY.md)** for tested promp
 
 ## Pipelines
 
-Each pipeline is a complete production workflow, from idea to finished video.
+Each pipeline is a complete production workflow, from idea to finished video — or, for the two print-studio pipelines, from idea to finished images and publications.
 
 | Pipeline | What It Produces | Best For |
 |----------|-----------------|----------|
@@ -376,6 +376,8 @@ Each pipeline is a complete production workflow, from idea to finished video.
 | **Podcast Repurpose** | Podcast highlights to video | Podcast marketing, audiogram videos |
 | **Screen Demo** | Polished software screen recordings and walkthroughs | Product demos, tutorials, documentation |
 | **Talking Head** | Footage-led speaker videos | Presentations, vlogs, interviews |
+| **Image Studio** | Finished still images at exact sizes: posts, carousels, posters, ad sets, thumbnails — pictures from any image provider, typography set in HTML | Social media, ads, announcements, Arabic and English graphics |
+| **Magazine** | Multi-page magazines, zines, brochures, catalogs and reports as print/screen PDF plus page PNGs | Publications, lookbooks, company magazines, illustrated reports |
 
 Every pipeline follows the same structured flow:
 

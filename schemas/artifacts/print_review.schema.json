@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/print_review",
+  "title": "Print Review",
+  "description": "The self-review before the user sees the work: technical checks from page_render plus a human-style look at every page or frame.",
+  "type": "object",
+  "required": [
+    "version",
+    "status",
+    "checks",
+    "frames_viewed"
+  ],
+  "properties": {
+    "version": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "revise",
+        "fail"
+      ]
+    },
+    "checks": {
+      "type": "object",
+      "required": [
+        "technical",
+        "text_fit",
+        "image_quality",
+        "typography",
+        "language_and_digits",
+        "brief_promise"
+      ],
+      "properties": {
+        "technical": {
+          "type": "object",
+          "required": [
+            "status",
+            "notes"
+          ],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "pass",
+                "fail",
+                "not_applicable"
+              ]
+            },
+            "notes": {
+              "type": "string"
+            }
+          }
+        },
+        "text_fit": {
+          "type": "object",
+          "required": [
+            "status",
+            "notes"
+          ],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "pass",
+                "fail",
+                "not_applicable"
+              ]
+            },
+            "notes": {
+              "type": "string"
+            }
+          }
+        },
+        "image_quality": {
+          "type": "object",
+          "required": [
+            "status",
+            "notes"
+          ],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "pass",
+                "fail",
+                "not_applicable"
+              ]
+            },
+            "notes": {
+              "type": "string"
+            }
+          }
+        },
+        "typography": {
+          "type": "object",
+          "required": [
+            "status",
+            "notes"
+          ],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "pass",
+                "fail",
+                "not_applicable"
+              ]
+            },
+            "notes": {
+              "type": "string"
+            }
+          }
+        },
+        "language_and_digits": {
+          "type": "object",
+          "required": [
+            "status",
+            "notes"
+          ],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "pass",
+                "fail",
+                "not_applicable"
+              ]
+            },
+            "notes": {
+              "type": "string"
+            }
+          }
+        },
+        "brief_promise": {
+          "type": "object",
+          "required": [
+            "status",
+            "notes"
+          ],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "pass",
+                "fail",
+                "not_applicable"
+              ]
+            },
+            "notes": {
+              "type": "string"
+            }
+          }
+        },
+        "brand": {
+          "type": "object",
+          "required": [
+            "status",
+            "notes"
+          ],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "pass",
+                "fail",
+                "not_applicable"
+              ]
+            },
+            "notes": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "frames_viewed": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      },
+      "description": "Every page/frame id actually looked at (preview PNG opened)"
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "frame_id",
+          "severity",
+          "issue"
+        ],
+        "properties": {
+          "frame_id": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "major",
+              "minor"
+            ]
+          },
+          "issue": {
+            "type": "string"
+          },
+          "fixed": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "revision_round": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

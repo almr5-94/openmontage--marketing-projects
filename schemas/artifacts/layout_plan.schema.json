@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/layout_plan",
+  "title": "Layout Plan",
+  "description": "The flatplan (magazine) or frame list (image set): every page or frame, its format, its text and its image slots. The asset stage fills the image slots; the render stage typesets it.",
+  "type": "object",
+  "required": [
+    "version",
+    "units",
+    "template",
+    "frames"
+  ],
+  "properties": {
+    "version": {
+      "type": "string"
+    },
+    "units": {
+      "type": "string",
+      "enum": [
+        "pages",
+        "frames"
+      ]
+    },
+    "template": {
+      "type": "string",
+      "description": "Starting template, e.g. print-studio/templates/magazine/issue.html, or 'custom'"
+    },
+    "stylesheet": {
+      "type": "string"
+    },
+    "grid": {
+      "type": "object",
+      "properties": {
+        "columns": {
+          "type": "integer"
+        },
+        "gutter_mm": {
+          "type": "number"
+        },
+        "margins_mm": {
+          "type": "object"
+        }
+      }
+    },
+    "type_scale": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "palette": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "frames": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "role",
+          "format",
+          "elements"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Page number ('p01') or frame id ('f01'); the asset_manifest scene_id points here"
+          },
+          "role": {
+            "type": "string",
+            "description": "cover, contents, feature_open, feature_body, ad, back_cover, still, carousel_slide ..."
+          },
+          "format": {
+            "type": "string",
+            "description": "A formats[].name from the print_brief"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "left",
+              "right",
+              "single"
+            ]
+          },
+          "copy_ref": {
+            "type": "string",
+            "description": "editorial_copy piece id, if any"
+          },
+          "elements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "type"
+              ],
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "text",
+                    "image",
+                    "shape",
+                    "logo",
+                    "qr",
+                    "chart"
+                  ]
+                },
+                "slot": {
+                  "type": "string",
+                  "description": "Image slot id for images; text role for text (headline, dek, body ...)"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "image_prompt": {
+                  "type": "string"
+                },
+                "image_source": {
+                  "type": "string",
+                  "enum": [
+                    "generate",
+                    "stock",
+                    "user",
+                    "none"
+                  ]
+                },
+                "min_px": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  },
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "description": "Minimum pixel size so the image prints sharp at its placed size"
+                },
+                "aspect": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

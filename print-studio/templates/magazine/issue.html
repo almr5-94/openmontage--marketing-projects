@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sample issue -- OpenMontage print studio</title>
+<!--
+  Starter issue for the magazine pipeline. Copy this folder into
+  projects/<id>/layout/, point the stylesheet link at your copy of
+  print-base.css, then replace the copy and images page by page following
+  the layout_plan. Every page is a <section class="page" data-page="N">.
+-->
+<link rel="stylesheet" href="../../css/print-base.css">
+<style>
+  :root { --accent: #b4462b; }
+  .cover { background: #20202a; }
+  .cover .bleed { filter: saturate(1.05) contrast(1.05); }
+  .cover .shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.45) 0%, rgba(0,0,0,0) 35%, rgba(0,0,0,0) 55%, rgba(0,0,0,.7) 100%); }
+  .cover .lead { left: 14mm; right: 14mm; bottom: 34mm; font-size: 30pt; line-height: 1.02; font-weight: 700; }
+  .cover .lead small { display: block; font-family: var(--font-sans); font-size: 9pt; font-weight: 400; letter-spacing: .04em; margin-top: 3mm; }
+  .cover .side { left: 14mm; top: 120mm; width: 58mm; font-size: 13pt; line-height: 1.15; }
+  .cover .side b { display: block; font-family: var(--font-sans); font-size: 7pt; letter-spacing: .16em; text-transform: uppercase; color: #ffd8c9; margin-bottom: 1mm; }
+  .cover .barcode { position: absolute; right: 14mm; bottom: 12mm; width: 26mm; height: 15mm; background: repeating-linear-gradient(90deg, #111 0 0.5mm, #fff 0.5mm 1mm, #111 1mm 1.3mm, #fff 1.3mm 2.1mm); border: 1.5mm solid #fff; }
+
+  .feature-open .picture { position: absolute; inset: 0 0 auto 0; height: 168mm; width: 100%; object-fit: cover; }
+  .feature-open .title-block { position: absolute; top: 176mm; left: var(--margin-outer); right: var(--margin-inner); height: 92mm; }
+  .feature-body .cols-3 { position: absolute; top: 0; bottom: 0; left: 0; right: 0; }
+
+  .ad { background: linear-gradient(135deg, #b4462b, #6d1f12); color: #fff; }
+  .ad .frame { position: absolute; left: 20mm; right: 20mm; top: 60mm; height: 150mm; text-align: center; }
+  .ad h2 { font-family: var(--font-display); font-size: 46pt; line-height: 1; margin: 0 0 6mm; }
+  .ad p { font-family: var(--font-sans); font-size: 11pt; margin: 0; }
+</style>
+</head>
+<body>
+
+<!-- 1. Cover -->
+<section class="page cover" data-page="1">
+  <img class="bleed" src="../../../assets/showcase.jpg" alt="">
+  <div class="shade"></div>
+  <div class="masthead">MONTAGE</div>
+  <div class="issue-line"><span>Issue 01</span><span>Winter 2026</span><span>KWD 2.500</span></div>
+  <div class="coverline side"><b>Inside</b>The quiet craft of making things look effortless</div>
+  <div class="coverline lead">Every frame is a decision
+    <small>How small studios plan, shoot and publish without losing the plot</small></div>
+  <div class="barcode"></div>
+</section>
+
+<!-- 2. Contents -->
+<section class="page right" data-page="2">
+  <div class="live frame">
+    <div class="kicker">In this issue</div>
+    <h1 class="headline" style="font-size:34pt">Contents</h1>
+    <div class="toc-item"><div class="num">03</div><div><h3>Every frame is a decision</h3><p>A working week inside a four-person studio, from brief to final file.</p></div></div>
+    <div class="toc-item"><div class="num">05</div><div><h3>Notes from the edit</h3><p>Why the best cut is usually the one you almost threw away.</p></div></div>
+    <div class="toc-item"><div class="num">06</div><div><h3>Arabic section</h3><p>A short essay set right to left, with Latin digits throughout.</p></div></div>
+    <div class="toc-item"><div class="num">08</div><div><h3>Back page</h3><p>Advertising and the next issue.</p></div></div>
+  </div>
+  <div class="folio"><span>Contents</span><span>2</span></div>
+</section>
+
+<!-- 3. Feature opener -->
+<section class="page feature-open" data-page="3">
+  <img class="picture" src="../../../assets/showcase.jpg" alt="">
+  <div class="title-block frame">
+    <div class="kicker">Feature</div>
+    <h1 class="headline">Every frame is a decision</h1>
+    <p class="dek">A working week inside a four-person studio, where the brief is short, the budget is shorter and every choice shows on the page.</p>
+    <div class="byline">Words by the editors &middot; Pictures by the studio</div>
+  </div>
+  <div class="folio"><span>Feature</span><span>3</span></div>
+</section>
+
+<!-- 4. Feature body -->
+<section class="page right feature-body" data-page="4">
+  <div class="live">
+    <div class="cols-3 cols-fill">
+      <p class="dropcap">Monday starts with a single page. Not a deck, not a mood board -- one page that says who the piece is for, what they should feel, and the one thing they must remember. Everything after that is measured against it.</p>
+      <p>The studio keeps the page pinned above the shared screen. When a picture is beautiful but says the wrong thing, the page wins. When a headline is clever but slows the reader down, the page wins again.</p>
+      <p>By Tuesday the team has a flatplan: a map of every page in the issue, drawn small enough to fit on one sheet. Each box carries a page number, a working title and a rough word count, so nobody writes 1,800 words for a slot that holds 900.</p>
+      <div class="pullquote">"When a picture is beautiful but says the wrong thing, the page wins."</div>
+      <p>Pictures come next. Some are shot, some are drawn, some are generated, and each one is checked against the page it lands on: does it leave room for the headline, does the subject face into the spread rather than off it, does it survive being printed at 230 by 300 millimetres.</p>
+      <p>Wednesday is for words. Copy is written to length, then cut to fit, then read aloud. Captions get the same care as the feature itself, because readers look at pictures first and captions second.</p>
+      <p>Thursday the layout is set, proofed and set again. Every text box is checked for overflow, every image for resolution, every number for the right digits. Friday the file goes to print, and the studio starts the next single page.</p>
+    </div>
+  </div>
+  <div class="folio"><span>Every frame is a decision</span><span>4</span></div>
+</section>
+
+<!-- 5. Arabic page (right-to-left, Latin digits) -->
+<section class="page" data-page="5" dir="rtl" lang="ar">
+  <div class="live frame">
+    <div class="kicker">مقالة قصيرة</div>
+    <h1 class="headline" style="font-size:30pt">كل صورة قرار</h1>
+    <p class="dek">ورشة صغيرة من 4 أشخاص تصنع عددًا كاملًا في 5 أيام.</p>
+    <div class="cols-2">
+      <p>يبدأ الأسبوع بصفحة واحدة تقول لمن نكتب، وماذا نريد أن يشعر القارئ، وما الشيء الوحيد الذي يجب أن يتذكره. كل ما يأتي بعد ذلك يُقاس عليها.</p>
+      <p>في اليوم الثاني يرسم الفريق خريطة العدد: كل صفحة في مربع صغير، عليه رقمها وعنوانها وعدد كلماتها التقريبي، حتى لا يكتب أحد 1800 كلمة لمساحة تتسع لـ 900 فقط.</p>
+      <p>ثم تأتي الصور، وتُفحص كل صورة على الصفحة التي ستُطبع فيها بمقاس <span class="nowrap">230 × 300</span> ملم.</p>
+    </div>
+  </div>
+  <div class="folio"><span>كل صورة قرار</span><span>5</span></div>
+</section>
+
+<!-- 6. Back cover ad -->
+<section class="page ad" data-page="6">
+  <div class="frame">
+    <div class="kicker" style="color:#ffd8c9">Advertisement</div>
+    <h2>Your brand, on this page</h2>
+    <p>Full-page placements from issue 02. Booking closes 15 January 2027.</p>
+  </div>
+</section>
+
+</body>
+</html>

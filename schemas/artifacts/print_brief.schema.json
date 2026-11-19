@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/print_brief",
+  "title": "Print Brief",
+  "description": "What the image set or publication is, who it is for, and what must be true of the finished file. Produced by the brief stage of image-studio and magazine.",
+  "type": "object",
+  "required": [
+    "version",
+    "kind",
+    "title",
+    "purpose",
+    "audience",
+    "formats",
+    "languages",
+    "tone",
+    "success_criteria"
+  ],
+  "properties": {
+    "version": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "single_image",
+        "image_set",
+        "carousel",
+        "poster",
+        "ad_set",
+        "magazine",
+        "brochure",
+        "catalog",
+        "report",
+        "zine"
+      ]
+    },
+    "title": {
+      "type": "string"
+    },
+    "purpose": {
+      "type": "string",
+      "description": "The one thing the piece must achieve"
+    },
+    "audience": {
+      "type": "string"
+    },
+    "key_messages": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "formats": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "description": "A deliverable format: a named preset from page_render.SIZE_PRESETS and/or explicit dimensions.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Format id, e.g. instagram_post, a4, magazine_standard"
+          },
+          "width_px": {
+            "type": "number"
+          },
+          "height_px": {
+            "type": "number"
+          },
+          "width_mm": {
+            "type": "number"
+          },
+          "height_mm": {
+            "type": "number"
+          },
+          "bleed_mm": {
+            "type": "number",
+            "minimum": 0
+          },
+          "dpi": {
+            "type": "integer",
+            "minimum": 72
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "languages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "code",
+          "direction"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "ltr",
+              "rtl"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "tone": {
+      "type": "string"
+    },
+    "style_references": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Paths or URLs the user supplied, or a style playbook name"
+    },
+    "brand": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "colors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fonts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "logo_path": {
+          "type": "string"
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "page_count": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Magazine/brochure: total pages including covers"
+    },
+    "image_count": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Image set: number of distinct frames"
+    },
+    "mandatory_copy": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Text that must appear exactly (legal lines, prices, dates)"
+    },
+    "user_assets": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Photos, logos or copy the user supplied"
+    },
+    "budget_usd": {
+      "type": "number",
+      "minimum": 0
+    },
+    "deadline": {
+      "type": "string"
+    },
+    "delivery": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "png",
+          "jpg",
+          "pdf_screen",
+          "pdf_print",
+          "webp"
+        ]
+      }
+    },
+    "success_criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
