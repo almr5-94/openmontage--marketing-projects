@@ -1,0 +1,23 @@
+# Local models for the "human + local model" mode (om CLI) and for the offline critics.
+# Both runtimes are reached through their OpenAI-compatible endpoints. Detection only:
+# nothing here ever downloads a model (ask the owner first; big pulls are a decision).
+runtimes:
+  ollama:
+    base_url: http://127.0.0.1:11434/v1
+    models_url: http://127.0.0.1:11434/api/tags
+  lmstudio:
+    base_url: http://127.0.0.1:1234/v1
+    models_url: http://127.0.0.1:1234/v1/models
+prefer: [ollama, lmstudio]          # first runtime that answers wins
+roles:
+  # planner / reasoner: briefs, palettes, inventories, arcs, shot lists, layout plans, critiques
+  planner:
+    candidates: ["qwen3.6:35b-a3b", "qwen2.5:14b", "gemma4:12b", "qwen2.5:7b"]
+    temperature: 0.4
+    max_tokens: 2048
+  # vision: the face gate, art matching and the page critic
+  vision:
+    candidates: ["qwen2.5vl:7b", "gemma4:12b"]
+    temperature: 0
+    max_tokens: 400
+timeouts_s: {planner: 600, vision: 240}

@@ -117,8 +117,10 @@ body {
 .body.cols-2 { column-count: 2; column-gap: var(--gutter); column-fill: balance; }
 .body.cols-3 { column-count: 3; column-gap: var(--gutter); column-fill: balance; }
 .body.fill { column-fill: auto; }   /* long text: fill column by column; overflow is caught by the checker */
+/* a three-line drop cap: the float is exactly three baselines tall, so line 4 returns to the margin */
 .body p.first::first-letter { float: left; font-family: var(--font-display); font-weight: var(--font-display-weight);
-  font-size: calc(var(--baseline) * 3.1); line-height: calc(var(--baseline) * 2.6); padding: 0.06em 0.08em 0 0; color: var(--accent); }
+  font-size: calc(var(--baseline) * 3.2); line-height: calc(var(--baseline) * 3); margin-top: calc(var(--baseline) * 0.08);
+  padding: 0 0.08em 0 0; color: var(--accent); }
 /* Arabic letters join: a detached first letter breaks the word, so RTL never takes a drop cap. */
 [dir="rtl"] .body p.first::first-letter { float: none; font: inherit; color: inherit; padding: 0; }
 .rule { border: 0; border-top: 0.4pt solid var(--rule); margin: 0; }

@@ -4,15 +4,32 @@
   "title": "Decision Log",
   "description": "Audit trail of every meaningful choice made during production. Prevents hidden system behavior, enables reviewer inspection, and guards against context drift.",
   "type": "object",
-  "required": ["version", "project_id", "decisions"],
+  "required": [
+    "version",
+    "project_id",
+    "decisions"
+  ],
   "properties": {
-    "version": { "type": "string", "const": "1.0" },
-    "project_id": { "type": "string" },
+    "version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "project_id": {
+      "type": "string"
+    },
     "decisions": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["decision_id", "stage", "category", "subject", "options_considered", "selected", "reason"],
+        "required": [
+          "decision_id",
+          "stage",
+          "category",
+          "subject",
+          "options_considered",
+          "selected",
+          "reason"
+        ],
         "properties": {
           "decision_id": {
             "type": "string",
@@ -40,7 +57,11 @@
               "voice_selection",
               "capability_extension",
               "playbook_override",
-              "visual_accuracy_check"
+              "visual_accuracy_check",
+              "anti_pattern_override",
+              "paid_election",
+              "asset_election",
+              "critique_override"
             ],
             "description": "What class of decision this is"
           },
@@ -52,18 +73,34 @@
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["option_id", "label", "score", "reason"],
+              "required": [
+                "option_id",
+                "label",
+                "score",
+                "reason"
+              ],
               "properties": {
-                "option_id": { "type": "string" },
-                "label": { "type": "string", "description": "Human-readable name" },
+                "option_id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string",
+                  "description": "Human-readable name"
+                },
                 "score": {
                   "type": "number",
                   "minimum": 0,
                   "maximum": 1,
                   "description": "Normalized score 0-1 (1 is best)"
                 },
-                "reason": { "type": "string", "description": "Why this option scored this way" },
-                "rejected_because": { "type": "string", "description": "If rejected, why" }
+                "reason": {
+                  "type": "string",
+                  "description": "Why this option scored this way"
+                },
+                "rejected_because": {
+                  "type": "string",
+                  "description": "If rejected, why"
+                }
               },
               "additionalProperties": false
             },
@@ -93,9 +130,100 @@
             "minimum": 0,
             "maximum": 1,
             "description": "Agent's confidence in this decision (0 = uncertain, 1 = certain)"
+          },
+          "election_id": {
+            "type": "string",
+            "description": "e-<project>-NNN; required before any paid action runs (Rule Zero in code)"
+          },
+          "anti_pattern": {
+            "type": "string",
+            "pattern": "^AP-[1-7]$",
+            "description": "For anti_pattern_override: which prohibited pattern the user elected"
+          },
+          "pages": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Pages an override or election applies to"
+          },
+          "cost": {
+            "type": "object",
+            "properties": {
+              "amount": {
+                "type": "number",
+                "minimum": 0
+              },
+              "unit": {
+                "type": "string"
+              },
+              "provider": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "description": "Quoted cost of a paid action (e.g. Runway credits)"
+          },
+          "actor": {
+            "type": "string",
+            "enum": [
+              "claude",
+              "human",
+              "local_model"
+            ],
+            "description": "Who drove the decision (MCP agent, om CLI human, local model)"
+          },
+          "recorded_at": {
+            "type": "string",
+            "description": "ISO-8601 time the decision was recorded"
           }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "category": {
+                  "const": "anti_pattern_override"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "anti_pattern",
+                "pages",
+                "user_approved"
+              ],
+              "properties": {
+                "user_approved": {
+                  "const": true
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "category": {
+                  "const": "paid_election"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "election_id",
+                "cost",
+                "user_approved"
+              ],
+              "properties": {
+                "user_approved": {
+                  "const": true
+                }
+              }
+            }
+          }
+        ]
       }
     }
   },
