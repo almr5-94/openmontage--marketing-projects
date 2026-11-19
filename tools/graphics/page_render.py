@@ -96,6 +96,7 @@ _CHECK_SCRIPT = r"""
     var all = document.body ? document.body.querySelectorAll('*') : [];
     for (var i = 0; i < all.length; i++) {
       var el = all[i];
+      if (el.hasAttribute('data-clip-ok')) continue;  // a box that crops a picture or the bleed on purpose
       var cs = getComputedStyle(el);
       var clips = /(hidden|clip)/.test(cs.overflow + cs.overflowX + cs.overflowY);
       var isPage = el.classList.contains('page') || el.hasAttribute('data-page');

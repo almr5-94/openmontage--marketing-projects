@@ -1,0 +1,170 @@
+/*
+ * OpenMontage editorial layout -- the stylesheet editorial_layout writes pages against.
+ *
+ * Geometry (all set in :root by the tool; never edit the copy in print-studio/):
+ *   .sheet  = one PDF page: trim + 2 x (bleed + slug). Print: slug carries crop marks.
+ *             Screen: --slug is -bleed, so the sheet is exactly the trim and the bleed is cut.
+ *   .page   = the bleed box (trim + 2 x bleed), placed at (slug, slug) inside the sheet.
+ *   .trim   = the finished page, inset by the bleed.
+ *   .live   = the type area inside the margins; 12 columns, baseline grid.
+ * Full-bleed pictures fill .page so they print to the bleed edge.
+ */
+
+:root {
+  --trim-w: 210mm;
+  --trim-h: 297mm;
+  --bleed: 3mm;
+  --slug: 8mm;
+  --margin-inner: 20mm;
+  --margin-outer: 16mm;
+  --margin-top: 18mm;
+  --margin-bottom: 22mm;
+  --cols: 12;
+  --gutter: 4.5mm;
+  --baseline: 13pt;            /* body leading; every text block snaps to multiples of it */
+
+  --paper: #f4f0e7;
+  --ink: #1b1813;
+  --ink-soft: #5b554b;
+  --accent: #7a2e1f;
+  --rule: #cfc7b6;
+
+  --font-display: "Bodoni Moda Display";
+  --font-display-weight: 500;
+  --font-text: "EB Garamond";
+  --size-body: 9.6pt;
+}
+
+@page { margin: 0; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #ffffff;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body {
+  font-family: var(--font-text);
+  font-size: var(--size-body);
+  line-height: var(--baseline);
+  color: var(--ink);
+  font-kerning: normal;
+  font-variant-numeric: lining-nums proportional-nums;
+  text-rendering: geometricPrecision;
+}
+
+/* ---------- sheet / page / trim ---------- */
+.sheet {
+  position: relative;
+  width: calc(var(--trim-w) + 2 * (var(--bleed) + var(--slug)));
+  height: calc(var(--trim-h) + 2 * (var(--bleed) + var(--slug)));
+  overflow: hidden;
+  break-after: page; page-break-after: always;
+  background: #ffffff;
+}
+.sheet:last-child { break-after: auto; page-break-after: auto; }
+.page {
+  position: absolute;
+  left: var(--slug); top: var(--slug);
+  width: calc(var(--trim-w) + 2 * var(--bleed));
+  height: calc(var(--trim-h) + 2 * var(--bleed));
+  overflow: hidden;
+  background: var(--paper);
+}
+.trim { position: absolute; inset: var(--bleed); }
+.live {
+  position: absolute;
+  top: var(--margin-top); bottom: var(--margin-bottom);
+  left: var(--margin-outer); right: var(--margin-inner);
+}
+.page.right .live { left: var(--margin-inner); right: var(--margin-outer); }
+.frame { overflow: hidden; }
+
+/* ---------- crop marks (print only) ---------- */
+.mark { position: absolute; background: #000; }
+.mark.h { height: 0.25pt; width: calc(var(--slug) - 2mm); }
+.mark.v { width: 0.25pt; height: calc(var(--slug) - 2mm); }
+.screen .mark, .screen .slug-info { display: none; }
+.slug-info { position: absolute; bottom: 1.5mm; left: calc(var(--slug) + var(--bleed));
+  font: 5.5pt/1 "IBM Plex Mono"; color: #000; }
+
+/* ---------- grids ---------- */
+.grid12 { display: grid; grid-template-columns: repeat(var(--cols), 1fr); column-gap: var(--gutter); }
+.show-grid .live::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 50;
+  background:
+    repeating-linear-gradient(to bottom, rgba(200, 40, 40, .28) 0 0.3pt, transparent 0.3pt var(--baseline)),
+    repeating-linear-gradient(to right, rgba(40, 90, 200, .12) 0 calc((100% - 11 * var(--gutter)) / 12),
+      transparent calc((100% - 11 * var(--gutter)) / 12) calc((100% - 11 * var(--gutter)) / 12 + var(--gutter)));
+}
+
+/* ---------- pictures ---------- */
+.bleed-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.spread-img { position: absolute; top: 0; height: 100%;
+  width: calc(2 * var(--trim-w) + 2 * var(--bleed)); object-fit: cover; display: block; }
+.page.left .spread-img { left: 0; }
+.page.right .spread-img { left: calc(-1 * var(--trim-w)); }
+.inset-img { display: block; width: 100%; object-fit: contain; }
+
+/* ---------- type ---------- */
+.display { font-family: var(--font-display); font-weight: var(--font-display-weight);
+  letter-spacing: -0.005em; margin: 0; }
+.label { font-family: var(--font-text); font-variant-caps: all-small-caps; letter-spacing: .14em;
+  font-size: 8.4pt; line-height: var(--baseline); }
+.kicker { color: var(--accent); }
+.dek { font-size: 13pt; line-height: calc(var(--baseline) * 1.5); font-style: italic; margin: 0; }
+.byline { color: var(--ink-soft); }
+.caption { font-size: 7.6pt; line-height: calc(var(--baseline) * 0.85); color: var(--ink-soft); }
+.caption b { font-weight: 500; color: var(--ink); }
+.body p { margin: 0; text-align: justify; hyphens: auto; -webkit-hyphens: auto; }
+.body p + p { text-indent: 1.1em; }
+.body.cols-2 { column-count: 2; column-gap: var(--gutter); column-fill: balance; }
+.body.cols-3 { column-count: 3; column-gap: var(--gutter); column-fill: balance; }
+.body.fill { column-fill: auto; }   /* long text: fill column by column; overflow is caught by the checker */
+.body p.first::first-letter { float: left; font-family: var(--font-display); font-weight: var(--font-display-weight);
+  font-size: calc(var(--baseline) * 3.1); line-height: calc(var(--baseline) * 2.6); padding: 0.06em 0.08em 0 0; color: var(--accent); }
+/* Arabic letters join: a detached first letter breaks the word, so RTL never takes a drop cap. */
+[dir="rtl"] .body p.first::first-letter { float: none; font: inherit; color: inherit; padding: 0; }
+.rule { border: 0; border-top: 0.4pt solid var(--rule); margin: 0; }
+.folio { position: absolute; bottom: calc(var(--margin-bottom) - var(--baseline) * 2.4); }
+.page.left .folio { left: var(--margin-outer); }
+.page.right .folio { right: var(--margin-outer); }
+
+/* ---------- cover ---------- */
+.cover .masthead { position: absolute; left: 0; right: 0; top: 0; text-align: center;
+  font-size: 64pt; line-height: 1; color: var(--cover-ink, var(--paper)); }
+.cover .issue-line { position: absolute; left: 0; right: 0; top: calc(64pt + 3mm); text-align: center;
+  color: var(--cover-ink, var(--paper)); }
+.cover .cover-head { position: absolute; left: 0; right: 0; bottom: 0; color: var(--cover-ink, var(--paper)); }
+.cover .cover-head .display { font-size: 30pt; line-height: calc(var(--baseline) * 2.6); }
+.cover .cover-lines { margin-top: calc(var(--baseline) * 0.6); }
+
+/* ---------- contents ---------- */
+.contents .entries { margin-top: calc(var(--baseline) * 3); }
+.contents .entry { display: grid; grid-template-columns: 14mm 1fr; column-gap: var(--gutter);
+  padding: calc(var(--baseline) * 0.5) 0; border-top: 0.4pt solid var(--rule); }
+.contents .entry .n { font-family: var(--font-display); font-size: 16pt; line-height: calc(var(--baseline) * 1.5); }
+.contents .entry .t { font-family: var(--font-display); font-size: 14pt; line-height: calc(var(--baseline) * 1.5); }
+.contents .entry .d { color: var(--ink-soft); }
+
+/* ---------- opening / feature ---------- */
+.opener-title { position: absolute; left: 0; right: 0; bottom: 0; }
+.opener-title .display { font-size: 40pt; line-height: calc(var(--baseline) * 3.4); }
+.feature-head .kicker, .opener-title .kicker, .contents .kicker { display: block; margin-bottom: calc(var(--baseline) * 0.5); }
+.feature-head .display { font-size: 26pt; line-height: calc(var(--baseline) * 2.2); }
+
+/* ---------- pull quote ---------- */
+.pull { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); }
+.pull blockquote { margin: 0; font-family: var(--font-display); font-weight: var(--font-display-weight);
+  font-size: 26pt; line-height: calc(var(--baseline) * 2.4); }
+.pull .attr { margin-top: calc(var(--baseline) * 1.5); }
+
+/* ---------- campaign (single-page ad) ---------- */
+.campaign .claim { position: absolute; left: 0; right: 0; bottom: 0; color: var(--cover-ink, var(--paper)); }
+.campaign .claim .display { font-size: 28pt; line-height: calc(var(--baseline) * 2.4); }
+
+/* ---------- colophon ---------- */
+.colophon .credits { margin-top: calc(var(--baseline) * 2); font-size: 7.8pt; }
+.colophon .credits p { margin: 0 0 calc(var(--baseline) * 0.5); }
+
+/* ---------- right-to-left ---------- */
+[dir="rtl"] body, [dir="rtl"] .body p { text-align: justify; }
+[dir="rtl"] .label { letter-spacing: 0; font-variant-caps: normal; font-size: 9pt; }
+[dir="rtl"] .dek, [dir="rtl"] em, [dir="rtl"] i { font-style: normal; }   /* no synthetic oblique on Arabic */
+[dir="rtl"] .display { letter-spacing: 0; }
