@@ -128,3 +128,22 @@ def test_every_playbook_theme_keeps_captions_legible(playbook: str) -> None:
         f"{playbook}: caption text {theme['textColor']} on bar {caption_bar} "
         f"is {ratio}:1, below WCAG AA {MIN_CONTRAST}:1"
     )
+
+
+@pytest.mark.parametrize(
+    ("text", "background", "expected"),
+    [
+        ("#173035", "#94C0B9", "light"),  # handdrawn-biotext: dark text on mid-tone mint
+        ("#181818", "#E7D6BE", "light"),  # handdrawn-paperfolk: dark text on warm grey
+        ("#F7F7F0", "#3B7673", "dark"),   # handdrawn-incise: light text on mid-tone teal
+        ("#1F2937", "#FFFFFF", "light"),
+        ("#F8FAFC", "#0F172A", "dark"),
+    ],
+)
+def test_caption_bar_follows_the_text_not_a_white_list(text: str, background: str, expected: str) -> None:
+    """Regression: only exact white backgrounds got the light bar, so dark caption
+    text on any other light or mid-tone background sat on a dark navy bar."""
+    from tools.video.video_compose import _caption_bar_for
+
+    bar = _caption_bar_for(text, background)
+    assert bar.startswith("rgba(255, 255, 255") if expected == "light" else bar.startswith("rgba(15, 23, 42")

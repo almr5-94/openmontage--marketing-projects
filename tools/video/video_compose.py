@@ -55,6 +55,35 @@ from tools.base_tool import (
 )
 
 
+
+_LIGHT_CAPTION_BAR = "rgba(255, 255, 255, 0.85)"
+_DARK_CAPTION_BAR = "rgba(15, 23, 42, 0.75)"
+
+
+def _caption_bar_for(text_hex: str, background_hex: str) -> str:
+    """Pick the caption bar (light or dark, translucent) that gives the caption
+    text the higher contrast once the bar is composited over the background."""
+    from styles.playbook_loader import validate_contrast
+
+    def flatten(rgba: str) -> str:
+        parts = [float(x) for x in rgba[rgba.index("(") + 1 : rgba.index(")")].split(",")]
+        r, g, b, a = parts[0], parts[1], parts[2], parts[3]
+        h = background_hex.lstrip("#")
+        if len(h) == 3:
+            h = "".join(c * 2 for c in h)
+        br, bg_, bb = (int(h[i : i + 2], 16) for i in (0, 2, 4))
+        return "#%02X%02X%02X" % (
+            round(a * r + (1 - a) * br), round(a * g + (1 - a) * bg_), round(a * b + (1 - a) * bb)
+        )
+
+    try:
+        light = validate_contrast(text_hex, flatten(_LIGHT_CAPTION_BAR))["ratio"]
+        dark = validate_contrast(text_hex, flatten(_DARK_CAPTION_BAR))["ratio"]
+    except Exception:
+        return _DARK_CAPTION_BAR
+    return _LIGHT_CAPTION_BAR if light > dark else _DARK_CAPTION_BAR
+
+
 class VideoCompose(BaseTool):
     name = "video_compose"
     version = "0.1.0"
@@ -1333,11 +1362,11 @@ class VideoCompose(BaseTool):
 
             # Derive caption colors from the palette
             theme["captionHighlightColor"] = primary
-            # Caption background: semi-transparent version of the bg color
-            theme["captionBackgroundColor"] = (
-                f"rgba(255, 255, 255, 0.85)" if bg.upper() in ("#FFFFFF", "#FAFAFA", "#F9FAFB")
-                else f"rgba(15, 23, 42, 0.75)"
-            )
+            # Caption bar: a translucent light or dark bar, whichever keeps the
+            # theme's caption text readable. Deciding by "is the background pure
+            # white" put a dark navy bar under the dark text of mid-tone playbooks
+            # (handdrawn-biotext mint, handdrawn-paperfolk grey): 1.3-1.9:1.
+            theme["captionBackgroundColor"] = _caption_bar_for(text, bg)
 
             # Motion style from playbook. `pace` is an identity field in the
             # playbook schema; motion carries pacing_rules, not a pace enum.

@@ -19,6 +19,8 @@ extensions:
   custom_tools: false
 
 required_skills:
+  - pipelines/kli-daily-reel/idea-director
+  - pipelines/kli-daily-reel/compose-director
   - core/hyperframes
   - core/whisperx
   - meta/checkpoint-protocol
@@ -35,6 +37,7 @@ compatible_playbooks: []
 
 stages:
   - name: idea
+    skill: pipelines/kli-daily-reel/idea-director
     produces: [brief, decision_log]
     tools_available: []
     checkpoint_required: true
@@ -97,6 +100,7 @@ stages:
       - Caption chunks pass assert_caption_safe
 
   - name: compose
+    skill: pipelines/kli-daily-reel/compose-director
     required_artifacts_in: [edit_decisions, asset_manifest]
     produces: [render_report]
     required_tools: [audio_mixer]
