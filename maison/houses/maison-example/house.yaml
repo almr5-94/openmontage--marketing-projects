@@ -1,0 +1,45 @@
+# An INVENTED house for testing Maison end to end without touching any real brand.
+# Every name, date and story here is made up.
+id: maison-example
+name: Maison Example
+brand_owner: invented          # self | client | invented  (self/client names are allowed by brand_lint)
+founded: 1891
+heritage: >
+  A small workshop of instrument-makers on a river quay, founded in 1891 by a clock-repairer and
+  a bookbinder who shared one bench. They made brass navigational rules, folding sundials and
+  leather cases for them. The house still keeps the bench, the ledger of every instrument it
+  repaired, and a drawer of brass offcuts that apprentices use to learn the file.
+values: [patience, repair over replacement, the hand that measures, quiet precision]
+voice:
+  register: aspirational and precise; craft-literate; never salesy
+  do: [name the material, name the tool, name the gesture, give the date]
+  never: [superlatives without evidence, urgency, discounts, operational copy in display type]
+languages: [en, ar]           # Arabic is a first-class native edition (RTL), never translated in tone
+palette:
+  paper: "#f2ece0"            # uncoated off-white
+  ink: "#1c1915"
+  ink_soft: "#5d564b"
+  accent: "#8a5a2b"           # worn brass
+  rule: "#cdc3b0"
+type:                          # from print-studio/fonts/FONTS.yaml; two families per script at most
+  latin_display: Bodoni Moda Display
+  latin_text: EB Garamond
+  arabic_display: Amiri
+  arabic_text: IBM Plex Sans Arabic
+  mono: IBM Plex Mono         # plate numbers and colophon only
+motifs: [the arc of a sundial gnomon, the circle of a dial, ruled lines of a ledger, brass filings]
+masthead: "EXAMPLE"
+masthead_ar: "مثال"
+grid:
+  columns: 12
+  margins_mm: {inner: 22, outer: 18, top: 20, bottom: 26}   # the Maison preset: wide margins
+  baseline_pt: 13
+production:
+  cadence: biannual
+  trim: a4
+  bleed_mm: 3
+  paper_stock: uncoated_offwhite
+  finish: "uncoated text, cover with a blind deboss of the masthead"
+drawing_series:
+  frame: "Drawing {theme} No. {n}"
+  hand: {medium: engraving, line: fine cross-hatch, palette: [ink, accent], paper: uncoated_offwhite}

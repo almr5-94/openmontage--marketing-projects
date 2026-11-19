@@ -38,6 +38,11 @@ ARTIFACT_NAMES = [
     "layout_plan",
     "print_render",
     "print_review",
+    # Editorial art stack and Maison (editorial-magazine, maison-* pipelines)
+    "quality_gate",
+    "maison_critique",
+    "maison_inventory",
+    "shot_list",
 ]
 
 

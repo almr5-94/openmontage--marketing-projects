@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/maison_inventory",
+  "title": "Maison Inventory",
+  "description": "An issue framed as an incomplete inventory of a place or idea: 20-40 candidate stories and objects, sequenced along the arc story -> character -> influence, then elected.",
+  "type": "object",
+  "required": [
+    "version",
+    "theme",
+    "candidates",
+    "arc",
+    "elected"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "theme": {
+      "type": "string"
+    },
+    "guest_voice": {
+      "type": "string"
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "kind",
+          "why"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "story",
+              "object",
+              "place",
+              "person_profile",
+              "archive",
+              "craft",
+              "drawing"
+            ]
+          },
+          "why": {
+            "type": "string"
+          },
+          "archive_pair": {
+            "type": "string"
+          },
+          "source_hint": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "arc": {
+      "type": "object",
+      "required": [
+        "story",
+        "character",
+        "influence"
+      ],
+      "properties": {
+        "story": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "character": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "influence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "elected": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "drafted_by": {
+      "type": "string"
+    },
+    "elected_by": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,148 @@
+# Maison pipeline (beta). Doctrine: .agents/skills/maison-doctrine/SKILL.md; house: maison/houses/<id>/house.yaml
+name: maison-drawing-series
+version: '1.0'
+description: A named, numbered drawing series for a house ("Drawing <theme> No. <n>") with a fixed hand - medium
+  look, line weight, palette, paper - locked by a style-lock sheet so plate No. 1 and No. 30 look like the same
+  artist. Free seeded vector drawing first (generative_art), then the repo's hand-drawn style systems, then elected
+  Runway generation; individual print plates, a series index page and an archive page by year, month and series.
+category: print
+stability: beta
+default_checkpoint_policy: guided
+extensions:
+  custom_scripts: false
+  custom_playbooks: true
+  custom_skills: true
+  custom_tools: false
+required_skills:
+- pipelines/maison-drawing-series/executive-producer
+- pipelines/maison-drawing-series/series-brief-director
+- pipelines/maison-drawing-series/hand-director
+- pipelines/maison-drawing-series/plates-director
+- pipelines/maison-drawing-series/style-lock-director
+- pipelines/maison-drawing-series/layout-director
+- pipelines/maison-drawing-series/critique-director
+- pipelines/maison-drawing-series/export-director
+- meta/print-production
+- meta/reviewer
+- meta/checkpoint-protocol
+orchestration:
+  mode: executive-producer
+  skill: pipelines/maison-drawing-series/executive-producer
+  budget_default_usd: 0.0
+  max_revisions_per_stage: 3
+  max_send_backs: 3
+  max_wall_time_minutes: 120
+compatible_playbooks:
+  recommended:
+  - clean-professional
+  custom_allowed: true
+stages:
+- name: series_brief
+  skill: pipelines/maison-drawing-series/series-brief-director
+  produces:
+  - print_brief
+  - decision_log
+  tools_available: []
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - 'Series name, theme, numbering, year; the hand: medium look, line weight, palette, paper'
+  success_criteria:
+  - Schema-valid print_brief; brand_lint clean
+- name: hand
+  skill: pipelines/maison-drawing-series/hand-director
+  required_artifacts_in:
+  - print_brief
+  produces:
+  - studio_proposal
+  - decision_log
+  tools_available:
+  - generative_art
+  - image_crop
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - '2-3 hand options rendered as test plates (seeds logged); engine route elected: generative_art, scripts/style_refs
+    families, or Runway MCP (paid)'
+  success_criteria:
+  - Schema-valid studio_proposal with the elected hand
+- name: assets
+  skill: pipelines/maison-drawing-series/plates-director
+  required_artifacts_in:
+  - studio_proposal
+  produces:
+  - asset_manifest
+  - decision_log
+  tools_available:
+  - generative_art
+  - image_crop
+  - met_art
+  - cleveland_art
+  - rijks_art
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - Each plate in the fixed hand at print resolution; face gate on every figure; seeds logged
+  success_criteria:
+  - Schema-valid asset_manifest of plates
+- name: style_lock
+  skill: pipelines/maison-drawing-series/style-lock-director
+  required_artifacts_in:
+  - asset_manifest
+  produces:
+  - quality_gate
+  tools_available:
+  - image_crop
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - Style-lock sheet (montage of every plate beside plate No. 1); outliers redone
+  success_criteria:
+  - Every plate matches the lock; quality_gate written
+- name: layout
+  skill: pipelines/maison-drawing-series/layout-director
+  required_artifacts_in:
+  - asset_manifest
+  produces:
+  - layout_plan
+  - print_render
+  tools_available:
+  - editorial_layout
+  - page_render
+  checkpoint_required: true
+  human_approval_default: false
+  review_focus:
+  - Plate pages on a paper-light ground, a series index, an archive page grouped by year, month, series
+  success_criteria:
+  - editorial_layout checks pass
+- name: critique
+  skill: pipelines/maison-drawing-series/critique-director
+  required_artifacts_in:
+  - print_render
+  produces:
+  - maison_critique
+  - quality_gate
+  tools_available:
+  - editorial_layout
+  - page_render
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - 'maison critique (Claude + local models): every rubric criterion 4 or above, with evidence'
+  - anti-AI-tells gate, face gate, provenance and brand_lint all pass (blocking)
+  success_criteria:
+  - maison_critique pass and quality_gate pass
+- name: publish
+  skill: pipelines/maison-drawing-series/export-director
+  required_artifacts_in:
+  - quality_gate
+  produces:
+  - publish_log
+  tools_available:
+  - editorial_layout
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - Plates as print PNGs and a series PDF handed over
+  success_criteria:
+  - Schema-valid publish_log

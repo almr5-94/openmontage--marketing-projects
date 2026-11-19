@@ -55,7 +55,10 @@ from tools.base_tool import (
 
 REPO = Path(__file__).resolve().parents[2]
 STUDIO = REPO / "print-studio"
-TRIMS = {"a4": (210.0, 297.0), "us_letter": (215.9, 279.4), "magazine_230x300": (230.0, 300.0)}
+TRIMS = {"a4": (210.0, 297.0), "us_letter": (215.9, 279.4), "magazine_230x300": (230.0, 300.0),
+         # campaign placements: 4:5 and 9:16 social stills (1080 px wide at ~127 dpi), out-of-home posters
+         "social_4x5": (216.0, 270.0), "social_9x16": (216.0, 384.0),
+         "ooh_portrait": (420.0, 594.0), "ooh_landscape": (594.0, 420.0)}
 PAGE_TYPES = ["cover", "contents", "opening_spread", "feature_spread", "art_page", "pull_quote",
               "text_page", "campaign", "back_cover", "colophon"]
 SPREADS = {"opening_spread", "feature_spread"}

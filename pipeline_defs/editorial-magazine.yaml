@@ -1,0 +1,206 @@
+name: editorial-magazine
+version: "1.0"
+description: >
+  Art-led magazines built from real art: a feeling becomes a colour and geometry system; CC0 museum
+  art and licensed photography are sourced, cut into geometric fragments, extended with elected
+  generations (Runway MCP only), layered with seeded generative art, collaged, and set as print
+  pages with bleed and crop marks. Every page passes the anti-AI-tells gate, the face gate,
+  provenance and brand_lint before export. Free tools first, always.
+category: print
+stability: beta
+
+default_checkpoint_policy: guided
+
+extensions:
+  custom_scripts: false
+  custom_playbooks: true
+  custom_skills: true
+  custom_tools: false
+
+required_skills:
+  - pipelines/editorial-magazine/executive-producer
+  - pipelines/editorial-magazine/feeling-brief-director
+  - pipelines/editorial-magazine/art-system-director
+  - pipelines/editorial-magazine/source-art-director
+  - pipelines/editorial-magazine/fragment-director
+  - pipelines/editorial-magazine/matching-parts-director
+  - pipelines/editorial-magazine/geometric-layers-director
+  - pipelines/editorial-magazine/fashion-director
+  - pipelines/editorial-magazine/collage-director
+  - pipelines/editorial-magazine/layout-director
+  - pipelines/editorial-magazine/review-gate-director
+  - pipelines/editorial-magazine/export-director
+  - pipelines/editorial-magazine/motion-director
+  - meta/print-production
+  - meta/reviewer
+  - meta/checkpoint-protocol
+
+orchestration:
+  mode: executive-producer
+  skill: pipelines/editorial-magazine/executive-producer
+  budget_default_usd: 0.00
+  max_revisions_per_stage: 3
+  max_send_backs: 3
+  max_wall_time_minutes: 120
+
+compatible_playbooks:
+  recommended:
+    - clean-professional
+  custom_allowed: true
+
+stages:
+  - name: feeling_brief
+    skill: pipelines/editorial-magazine/feeling-brief-director
+    produces: [print_brief, decision_log]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - One feeling named in a word or a short phrase, and the theme it serves
+      - Audience, page count (a multiple of 4), trim (a4 / us_letter / magazine_230x300), languages (EN / AR)
+    success_criteria:
+      - Schema-valid print_brief; the user confirmed the feeling and the format
+
+  - name: art_system
+    skill: pipelines/editorial-magazine/art-system-director
+    required_artifacts_in: [print_brief]
+    produces: [studio_proposal, decision_log]
+    tools_available: [generative_art, image_crop]
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Palette derived from the feeling with WCAG contrast for every text/ground pair
+      - One geometric motif family, one type pairing from FONTS.yaml (max two families per script), a 12-column grid
+      - generative_art previews of the motif (seeds logged); free tools listed before any paid route
+    success_criteria:
+      - Schema-valid studio_proposal approved; decision_log records palette, motif, type and the image-route election
+
+  - name: assets
+    skill: pipelines/editorial-magazine/source-art-director
+    required_artifacts_in: [studio_proposal]
+    produces: [asset_manifest]
+    tools_available: [met_art, cleveland_art, rijks_art, aic_art, pexels_image, pixabay_image]
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Museum art (CC0 / public domain) first, then Pexels, then Pixabay, then the user's uploads
+      - Every file recorded in assets/PROVENANCE.json; reference images never downloaded
+      - Enough unique sources that no image is reused (AP-5)
+    success_criteria:
+      - Schema-valid asset_manifest; provenance.check_complete passes on every sourced file
+
+  - name: fragments
+    skill: pipelines/editorial-magazine/fragment-director
+    required_artifacts_in: [asset_manifest, studio_proposal]
+    produces: [asset_manifest]
+    tools_available: [image_crop]
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Smart crops and geometric-mask fragments in the motif family, cut along the objects' own geometry
+      - A contact sheet (image_crop montage) reviewed; every fragment recorded as derived with its parent
+    success_criteria:
+      - Fragment library under assets/fragments/ with complete provenance
+
+  - name: matching_parts
+    skill: pipelines/editorial-magazine/matching-parts-director
+    required_artifacts_in: [asset_manifest, studio_proposal]
+    produces: [asset_manifest, decision_log]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Optional and paid - Runway MCP only (no pay-per-call image API), each call with a recorded election ID and credit cost
+      - A full art-direction micro-brief per generation; brand_lint clean; face gate on every result
+    success_criteria:
+      - Either skipped with the reason logged, or every generated part elected, gated and recorded as generated-in-session
+
+  - name: geometric_layers
+    skill: pipelines/editorial-magazine/geometric-layers-director
+    required_artifacts_in: [studio_proposal]
+    produces: [asset_manifest]
+    tools_available: [generative_art]
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Seeded plates at print resolution (300 dpi at the slot size) with material rendering - never thin uniform-stroke clip-art (AP-2)
+      - Seeds logged; same seed reproduces the same SVG
+    success_criteria:
+      - Plates under assets/generative/ with SVG + PNG and provenance
+
+  - name: fashion_direction
+    skill: pipelines/editorial-magazine/fashion-director
+    required_artifacts_in: [print_brief, studio_proposal]
+    produces: [shot_list, decision_log]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Optional - Safe / Bold / Conceptual treatments, cast notes, shot list, Runway-ready prompts
+      - No house, trademark or living-artist names (brand_lint); face gate on every elected result
+    success_criteria:
+      - Schema-valid shot_list (or the stage skipped with the reason logged)
+
+  - name: collage
+    skill: pipelines/editorial-magazine/collage-director
+    required_artifacts_in: [asset_manifest, studio_proposal]
+    produces: [asset_manifest]
+    tools_available: [collage, image_crop]
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - One focal piece per page art; negative space reserved for the type block
+      - Layout JSON kept beside every collage; provenance lists every parent
+    success_criteria:
+      - Page art at print resolution for every image slot in the flatplan
+
+  - name: layout
+    skill: pipelines/editorial-magazine/layout-director
+    required_artifacts_in: [asset_manifest, print_brief, studio_proposal]
+    produces: [layout_plan, print_render]
+    tools_available: [editorial_layout, page_render]
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Cover, contents, opening and feature spreads, art pages, pull quotes, colophon, back cover on the 12-column + baseline grid
+      - Spreads face each other; no overflow; RTL edition mirrored with Arabic faces and Latin digits
+    success_criteria:
+      - Schema-valid layout_plan and print_render; editorial_layout checks pass
+
+  - name: review_gate
+    skill: pipelines/editorial-magazine/review-gate-director
+    required_artifacts_in: [print_render, asset_manifest]
+    produces: [quality_gate, print_review]
+    tools_available: [editorial_layout, page_render]
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - qa_anti_ai_tells passes on every page (automated checks + local critic + Claude critic)
+      - Face gate on every image of a person; provenance complete; brand_lint clean; contrast and legibility
+    success_criteria:
+      - Schema-valid quality_gate with pass true (overrides only by logged user election)
+
+  - name: publish
+    skill: pipelines/editorial-magazine/export-director
+    required_artifacts_in: [quality_gate]
+    produces: [publish_log]
+    tools_available: [editorial_layout]
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Print PDF (bleed + crop marks), screen PDF, page PNGs and a paper-stock proof handed to the user
+    success_criteria:
+      - Schema-valid publish_log listing every file
+
+  - name: motion
+    skill: pipelines/editorial-magazine/motion-director
+    required_artifacts_in: [publish_log]
+    produces: [decision_log]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Optional - animated cover, page-flip teaser or reel through the animation / cinematic pipelines
+      - Both render runtimes offered (HyperFrames and Remotion); Runway MCP for generated motion, elected
+    success_criteria:
+      - The motion route elected and handed to its pipeline, or the stage skipped with the reason logged

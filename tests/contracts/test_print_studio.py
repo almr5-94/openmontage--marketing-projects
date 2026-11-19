@@ -16,7 +16,8 @@ from lib.checkpoint import get_pipeline_stages, validate_checkpoint
 from schemas.artifacts import ARTIFACT_NAMES, validate_artifact
 
 REPO = Path(__file__).resolve().parents[2]
-PRINT_PIPELINES = ["image-studio", "magazine"]
+PRINT_PIPELINES = ["image-studio", "magazine", "editorial-magazine", "maison-issue",
+                   "maison-drawing-series", "maison-campaign"]
 
 
 def _manifest(name: str) -> dict:

@@ -1,0 +1,189 @@
+# Maison pipeline (beta). Doctrine: .agents/skills/maison-doctrine/SKILL.md; house: maison/houses/<id>/house.yaml
+name: maison-issue
+version: '1.0'
+description: 'A collectible art magazine for the user''s own house, a client''s house or an invented house: one
+  theme framed as an incomplete inventory, a singular cover object, a commissioned image set that pairs archive
+  and contemporary work, long-form writing in the house voice (Arabic as a native RTL edition), a disciplined Maison
+  grid, and a luxury critique gate scored by Claude and by the local models before export.'
+category: print
+stability: beta
+default_checkpoint_policy: guided
+extensions:
+  custom_scripts: false
+  custom_playbooks: true
+  custom_skills: true
+  custom_tools: false
+required_skills:
+- pipelines/maison-issue/executive-producer
+- pipelines/maison-issue/house-brief-director
+- pipelines/maison-issue/inventory-director
+- pipelines/maison-issue/cover-object-director
+- pipelines/maison-issue/commission-director
+- pipelines/maison-issue/writing-director
+- pipelines/maison-issue/layout-director
+- pipelines/maison-issue/critique-director
+- pipelines/maison-issue/export-director
+- pipelines/maison-issue/motion-director
+- meta/print-production
+- meta/reviewer
+- meta/checkpoint-protocol
+orchestration:
+  mode: executive-producer
+  skill: pipelines/maison-issue/executive-producer
+  budget_default_usd: 0.0
+  max_revisions_per_stage: 3
+  max_send_backs: 3
+  max_wall_time_minutes: 120
+compatible_playbooks:
+  recommended:
+  - clean-professional
+  custom_allowed: true
+stages:
+- name: house_brief
+  skill: pipelines/maison-issue/house-brief-director
+  produces:
+  - print_brief
+  - decision_log
+  tools_available: []
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - house.yaml loaded; theme in one word or idea; guest voice; languages, page count, trim, paper, finish
+  success_criteria:
+  - Schema-valid print_brief; brand_lint clean on house.yaml and the brief
+- name: inventory
+  skill: pipelines/maison-issue/inventory-director
+  required_artifacts_in:
+  - print_brief
+  produces:
+  - maison_inventory
+  - decision_log
+  tools_available: []
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - 20-40 candidates drafted (local model or Claude), sequenced story -> character -> influence, elected by the
+    human or Claude
+  success_criteria:
+  - Schema-valid maison_inventory with an elected list
+- name: cover_object
+  skill: pipelines/maison-issue/cover-object-director
+  required_artifacts_in:
+  - maison_inventory
+  produces:
+  - asset_manifest
+  - decision_log
+  tools_available:
+  - met_art
+  - cleveland_art
+  - rijks_art
+  - aic_art
+  - generative_art
+  - image_crop
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - One singular object, generous negative space; CC0 object, a drawing plate, or an elected Runway generation
+  success_criteria:
+  - The cover object at print resolution with provenance
+- name: assets
+  skill: pipelines/maison-issue/commission-director
+  required_artifacts_in:
+  - maison_inventory
+  produces:
+  - asset_manifest
+  - decision_log
+  tools_available:
+  - met_art
+  - cleveland_art
+  - rijks_art
+  - aic_art
+  - pexels_image
+  - pixabay_image
+  - generative_art
+  - image_crop
+  - collage
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - One commission per story (light, palette, hand, paper); free first, then elected Runway MCP
+  - A consistency check on the whole set; each source used once (AP-5); face gate on every person
+  success_criteria:
+  - Schema-valid asset_manifest; provenance complete
+- name: writing
+  skill: pipelines/maison-issue/writing-director
+  required_artifacts_in:
+  - maison_inventory
+  - asset_manifest
+  produces:
+  - editorial_copy
+  tools_available: []
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - Long-form features, captions and object notes in the house voice; Arabic written natively
+  - AP-1 copy lint clean; no superlatives without evidence
+  success_criteria:
+  - Schema-valid editorial_copy approved
+- name: layout
+  skill: pipelines/maison-issue/layout-director
+  required_artifacts_in:
+  - editorial_copy
+  - asset_manifest
+  produces:
+  - layout_plan
+  - print_render
+  tools_available:
+  - editorial_layout
+  - page_render
+  checkpoint_required: true
+  human_approval_default: false
+  review_focus:
+  - Maison grid preset from house.yaml (wide margins, quiet folio, constant masthead); archive/contemporary spreads
+  success_criteria:
+  - editorial_layout checks pass; spreads face
+- name: critique
+  skill: pipelines/maison-issue/critique-director
+  required_artifacts_in:
+  - print_render
+  produces:
+  - maison_critique
+  - quality_gate
+  tools_available:
+  - editorial_layout
+  - page_render
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - 'maison critique (Claude + local models): every rubric criterion 4 or above, with evidence'
+  - anti-AI-tells gate, face gate, provenance and brand_lint all pass (blocking)
+  success_criteria:
+  - maison_critique pass and quality_gate pass
+- name: publish
+  skill: pipelines/maison-issue/export-director
+  required_artifacts_in:
+  - quality_gate
+  produces:
+  - publish_log
+  tools_available:
+  - editorial_layout
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - Print PDF with bleed and crop marks, paper-colour proof, screen PDF, page PNGs, all handed over
+  success_criteria:
+  - Schema-valid publish_log
+- name: motion
+  skill: pipelines/maison-issue/motion-director
+  required_artifacts_in:
+  - publish_log
+  produces:
+  - decision_log
+  tools_available: []
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - 'Optional: slow page-turn film, animated cover, drawing-in-progress reveal; HyperFrames and Remotion both offered;
+    Runway MCP elected'
+  success_criteria:
+  - Route elected or the stage skipped with the reason logged

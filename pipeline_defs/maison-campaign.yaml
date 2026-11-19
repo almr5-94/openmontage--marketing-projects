@@ -1,0 +1,157 @@
+# Maison pipeline (beta). Doctrine: .agents/skills/maison-doctrine/SKILL.md; house: maison/houses/<id>/house.yaml
+name: maison-campaign
+version: '1.0'
+description: 'High-art luxury marketing for a house: one idea and one image per execution, the product as an object
+  of craft inside an artful scene or drawing, minimal copy (a line, the house name, sometimes nothing) and never
+  discount or urgency language. Safe / Bold / Conceptual treatments from the fashion-direction skill under the Maison
+  doctrine; a master composition with per-placement variants (single and double page print, out-of-home, social
+  stills and carousels, 6-15 s motion, a campaign book) keeping safe areas and text-free versions.'
+category: print
+stability: beta
+default_checkpoint_policy: guided
+extensions:
+  custom_scripts: false
+  custom_playbooks: true
+  custom_skills: true
+  custom_tools: false
+required_skills:
+- pipelines/maison-campaign/executive-producer
+- pipelines/maison-campaign/campaign-brief-director
+- pipelines/maison-campaign/treatments-director
+- pipelines/maison-campaign/image-director
+- pipelines/maison-campaign/layout-director
+- pipelines/maison-campaign/critique-director
+- pipelines/maison-campaign/export-director
+- pipelines/maison-campaign/motion-director
+- meta/print-production
+- meta/reviewer
+- meta/checkpoint-protocol
+orchestration:
+  mode: executive-producer
+  skill: pipelines/maison-campaign/executive-producer
+  budget_default_usd: 0.0
+  max_revisions_per_stage: 3
+  max_send_backs: 3
+  max_wall_time_minutes: 120
+compatible_playbooks:
+  recommended:
+  - clean-professional
+  custom_allowed: true
+stages:
+- name: campaign_brief
+  skill: pipelines/maison-campaign/campaign-brief-director
+  produces:
+  - print_brief
+  - decision_log
+  tools_available: []
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - The one idea; the product as an object of craft; placements and sizes; languages
+  success_criteria:
+  - Schema-valid print_brief; brand_lint clean
+- name: treatments
+  skill: pipelines/maison-campaign/treatments-director
+  required_artifacts_in:
+  - print_brief
+  produces:
+  - shot_list
+  - studio_proposal
+  - decision_log
+  tools_available:
+  - generative_art
+  - image_crop
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - Safe / Bold / Conceptual treatments; house.yaml overrides fashion-direction defaults; shot list with Runway-ready
+    prompts (qualities, never names)
+  success_criteria:
+  - Schema-valid shot_list and studio_proposal with the elected treatment
+- name: assets
+  skill: pipelines/maison-campaign/image-director
+  required_artifacts_in:
+  - shot_list
+  produces:
+  - asset_manifest
+  - decision_log
+  tools_available:
+  - met_art
+  - cleveland_art
+  - rijks_art
+  - aic_art
+  - pexels_image
+  - pixabay_image
+  - generative_art
+  - image_crop
+  - collage
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - One commanding image per execution; free first, then elected Runway MCP with credits shown; face gate on every
+    person
+  success_criteria:
+  - Schema-valid asset_manifest; provenance complete
+- name: layout
+  skill: pipelines/maison-campaign/layout-director
+  required_artifacts_in:
+  - asset_manifest
+  produces:
+  - layout_plan
+  - print_render
+  tools_available:
+  - editorial_layout
+  - page_render
+  - image_crop
+  checkpoint_required: true
+  human_approval_default: false
+  review_focus:
+  - A master composition, then variants per placement (4:5 social, 9:16, OOH portrait/landscape, double page) with
+    safe areas and a text-free version
+  success_criteria:
+  - editorial_layout checks pass on every variant
+- name: critique
+  skill: pipelines/maison-campaign/critique-director
+  required_artifacts_in:
+  - print_render
+  produces:
+  - maison_critique
+  - quality_gate
+  tools_available:
+  - editorial_layout
+  - page_render
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - 'maison critique (Claude + local models): every rubric criterion 4 or above, with evidence'
+  - anti-AI-tells gate, face gate, provenance and brand_lint all pass (blocking)
+  - No discount or urgency language anywhere (AP-1)
+  success_criteria:
+  - maison_critique pass and quality_gate pass
+- name: publish
+  skill: pipelines/maison-campaign/export-director
+  required_artifacts_in:
+  - quality_gate
+  produces:
+  - publish_log
+  tools_available:
+  - editorial_layout
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - Every placement file handed over with its size and safe area
+  success_criteria:
+  - Schema-valid publish_log
+- name: motion
+  skill: pipelines/maison-campaign/motion-director
+  required_artifacts_in:
+  - publish_log
+  produces:
+  - decision_log
+  tools_available: []
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - 'Optional 6-15 s motion version: HyperFrames and Remotion both offered; Runway MCP elected'
+  success_criteria:
+  - Route elected or skipped with the reason logged

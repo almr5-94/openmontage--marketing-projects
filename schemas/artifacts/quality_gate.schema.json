@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/quality_gate",
+  "title": "Quality Gate",
+  "description": "Blocking gates before export: anti-AI-tells (AP-1..AP-7), face gate on every person image, provenance completeness, brand_lint. Any false blocks export; an override needs an anti_pattern_override decision.",
+  "type": "object",
+  "required": [
+    "version",
+    "pdf",
+    "anti_ai_tells",
+    "face_gate",
+    "provenance",
+    "brand_lint",
+    "pass"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "pdf": {
+      "type": "string"
+    },
+    "anti_ai_tells": {
+      "type": "object",
+      "required": [
+        "pass"
+      ],
+      "properties": {
+        "pass": {
+          "type": "boolean"
+        },
+        "report": {
+          "type": "string"
+        },
+        "codes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "failed_pages": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "face_gate": {
+      "type": "object",
+      "required": [
+        "pass",
+        "checked"
+      ],
+      "properties": {
+        "pass": {
+          "type": "boolean"
+        },
+        "checked": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "people": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "pass"
+      ],
+      "properties": {
+        "pass": {
+          "type": "boolean"
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "bad_licence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "broken_chain": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "brand_lint": {
+      "type": "object",
+      "required": [
+        "pass"
+      ],
+      "properties": {
+        "pass": {
+          "type": "boolean"
+        },
+        "report": {
+          "type": "string"
+        },
+        "codes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "failed_pages": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "maison_critique_ref": {
+      "type": "string"
+    },
+    "pass": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false
+}

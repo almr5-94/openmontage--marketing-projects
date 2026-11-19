@@ -80,6 +80,10 @@ _EXCLUDED_PIPELINES = {
     # (HTML -> PNG/PDF), so there is no Remotion/HyperFrames runtime to present.
     "image-studio": "print pipeline, renders stills with page_render, no video compose",
     "magazine": "print pipeline, renders PDFs with page_render, no video compose",
+    "editorial-magazine": "print pipeline, editorial_layout renders PDFs; motion is an optional handoff",
+    "maison-issue": "print pipeline, editorial_layout renders PDFs; motion is an optional handoff",
+    "maison-drawing-series": "print pipeline, plates and a series PDF, no video compose",
+    "maison-campaign": "print/placement pipeline; the 6-15 s film is an optional handoff stage",
 }
 
 

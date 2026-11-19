@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/shot_list",
+  "title": "Shot List",
+  "description": "Fashion / campaign direction (fashion-direction skill): treatments, cast notes and one entry per shot with a Runway-ready prompt. No brand or living-artist names (brand_lint).",
+  "type": "object",
+  "required": [
+    "version",
+    "treatments",
+    "selected_treatment",
+    "shots"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "treatments": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "idea"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "safe",
+              "bold",
+              "conceptual"
+            ]
+          },
+          "idea": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "selected_treatment": {
+      "type": "string"
+    },
+    "cast": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "shots": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "purpose",
+          "framing",
+          "light",
+          "aspect_ratio",
+          "prompt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "framing": {
+            "type": "string"
+          },
+          "light": {
+            "type": "string"
+          },
+          "wardrobe": {
+            "type": "string"
+          },
+          "set": {
+            "type": "string"
+          },
+          "pose": {
+            "type": "string"
+          },
+          "aspect_ratio": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "route": {
+            "type": "string",
+            "enum": [
+              "runway_mcp",
+              "pexels",
+              "pixabay",
+              "museum",
+              "drawing_series"
+            ]
+          },
+          "election_id": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}
