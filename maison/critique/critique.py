@@ -164,8 +164,12 @@ def run_critique(project_dir: str | Path, pdf: str | Path, house_yaml: str | Pat
         critics.append({"critic": "claude", "model": claude_scores.get("model", "claude"), "scores": claude_scores["scores"]})
     if local:
         text, ar = pdf_text(pdf)
+        ls = local_scores(pngs, house, text, ar, work)
+        for crit in CRITERIA:  # a 7B answer that would not parse is no score, not a crash; the other critic still rules
+            if not ls.get(crit):
+                ls[crit] = {"not_applicable": "local model gave no usable score for this criterion"}
         critics.append({"critic": "local", "model": f"{lm.detect().get('vision')} + {lm.detect().get('planner')}",
-                        "scores": local_scores(pngs, house, text, ar, work)})
+                        "scores": ls})
     res = merge(str(pdf), critics, offline, "ar" in (house.get("languages") or []))
     validate_artifact("maison_critique", res)
     out = pd / "qa" / "maison_critique.json"

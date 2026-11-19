@@ -12,7 +12,7 @@ from BOTH critics, with evidence. Anything lower goes back to the stage the rubr
    contact sheet, the reasoning model on the copy and the Arabic), takes the LOWER score per
    criterion and writes `qa/maison_critique.json` + `.md`.
 4. **Anti-AI-tells** — `qa_anti_ai_tells` / `om qa` with your page verdicts in
-   `qa/critic/claude_verdicts.json`. Must pass (or carry a logged `anti_pattern_override`).
+   `qa/critic/claude_verdicts.<pdf stem>.json`. Must pass (or carry a logged `anti_pattern_override`).
 5. **Face gate, provenance, brand_lint** — `python maison/critique/brand_lint.py projects/<id>`
    must exit 0. A real house's name, monogram or trade dress is allowed only when `house.yaml`
    says `brand_owner: self` or `client`.

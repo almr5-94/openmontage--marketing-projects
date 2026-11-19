@@ -16,4 +16,5 @@ setup(
         "google-genai>=1.0.0",
         "openai>=2.44.0",
     ],
+    entry_points={"console_scripts": ["om=cli.om:main", "openmontage-mcp=mcp_server.openmontage_mcp:main"]},
 )

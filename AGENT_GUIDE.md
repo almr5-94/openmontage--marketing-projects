@@ -258,6 +258,10 @@ If the folder has tracks, the proposal and asset stages should present them as o
 | `localization-dub` | Subtitle, dub, and translated variants | beta |
 | `image-studio` | Still images: posts, carousels, posters, ad sets, thumbnails | beta |
 | `magazine` | Magazines, zines, brochures, catalogs, reports (PDF + page PNGs) | beta |
+| `editorial-magazine` | Art-led magazines: museum art, fragments, collage, generative layers, fashion direction, print layout (12 stages) | beta |
+| `maison-issue` | A house's collectible art magazine (Maison doctrine, critique gate) | beta |
+| `maison-drawing-series` | Numbered drawing plates in one fixed hand, with a style-lock sheet | beta |
+| `maison-campaign` | One-idea luxury campaign: master composition plus placement variants | beta |
 | `framework-smoke` | Test: minimal 2-stage smoke test | test |
 
 > **Beta pipelines** have not been fully audited. They work, but expect rough edges. Mention this when the user selects one.
@@ -275,12 +279,42 @@ stage director, elect every paid tool out loud.
   pages in HTML and renders exact-size PNG/JPG stills or a print PDF with page previews. It is
   free and local (headless Chromium) and fails the render on cut-off text, missing images,
   wrong page count/size, unembedded fonts, or Arabic-Indic digits.
-- **Pictures** come from the existing `image_generation` family (or stock, or the user's
-  photos); **words** are never baked into generated pictures — they are typeset in HTML.
+- **Pictures — free first, then Runway only.** Free: CC0 museum art (`met_art`, `cleveland_art`,
+  `rijks_art`, `aic_art`, and the Met MCP server), stock (`pexels_image`, `pixabay_image`), the
+  user's photos, seeded `generative_art`, local models. Generated or AI-edited images and video
+  come **only from the Runway MCP connector**: quote it with `prepare_runway_call`, ask the user,
+  record their yes with `record_election`, then make the call. Never offer any other paid image
+  service. **Words** are never baked into generated pictures — they are typeset in HTML.
 - **Starters:** `print-studio/css/print-base.css`, `print-studio/templates/magazine/issue.html`,
   `print-studio/templates/stills/social-post.html`.
 - These pipelines have no `video_compose` stage, so the Remotion/HyperFrames runtime rule does
   not apply to them.
+
+### Editorial art stack and Maison
+
+- **Seven layers:** sourcing (CC0 museums, stock), forging (`image_crop`: smart crop, batch,
+  montage, masks), Runway generation (elected), `generative_art` (seeded SVG/p5 plates),
+  `collage` (grid, joiner, cut-and-paste, moodboard, overlay, mosaic), `editorial_layout`
+  (bleed, crop marks, 12-column and baseline grid, RTL books, paper proofs), and the gates.
+  Skills: `.agents/skills/{art-sourcing,image-forge,generative-art,collage-composition,editorial-design,fashion-direction}`.
+- **Maison** (`maison/README.md`): a house file (`maison/houses/<id>/house.yaml`) drives palette,
+  type, grid and voice; the ten principles are in `.agents/skills/maison-doctrine/SKILL.md`.
+- **Provenance:** every image is recorded in `PROVENANCE.json` (`lib/provenance.py`); the colophon
+  credits are written from it, and export is blocked when a placed image has no record.
+- **Blocking gates before export** (`quality_gate`):
+  1. anti-AI-tells AP-1..AP-7 — `qa_anti_ai_tells` / `om qa`, report in `projects/<id>/qa/anti_ai_tells.md`.
+     You add your own page verdicts in `qa/critic/claude_verdicts.<pdf stem>.json`. An exception is valid only
+     as an `anti_pattern_override` decision with the user's own reason and the page numbers.
+  2. face gate — `run_face_gate` on **every** image that may show a person (photo or cartoon mode).
+  3. Maison critique — `maison_critique`: your rubric scores plus the local models'; the lower score
+     counts; anything under 4 goes back to the stage the rubric names.
+  4. `brand_lint` — no real house's name, monogram or trade dress unless `brand_owner` is self/client.
+- **Controls:** the `openmontage` MCP server (`mcp_server/openmontage_mcp.py`, in `.mcp.json`) and
+  the `om` CLI (`bin/om`) call the same functions in `lib/studio_api.py`; decision logs from either
+  have the same structure (only `actor` differs). Paid actions require an `election_id`.
+- **Local models** (`config/local_models.yaml`, Ollama or LM Studio) do the planning hints, the
+  face gate and the second critic — free, on this machine.
+- Generated media is never deleted: rejected takes move to `components/`.
 
 ## Mandatory Preflight
 

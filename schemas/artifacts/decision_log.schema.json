@@ -61,7 +61,8 @@
               "anti_pattern_override",
               "paid_election",
               "asset_election",
-              "critique_override"
+              "critique_override",
+              "stage_run"
             ],
             "description": "What class of decision this is"
           },

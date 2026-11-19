@@ -1,0 +1,11 @@
+# Runway credit prices for the image/video models reached through the Runway MCP connector.
+# Source: Runway API pricing guide (https://docs.dev.runwayml.com/guides/pricing/), read 2026-11-20.
+# The connector spends the owner's Runway plan credits; a call is never made until the human
+# elects it (lib/election.py) with this cost shown. Re-check the guide when a model is added.
+credit_usd: 0.01
+image:
+  gen4_image: {"720p": 5, "1080p": 8}
+  gen4_image_turbo: {"any": 2}
+video_per_second:
+  gen4_turbo: 5
+  gen4_aleph: 15

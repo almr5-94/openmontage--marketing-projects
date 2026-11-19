@@ -25,10 +25,11 @@ them. Text lives in HTML, on top of or beside the picture.
 The repo's tool-election rule (`AGENT_GUIDE.md` → Decision Communication Contract) covers
 images exactly as it covers video:
 
-- Before any paid image call, present a menu of the **real** registry tools that can do the
-  job (`registry.capability_catalog()["image_generation"]` plus stock: `pexels_image`,
-  `pixabay_image`, plus "the user's own photos" and "typographic only — no pictures"). Free
-  and local options first. Name exact tool names, provider, rough unit price, and trade-off.
+- Before any picture is made, present a menu: free first (CC0 museum art, `pexels_image`,
+  `pixabay_image`, seeded `generative_art`, the local models in
+  `registry.capability_catalog()["image_generation"]`, "the user's own photos", "typographic
+  only — no pictures"), then generation through the Runway MCP connector (quoted in credits with `prepare_runway_call`, run only after the user elects it).
+  **No other paid image service is offered** — images and video go through Runway only.
 - Log the election in `decision_log` (`category: "provider_selection"`, `subject: "Image
   source"`) with **every** offered option in `options_considered`.
 - `page_render` is free and local; it still gets one line in the tool plan, but needs no menu.

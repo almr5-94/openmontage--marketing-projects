@@ -9,7 +9,8 @@ spending gate**: no paid image call happens before `approval.status` is `approve
 
 ```python
 from tools.tool_registry import registry; registry.discover()
-registry.capability_catalog()["image_generation"]   # status per tool
+registry.capability_catalog()["image_generation"]   # status per tool; offer only the LOCAL ones
+# Paid generation is never a registry tool here: it goes through the Runway MCP connector.
 ```
 
 A tool is a real option only if its status is `available`. A green status means a key exists,
@@ -27,12 +28,13 @@ template, placeholder rectangles for pictures, real copy.
 
 ## 3. Tool election (Rule Zero)
 
-Present the image-source menu: free/local first (`local_diffusion`, `qwen_image_local`,
-`comfyui_image` if available; `pexels_image`, `pixabay_image` stock; user's photos; none), then
-paid providers with unit price and trade-off (e.g. `recraft_image` for vector/brand
-illustration, `google_imagen` / `flux_image` for photo-real, `openai_image` for complex
-instructions, `qwen_image_edit_local` to edit the user's photo). Also offer enhancement only if
-needed (`upscale`, `bg_remove`). Wait for the user's pick.
+Present the image-source menu: free first — CC0 museum art (`met_art`, `cleveland_art`, `rijks_art`,
+`aic_art`), stock (`pexels_image`, `pixabay_image`), the user's own photos, seeded drawing
+(`generative_art`), local models (`local_diffusion`, `qwen_image_local`, `comfyui_image` if available,
+`qwen_image_edit_local` to edit the user's photo); then **generation through the Runway MCP connector**,
+quoted in credits with `prepare_runway_call` and run only after the user elects it (`record_election`).
+No other paid image service is ever offered (owner rule: images and video go through Runway only).
+Offer enhancement only if needed (`upscale`, `bg_remove`, both local). Wait for the user's pick.
 
 Log one `decision_log` entry per capability with every offered option in `options_considered`
 (`category: provider_selection`, `subject: "Image source"`), plus `concept_selection`.

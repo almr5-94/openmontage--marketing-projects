@@ -241,7 +241,7 @@ class ImageCrop(BaseTool):
         "type": "object",
         "required": ["operation"],
         "properties": {
-            "operation": {"type": "string", "enum": ["smart_crop", "batch", "montage", "mask"]},
+            "operation": {"type": "string", "enum": ["smart_crop", "batch", "montage", "mask", "cutout"]},
             "input_path": {"type": "string"},
             "input_paths": {"type": "array", "items": {"type": "string"}},
             "project_dir": {"type": "string"},
@@ -296,7 +296,8 @@ class ImageCrop(BaseTool):
         start = time.time()
         op = inputs.get("operation")
         try:
-            fn = {"smart_crop": self._smart_crop, "batch": self._batch, "montage": self._montage, "mask": self._mask}.get(op)
+            fn = {"smart_crop": self._smart_crop, "batch": self._batch, "montage": self._montage, "mask": self._mask,
+                  "cutout": self._cutout}.get(op)
             if fn is None:
                 return ToolResult(success=False, error=f"unknown operation {op!r}")
             res = fn(inputs)
@@ -355,6 +356,66 @@ class ImageCrop(BaseTool):
                                                   "size": list(frag.size)})
         return ToolResult(success=True, data={"path": str(out), "size": list(frag.size), "provenance": rec},
                           artifacts=[str(out)])
+
+    def _cutout(self, inputs: dict[str, Any]) -> ToolResult:
+        """Lift an object off a plain studio ground (museum photographs) with OpenCV GrabCut.
+
+        Free and local. ``inset`` is the fraction of each edge assumed to be ground (default 0.03).
+        Writes an RGBA PNG trimmed to the object; the source stays untouched.
+        """
+        import cv2
+
+        src = Path(inputs["input_path"])
+        im = _open(src).convert("RGB")
+        inset = float((inputs.get("shape_params") or {}).get("inset", 0.03))
+        small = im.copy()
+        small.thumbnail((1200, 1200))
+        arr = cv2.cvtColor(np.array(small), cv2.COLOR_RGB2BGR)
+        h, w = arr.shape[:2]
+        box = (inputs.get("shape_params") or {}).get("rect")  # [x0, y0, x1, y1] as fractions: where the object is
+        if box:
+            rect = (int(w * box[0]), int(h * box[1]), int(w * (box[2] - box[0])), int(h * (box[3] - box[1])))
+        else:
+            rect = (int(w * inset), int(h * inset), int(w * (1 - 2 * inset)), int(h * (1 - 2 * inset)))
+        mask = np.zeros((h, w), np.uint8)
+        bgd, fgd = np.zeros((1, 65), np.float64), np.zeros((1, 65), np.float64)
+        cv2.grabCut(arr, mask, rect, bgd, fgd, 6, cv2.GC_INIT_WITH_RECT)
+        fg = np.where((mask == cv2.GC_FGD) | (mask == cv2.GC_PR_FGD), 255, 0).astype(np.uint8)
+        n, lab, stats, _ = cv2.connectedComponentsWithStats(fg)
+        if n > 1:  # keep the largest piece: the object, not specks of the ground
+            keep = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
+            fg = np.where(lab == keep, 255, 0).astype(np.uint8)
+        if (inputs.get("shape_params") or {}).get("drop_neutral"):
+            # cast shadows on a studio ground are light and colourless; a coloured object (bronze, glaze) is not
+            hsv = cv2.cvtColor(arr, cv2.COLOR_BGR2HSV)
+            neutral = (hsv[..., 1] < 28) & (hsv[..., 2] > 120)
+            fg[neutral] = 0
+            n2, lab2, st2, _ = cv2.connectedComponentsWithStats(fg)
+            if n2 > 1:
+                fg = np.where(lab2 == 1 + int(np.argmax(st2[1:, cv2.CC_STAT_AREA])), 255, 0).astype(np.uint8)
+        if (inputs.get("shape_params") or {}).get("drop_shadow"):
+            # a dark cast shadow on grey ground has no colour at all; a dark unglazed foot keeps a little.
+            # smooth the saturation first so JPEG noise in the foot does not punch holes in it
+            hsv = cv2.cvtColor(arr, cv2.COLOR_BGR2HSV)
+            sat = cv2.medianBlur(hsv[..., 1], 9)
+            fg[(sat < 7) & (hsv[..., 2] < 140)] = 0
+            fg = cv2.morphologyEx(fg, cv2.MORPH_OPEN, np.ones((7, 7), np.uint8))
+            n3, lab3, st3, _ = cv2.connectedComponentsWithStats(fg)
+            if n3 > 1:
+                fg = np.where(lab3 == 1 + int(np.argmax(st3[1:, cv2.CC_STAT_AREA])), 255, 0).astype(np.uint8)
+        fg = cv2.morphologyEx(fg, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+        alpha = Image.fromarray(fg).resize(im.size, Image.LANCZOS).filter(ImageFilter.GaussianBlur(1.2))
+        out_im = im.convert("RGBA")
+        out_im.putalpha(alpha)
+        bbox = alpha.point(lambda v: 255 if v > 24 else 0).getbbox()
+        if bbox:
+            out_im = out_im.crop(bbox)
+        out = self._out(inputs, src, "cutout", "png")
+        out_im.save(out)
+        cover = float((np.array(alpha) > 127).mean())
+        rec = self._record(inputs, out, [src], {"op": "cutout", "inset": inset, "size": list(out_im.size)})
+        return ToolResult(success=True, data={"path": str(out), "size": list(out_im.size), "object_share": round(cover, 3),
+                                              "provenance": rec}, artifacts=[str(out)])
 
     def _batch(self, inputs: dict[str, Any]) -> ToolResult:
         op = inputs["op"]

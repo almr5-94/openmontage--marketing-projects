@@ -25,9 +25,10 @@ and show the PNGs. Directions are judged on pages, not on adjectives.
 
 ## Tool election (Rule Zero)
 
-Present the image-source menu from `registry.capability_catalog()["image_generation"]` (only
-`available` tools), free/local and stock first, then paid with unit price and trade-off;
-include "user's photos" and "no pictures". Ask separately about `upscale` if print resolution
+Present the image-source menu: free first (CC0 museum art `met_art`/`cleveland_art`/`rijks_art`/
+`aic_art`, stock `pexels_image`/`pixabay_image`, seeded `generative_art`, local models from
+`registry.capability_catalog()["image_generation"]` that are local and `available`), then
+the Runway MCP connector (quoted in credits with `prepare_runway_call`, run only after the user elects it). No other paid image service is ever offered. Include "user's photos" and "no pictures". Ask separately about `upscale` if print resolution
 requires it, and `diagram_gen` if the issue has charts or diagrams. Log every election in
 `decision_log` with all options considered.
 

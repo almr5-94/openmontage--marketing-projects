@@ -1,0 +1,24 @@
+{
+  "_read_me": [
+    "Merge the mcpServers entries below into your Claude Desktop config by hand (Settings > Developer > Edit Config).",
+    "This file is a snippet: nothing edits the real Desktop config for you.",
+    "Pick ONE openmontage entry: '-local' when the repo is on the same computer as Claude Desktop (replace /PATH/TO/openmontage),",
+    "'-over-ssh' when Claude Desktop runs on the Mac and the studio lives on abood (needs key-based ssh to the host alias 'abood').",
+    "Image and video generation use the Runway connector you already have in Claude Desktop; do not add any other image generator."
+  ],
+  "mcpServers": {
+    "openmontage-local": {
+      "command": "/PATH/TO/openmontage/.venv/bin/python",
+      "args": ["-m", "mcp_server.openmontage_mcp"],
+      "cwd": "/PATH/TO/openmontage"
+    },
+    "openmontage-over-ssh": {
+      "command": "ssh",
+      "args": ["-T", "abood", "cd /home/abood/work/openmontage--marketing-projects && exec .venv/bin/python -m mcp_server.openmontage_mcp"]
+    },
+    "met-museum-over-ssh": {
+      "command": "ssh",
+      "args": ["-T", "abood", "exec /home/abood/work/openmontage--marketing-projects/scripts/met_mcp.sh"]
+    }
+  }
+}

@@ -69,7 +69,7 @@ stages:
     produces:
       - studio_proposal
       - decision_log
-    tools_available: [image_selector, page_render]
+    tools_available: [page_render, pexels_image, pixabay_image, met_art]
     checkpoint_required: true
     human_approval_default: true
     review_focus:
@@ -106,18 +106,13 @@ stages:
     produces:
       - asset_manifest
     tools_available:
-      - image_selector
-      - flux_image
-      - google_imagen
-      - openai_image
-      - recraft_image
-      - grok_image
-      - seedream_image
-      - minimax_image
-      - dashscope_image
-      - hunyuan_image
-      - kling_official_image
-      - atlas_image
+      - met_art
+      - cleveland_art
+      - rijks_art
+      - aic_art
+      - generative_art
+      - image_crop
+      - collage
       - comfyui_image
       - local_diffusion
       - qwen_image_local

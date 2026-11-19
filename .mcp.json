@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "openmontage": {
+      "command": "./.venv/bin/python",
+      "args": ["-m", "mcp_server.openmontage_mcp"],
+      "env": {}
+    },
+    "met-museum": {
+      "command": "./scripts/met_mcp.sh",
+      "args": [],
+      "env": { "MCP_TRANSPORT_TYPE": "stdio" }
+    }
+  }
+}

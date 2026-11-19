@@ -16,7 +16,7 @@ uniform-stroke vector clip-art). Every algorithm draws with **material**:
 Algorithms (``algorithm``):
 
 =============  ==========================================================================
-flow_field     ink lines traced through a seeded noise field (wind, water, hair, smoke)
+flow_field     ink lines traced through a seeded noise field (wind, water, hair, smoke); params heading, turn, weight steer it
 engraving      hatched engraving whose line weight follows the tone of a source image
                (``source_image``) or a seeded light field; the classic banknote/plate look
 arches         nested arches / thresholds rendered as an engraved, foil-finished object
@@ -182,7 +182,20 @@ def tone_sampler(source_image: Optional[str], W: int, H: int, noise: Noise, cont
     if source_image:
         from PIL import Image, ImageOps
 
-        im = ImageOps.exif_transpose(Image.open(source_image)).convert("L")
+        im = ImageOps.exif_transpose(Image.open(source_image))
+        if im.mode in ("RGBA", "LA") or "transparency" in im.info:
+            # a cut-out: the ground is paper (no ink), and the whole object is kept in frame
+            rgba = im.convert("RGBA")
+            ground = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+            im = Image.alpha_composite(ground, rgba).convert("L")
+            margin = 0.12
+            fit = min(W * (1 - 2 * margin) / im.width, H * (1 - 2 * margin) / im.height)
+            canvas = Image.new("L", (int(W), int(H)), 255)
+            obj = im.resize((max(1, round(im.width * fit)), max(1, round(im.height * fit))), Image.LANCZOS)
+            canvas.paste(obj, ((int(W) - obj.width) // 2, int(H * 0.55 - obj.height / 2)))
+            im = canvas
+        else:
+            im = im.convert("L")
         scale = max(W / im.width, H / im.height)
         sw, sh = max(1, round(im.width * scale / 4)), max(1, round(im.height * scale / 4))
         im = im.resize((sw, sh))
@@ -211,13 +224,17 @@ def algo_flow_field(W, H, r, noise, p, ink):
     step = W / 500
     steps = int(p.get("length", 140))
     scale = p.get("scale", 2.2)
+    # heading (degrees) and turn (how far a line may swing, 2 = any direction) steer the field:
+    # heading 0, turn 0.12 draws long horizontal tide marks instead of smoke
+    heading, turn = math.radians(p.get("heading", 0.0)), float(p.get("turn", 2.0))
+    weight = float(p.get("weight", 1.0))
     out = []
     for _ in range(n_lines):
         x, y = r.uniform(-0.05, 1.05) * W, r.uniform(-0.05, 1.05) * H
         pts, ws = [], []
-        base_w = W * r.uniform(0.0006, 0.0028)
+        base_w = W * r.uniform(0.0006, 0.0028) * weight
         for k in range(steps):
-            a = noise.fbm(x / W * scale, y / H * scale) * math.tau * 2
+            a = heading + noise.fbm(x / W * scale, y / H * scale) * math.tau * turn
             pts.append((x, y))
             press = math.sin(math.pi * k / max(1, steps - 1))  # taper both ends
             ws.append(base_w * (0.25 + press))

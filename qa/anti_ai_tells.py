@@ -17,7 +17,7 @@ Automated checks, per page of the PDF:
         containers, text outside the safe area, vector shapes cut by the page edge, overflow
         (from the source HTML), RTL column order
 Vision critics (per page PNG): the local vision model (lib/local_models) and Claude. Claude's
-verdicts are read from qa/critic/claude_verdicts.json (written by the agent through the MCP tool
+verdicts are read from qa/critic/claude_verdicts.<pdf stem>.json (written by the agent through the MCP tool
 or by hand); missing verdicts keep the gate blocked unless offline mode is chosen explicitly.
 
 Overrides: a page passes a code only when decision_log.json holds an ``anti_pattern_override``
@@ -159,6 +159,53 @@ class PageResult:
 
 
 # ---------------------------------------------------------------- the gate
+HEDGES = re.compile(r"\b(might|may|could|possibly|perhaps|appears? to be|seems?)\b", re.I)
+DENIAL = re.compile(r"^\s*[:\-\u2013]?\s*(none|no\b|not\b|n/a|absent|nothing)", re.I)
+# the 7B model often restates the code's definition, then denies it: "The page does not contain ...",
+# "There is no ...", "The page lacks any ...". Those name a code without finding it.
+DENIAL_PHRASE = re.compile(r"\b(does not|do not|doesn't|don't|there (is|are) no|lacks?\b|lacking|is not present|are not "
+                           r"present|no (sign|signs|evidence|instance|instances) of|free of|without any)\b", re.I)
+
+
+def local_codes(answer: str) -> tuple[list[str], list[str]]:
+    """Parse the 7B critic's fault answer into (firm codes, hedged codes).
+
+    "AP-1: None, as there is no ..." names a code only to deny it; it is not a finding.
+    A finding worded as a guess ("might be considered ...") goes to review, not to a fail:
+    the Claude critic and the automated checks make the blocking call on those.
+    """
+    if re.match(r"\s*none\b", answer, re.I):
+        return [], []
+    firm, hedged = set(), set()
+    parts = re.split(r"(?=AP-[1-7])", answer)
+    for part in parts:
+        m = re.match(r"AP-([1-7])(.*)", part, re.S)
+        if not m:
+            continue
+        code, rest = f"AP-{m.group(1)}", m.group(2)
+        if DENIAL.match(rest) or DENIAL_PHRASE.search(rest):
+            continue
+        (hedged if HEDGES.search(rest) else firm).add(code)
+    return sorted(firm), sorted(hedged - firm)
+
+
+# What a fine art magazine does on each kind of page, so the 7B critic does not mark a quiet page as unfinished.
+ROLE_HINTS = {
+    "colophon": "a colophon: the credits page at the back of a magazine, set as plain small text on purpose",
+    "back": "a back cover: deliberately near-empty, one object or one line of type on open paper",
+    "contents": "a contents page: a short list of titles and page numbers",
+    "index": "a series index: a short list of titles and page numbers",
+}
+
+
+def _pdf_stem(pdf: Path) -> str:
+    n = Path(pdf).name
+    for suf in ("-screen.pdf", "-print.pdf", ".pdf"):
+        if n.endswith(suf):
+            return n[: -len(suf)]
+    return Path(pdf).stem
+
+
 class Gate:
     def __init__(self, pdf: Path, project_dir: Optional[Path] = None, html: Optional[Path] = None,
                  min_dpi: int = 300, safe_mm: float = 5.0, vision: bool = True, offline: bool = False,
@@ -444,13 +491,23 @@ class Gate:
         d = self.tmp / "imgs"
         d.mkdir()
         subprocess.run(["pdfimages", "-png", "-p", str(self.pdf_path), str(d / "i")], capture_output=True, check=False)
+        # transparency masks of cut-outs are silhouettes, not pictures: two vessels' masks share edge
+        # features and read as "the same picture". Skip every image the PDF itself lists as a mask.
+        masks: set[int] = set()
+        lst = subprocess.run(["pdfimages", "-list", str(self.pdf_path)], capture_output=True, text=True, check=False)
+        for row in lst.stdout.splitlines()[2:]:
+            cols = row.split()
+            if len(cols) > 2 and cols[1].isdigit() and cols[2] in ("smask", "mask", "stencil"):
+                masks.add(int(cols[1]))
         items = []
         for f in sorted(d.glob("i-*.png")):
             page = int(f.stem.split("-")[1])
+            if int(f.stem.split("-")[2]) in masks:
+                continue
             try:
                 im = Image.open(f)
                 if im.mode in ("1", "L") and im.width * im.height < 40000:
-                    continue  # soft masks
+                    continue  # small masks the list did not label
                 rgb = im.convert("RGB")
             except Exception:  # noqa: BLE001
                 continue
@@ -504,6 +561,17 @@ class Gate:
         subprocess.run(["pdftoppm", "-r", str(dpi), "-png", str(self.pdf_path), str(out / "page")], capture_output=True, check=False)
         return sorted(out.glob("page-*.png"))
 
+    def page_roles(self) -> list[str]:
+        """The layout's page type per sheet (cover, colophon, back ...), read from the screen HTML."""
+        if not self.html or not Path(self.html).exists():
+            return []
+        html = Path(self.html).read_text(encoding="utf-8", errors="ignore")
+        roles = []
+        for cls in re.findall(r'<div class="page (?:left|right) ?([^"]*)"', html):
+            words = [w for w in cls.split() if w not in ("left", "right")]
+            roles.append(words[0] if words else "")
+        return roles
+
     def vision_local(self, pngs: list[Path]) -> None:
         from lib import local_models as lm
 
@@ -516,14 +584,19 @@ class Gate:
         # barely separates them, so the rating only blocks at <= 2 and the publish verdict is Claude's.
         q_rate = ("Rate this page as a luxury magazine page from 1 (amateur slide or document) to 5 "
                   "(published art magazine). Answer with one number.")
-        for pr, png in zip(self.pages, pngs):
+        roles = self.page_roles()
+        for i, (pr, png) in enumerate(zip(self.pages, pngs)):
+            role = ROLE_HINTS.get(roles[i]) if i < len(roles) else None
+            ctx = f"This page is {role}. Judge it as that kind of page. " if role else ""
             try:
-                a = lm.see(png, q_codes, max_tokens=80)
-                b = lm.see(png, q_rate, max_tokens=6)
+                a = lm.see(png, ctx + q_codes, max_tokens=80)
+                b = lm.see(png, ctx + q_rate, max_tokens=6)
             except Exception as e:  # noqa: BLE001
                 pr.notes.append(f"local critic unavailable: {e}")
                 continue
-            codes = sorted(set(re.findall(r"AP-[1-7]", a)))
+            codes, hedged = local_codes(a)
+            if hedged:
+                pr.notes.append(f"local vision critic suggests {', '.join(hedged)} (hedged, for review): {a[:120]}")
             m = re.search(r"[1-5]", b)
             rating = int(m.group(0)) if m else None
             pr.metrics["local_critic"] = {"codes": codes, "said": a[:160], "rating": rating,
@@ -534,7 +607,7 @@ class Gate:
                 pr.fail("CRITIC", f"local vision critic rates it {rating}/5")
 
     def claude_pack(self, pngs: list[Path]) -> Path:
-        """Write the brief Claude answers per page; verdicts go to qa/critic/claude_verdicts.json."""
+        """Write the brief Claude answers per page; verdicts go to qa/critic/claude_verdicts.<pdf stem>.json."""
         base = (self.pd / "qa" / "critic") if self.pd else (self.tmp / "critic")
         base.mkdir(parents=True, exist_ok=True)
         lines = ["# Claude page critic", "",
@@ -546,8 +619,21 @@ class Gate:
                  '`{"pdf_sha256": "...", "pages": {"1": {"codes": [], "publish": true, "note": "..."}}}`', "",
                  f"PDF sha256: `{_sha(self.pdf_path)}`", "", "| Page | PNG |", "|---|---|"]
         lines += [f"| {i + 1} | {p} |" for i, p in enumerate(pngs)]
+        stem = _pdf_stem(self.pdf_path)
+        lines = [f"Record the answers in claude_verdicts.{stem}.json as" if ln.startswith("Record the answers") else ln
+                 for ln in lines]
         (base / "claude_pack.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-        return base / "claude_verdicts.json"
+        (base / f"claude_pack.{stem}.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        # one verdict file per PDF, so a project with several targets (an ad and its social cuts) keeps each review
+        per_pdf = base / f"claude_verdicts.{stem}.json"
+        legacy = base / "claude_verdicts.json"
+        if not per_pdf.exists() and legacy.exists():
+            try:
+                if json.loads(legacy.read_text(encoding="utf-8")).get("pdf_sha256") == _sha(self.pdf_path):
+                    return legacy
+            except (ValueError, OSError):
+                pass
+        return per_pdf
 
     def vision_claude(self, verdicts: Path) -> None:
         if not verdicts.exists():

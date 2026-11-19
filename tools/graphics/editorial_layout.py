@@ -60,7 +60,7 @@ TRIMS = {"a4": (210.0, 297.0), "us_letter": (215.9, 279.4), "magazine_230x300": 
          "social_4x5": (216.0, 270.0), "social_9x16": (216.0, 384.0),
          "ooh_portrait": (420.0, 594.0), "ooh_landscape": (594.0, 420.0)}
 PAGE_TYPES = ["cover", "contents", "opening_spread", "feature_spread", "art_page", "pull_quote",
-              "text_page", "campaign", "back_cover", "colophon"]
+              "text_page", "campaign", "back_cover", "colophon", "inventory", "opener"]
 SPREADS = {"opening_spread", "feature_spread"}
 # Paper stocks for soft proofs: paper white (multiplied in), ink density, grain strength.
 STOCKS = {
@@ -114,7 +114,7 @@ class Book:
         for i, p in enumerate(self.pages, start=1):
             p["folio"] = i
             p["side"] = self.side(i)
-        if len(self.pages) % 2:
+        if len(self.pages) % 2 and len(self.pages) > 1:  # a single page is a placement (ad, poster, still), not a bound issue
             self.warnings.append(f"{len(self.pages)} pages: a bound issue needs an even count (saddle stitch: a multiple of 4)")
         for i, p in enumerate(self.pages, start=1):
             if p["half"] == 0 and p["side"] != ("right" if self.rtl else "left"):
@@ -161,6 +161,19 @@ def page_inner(p: dict[str, Any], book: Book) -> tuple[str, str]:
     t = s["type"]
     side = p["side"]
     folio = folio_html(p, book)
+    if t == "cover" and s.get("fit") == "plate":
+        # the singular cover object on bare paper: masthead above it, the line below it, nothing on top of it
+        ink = s.get("cover_ink") or "var(--ink)"
+        lines = "".join(f'<div class="label">{esc(x)}</div>' for x in s.get("lines", []))
+        return "cover", (f'<div class="trim" style="--cover-ink:{esc(ink)}"><div class="live">'
+                         f'<div class="masthead display">{esc(book.issue.get("masthead", book.issue.get("title")))}</div>'
+                         f'<div class="issue-line label">{esc(s.get("issue_line", ""))}</div>'
+                         f'<div style="position:absolute;left:0;right:0;top:calc(64pt + 3mm + var(--baseline)*3);'
+                         f'bottom:calc(var(--baseline)*6);display:flex;align-items:center;justify-content:center">'
+                         + (f'<img src="{book.img(s.get("image"))}" alt="" style="max-width:{esc(str(s.get("scale", 0.62) * 100))}%;'
+                            f'max-height:100%;display:block">' if s.get("image") else "") + '</div>'
+                         f'<div class="cover-head" style="text-align:center"><h1 class="display">{esc(s.get("headline", ""))}</h1>'
+                         f'<div class="cover-lines">{lines}</div></div></div></div>')
     if t == "cover":
         ink = s.get("cover_ink")
         style = f' style="--cover-ink:{esc(ink)}"' if ink else ""
@@ -214,7 +227,13 @@ def page_inner(p: dict[str, Any], book: Book) -> tuple[str, str]:
                                    f'<div style="flex:1;min-height:0">{body_html(s.get("body"), int(s.get("columns", 2)))}</div>'
                                    f'</div>{folio}</div>')
     if t == "text_page":
-        return f"text {side}", (f'<div class="trim"><div class="live">{body_html(s.get("body"), int(s.get("columns", 2)), s.get("dropcap", False), fill=True)}'
+        head = ""
+        if s.get("kicker") or s.get("title"):
+            head = (f'<div class="feature-head" style="margin-bottom:calc(var(--baseline)*1.5)">'
+                    f'<div class="label kicker">{esc(s.get("kicker", ""))}</div>'
+                    f'<h2 class="display">{esc(s.get("title", ""))}</h2></div>')
+        return f"text {side}", (f'<div class="trim"><div class="live" style="display:flex;flex-direction:column">{head}'
+                                f'<div style="flex:1;min-height:0;{f"font-size:{float(s['size_pt'])}pt;line-height:{float(s['size_pt']) * 1.42:.1f}pt" if s.get("size_pt") else ""}">{body_html(s.get("body"), int(s.get("columns", 2)), s.get("dropcap", False), fill=bool(s.get("fill", False)))}</div>'
                                 f'</div>{folio}</div>')
     if t == "art_page":
         cap = ""
@@ -231,15 +250,72 @@ def page_inner(p: dict[str, Any], book: Book) -> tuple[str, str]:
         st = f' style="color:{esc(s["ink"])}"' if s.get("ink") else ""
         return f"pullq {side}", bg + (f'<div class="trim"><div class="live"><div class="pull"{st}><blockquote>{esc(s.get("quote", ""))}</blockquote>'
                                       f'<div class="attr label"{st}>{esc(s.get("attribution", ""))}</div></div></div>{folio}</div>')
+    if t == "campaign" and s.get("fit") == "plate":
+        # one idea, one image: the object of craft on bare paper, one line and the house name beneath it
+        claim = (f'<h1 class="display" style="font-size:{esc(str(s.get("claim_pt", 28)))}pt;line-height:1.15">{esc(s.get("claim", ""))}</h1>'
+                 if s.get("claim") else "")
+        sig = f'<div class="label" style="margin-top:calc(var(--baseline)*0.8)">{esc(s.get("signature", ""))}</div>' if s.get("signature") else ""
+        return "campaign", (f'<div class="trim"><div class="live" style="display:flex;flex-direction:column;align-items:center">'
+                            f'<div style="flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center">'
+                            f'<img src="{book.img(s.get("image"))}" alt="" style="max-width:{esc(str(s.get("scale", 0.6) * 100))}%;'
+                            f'max-height:100%;display:block"></div>'
+                            f'<div style="text-align:center;min-height:calc(var(--baseline)*5)">{claim}{sig}</div></div></div>')
     if t == "campaign":
         ink = s.get("ink")
         st = f' style="--cover-ink:{esc(ink)}"' if ink else ""
         return "campaign", figure_html(book, s) + (f'<div class="trim"{st}><div class="live"><div class="claim">'
                                                    f'<h1 class="display">{esc(s.get("claim", ""))}</h1>'
                                                    f'<div class="label">{esc(s.get("signature", ""))}</div></div></div></div>')
+    if t == "inventory":
+        # an incomplete inventory: objects on the bare page, each with a small caption -- no boxes, rules or numbers
+        items = s.get("items", [])
+        cols = int(s.get("cols", 1 if len(items) <= 1 else 2))
+        rows = max(1, -(-len(items) // cols))
+        cells = []
+        for it in items:
+            cap = (f'<div class="caption" style="margin-top:calc(var(--baseline)*0.6);text-align:center"><b>{esc(it.get("title", ""))}</b> '
+                   f'{esc(it.get("note", ""))}</div>')
+            cells.append(f'<figure style="margin:0;display:flex;flex-direction:column;min-height:0">'
+                         f'<div style="flex:1;min-height:0;display:flex;align-items:flex-end;justify-content:center">'
+                         f'<img src="{book.img(it.get("image"))}" alt="" style="max-width:{esc(str(it.get("scale", 0.8) * 100))}%;'
+                         f'max-height:100%;object-fit:contain;display:block"></div>{cap}</figure>')
+        head = ""
+        if s.get("kicker") or s.get("title"):
+            head = (f'<div class="label kicker">{esc(s.get("kicker", ""))}</div>'
+                    f'<h2 class="display" style="font-size:22pt;line-height:calc(var(--baseline)*2);margin-bottom:calc(var(--baseline)*1.5)">'
+                    f'{esc(s.get("title", ""))}</h2>')
+        grid = (f'<div style="flex:1;min-height:0;display:grid;grid-template-columns:repeat({cols},1fr);'
+                f'grid-template-rows:repeat({rows},1fr);column-gap:calc(var(--gutter)*3);row-gap:calc(var(--baseline)*2)">{"".join(cells)}</div>')
+        return f"inventory {side}", (f'<div class="trim"><div class="live" style="display:flex;flex-direction:column">{head}{grid}'
+                                     f'</div>{folio}</div>')
+    if t == "opener" and s.get("fit") == "plate":
+        # opener as a plate: the object above, the title below it on bare paper
+        return f"opening {side}", (f'<div class="trim"><div class="live" style="display:flex;flex-direction:column">'
+                                   f'<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;'
+                                   f'margin-bottom:calc(var(--baseline)*2)"><img src="{book.img(s.get("image"))}" alt="" '
+                                   f'style="max-width:{esc(str(s.get("scale", 0.7) * 100))}%;max-height:100%;display:block"></div>'
+                                   f'<div><div class="label kicker">{esc(s.get("kicker", ""))}</div>'
+                                   f'<h1 class="display" style="font-size:40pt;line-height:calc(var(--baseline)*3.4)">{esc(s.get("title", ""))}</h1>'
+                                   f'<p class="dek">{esc(s.get("dek", ""))}</p><div class="label byline">{esc(s.get("byline", ""))}</div></div>'
+                                   f'</div></div>')
+    if t == "opener":
+        # a single-page feature opener: one picture to the bleed, the title set low on it
+        ink = s.get("title_ink")
+        st = f' style="color:{esc(ink)}"' if ink else ""
+        return f"opening {side}", figure_html(book, s) + (
+            f'<div class="trim"><div class="live"><div class="opener-title"{st}><div class="label kicker"{st}>{esc(s.get("kicker", ""))}</div>'
+            f'<h1 class="display">{esc(s.get("title", ""))}</h1><p class="dek">{esc(s.get("dek", ""))}</p>'
+            f'<div class="label byline"{st}>{esc(s.get("byline", ""))}</div></div></div></div>')
+    if t == "back_cover" and s.get("fit") == "plate":
+        color = f"color:{esc(s['ink'])};" if s.get("ink") else ""
+        return "back", (f'<div class="trim"><div class="live" style="display:flex;align-items:center;justify-content:center;'
+                        f'bottom:calc(var(--margin-bottom) + var(--baseline)*4)">'
+                        f'<img src="{book.img(s.get("image"))}" alt="" style="max-width:{esc(str(s.get("scale", 0.45) * 100))}%;max-height:60%;display:block"></div>'
+                        f'<div class="live"><div class="label" style="position:absolute;bottom:0;left:0;right:0;text-align:center;{color}">'
+                        f'{esc(s.get("line", ""))}</div></div></div>')
     if t == "back_cover":
         color = f"color:{esc(s['ink'])};" if s.get("ink") else ""
-        return "back", figure_html(book, s) + (f'<div class="trim"><div class="live"><div class="label" '
+        return "back", (figure_html(book, s) if s.get("image") else "") + (f'<div class="trim"><div class="live"><div class="label" '
                                                f'style="position:absolute;bottom:0;left:0;right:0;text-align:center;{color}">'
                                                f'{esc(s.get("line", ""))}</div></div></div>')
     if t == "colophon":
@@ -250,6 +326,9 @@ def page_inner(p: dict[str, Any], book: Book) -> tuple[str, str]:
     raise ValueError(t)
 
 
+STOCK_NAMES = {"pexels": "Pexels", "pixabay": "Pixabay", "unsplash": "Unsplash"}
+
+
 def credit_lines(book: Book) -> list[str]:
     """Credit lines for every museum/stock root behind the images used, from PROVENANCE.json."""
     seen, lines = set(), []
@@ -257,9 +336,15 @@ def credit_lines(book: Book) -> list[str]:
         for rec in provenance.lineage(book.pd, path):
             if rec.get("kind") in ("museum", "stock", "user") and rec["path"] not in seen:
                 seen.add(rec["path"])
-                bits = [rec.get("title"), rec.get("creator"), rec.get("date")]
                 lic = {"CC0": "CC0", "public-domain": "Public domain"}.get(rec.get("licence"), rec.get("licence"))
-                lines.append(", ".join(b for b in bits if b) + f" - {rec.get('source')}. {lic}.")
+                src = STOCK_NAMES.get(str(rec.get("source", "")).lower(), rec.get("source"))
+                if rec.get("kind") == "stock":
+                    # stock titles are search alt-text, not titles: credit the photographer and the licence
+                    lic = STOCK_NAMES.get(str(lic).replace("-license", "").lower(), src) + " License"
+                    lines.append(f"Photograph by {rec.get('creator') or 'unknown'} - {src}. {lic}.")
+                    continue
+                bits = [rec.get("title"), rec.get("creator"), rec.get("date")]
+                lines.append(", ".join(b for b in bits if b) + f" - {src}. {lic}.")
     lines.append("Typefaces: " + ", ".join(sorted({book.issue.get('tokens', {}).get('font_display', 'Bodoni Moda Display'),
                                                     book.issue.get('tokens', {}).get('font_text', 'EB Garamond')})) + " (SIL Open Font License).")
     return lines

@@ -82,7 +82,7 @@ body {
 .mark.v { width: 0.25pt; height: calc(var(--slug) - 2mm); }
 .screen .mark, .screen .slug-info { display: none; }
 .slug-info { position: absolute; bottom: 1.5mm; left: calc(var(--slug) + var(--bleed));
-  font: 5.5pt/1 "IBM Plex Mono"; color: #000; }
+  font: 5.5pt/1 "IBM Plex Mono", var(--font-text); color: #000; }
 
 /* ---------- grids ---------- */
 .grid12 { display: grid; grid-template-columns: repeat(var(--cols), 1fr); column-gap: var(--gutter); }

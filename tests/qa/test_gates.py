@@ -12,7 +12,7 @@ from PIL import Image
 
 from lib import decision_log
 from lib.face_gate import run_face_gate
-from qa.anti_ai_tells import font_ok, lint_copy, run_gate
+from qa.anti_ai_tells import _pdf_stem, font_ok, lint_copy, local_codes, run_gate
 from tools.graphics.page_render import find_chromium
 
 REPO = Path(__file__).resolve().parents[2]
@@ -149,3 +149,36 @@ def test_face_gate_photo_counts_eyes_and_allows_teeth(tmp_path):
     assert run_face_gate(img, "photo", _ask(profile))["pass"]
     bad_hand = {**ok, "Is any hand deformed": "Yes."}
     assert "hands" in run_face_gate(img, "photo", _ask(bad_hand))["failed"]
+
+
+def test_local_critic_denials_are_not_findings():
+    # the 7B critic restates a code's definition and then denies it; that is not a finding
+    denied = ("AP-1: The page does not contain any operational copy.\n"
+              "AP-2: There is no thin uniform-stroke clip art.\n"
+              "AP-3: Infographic drift. The page lacks any diagrams.\nAP-4: None.")
+    assert local_codes(denied) == ([], [])
+    firm, hedged = local_codes("AP-3: the page uses chips and a numbered step diagram.\nAP-5: the vase might repeat")
+    assert firm == ["AP-3"] and hedged == ["AP-5"]
+
+
+def test_claude_verdicts_are_kept_per_pdf():
+    assert _pdf_stem(Path("out/social-4x5-screen.pdf")) == "social-4x5"
+    assert _pdf_stem(Path("out/master-a4-print.pdf")) == "master-a4"
+    assert _pdf_stem(Path("x/plain.pdf")) == "plain"
+
+
+def test_colophon_credits_stock_photographer_not_alt_text(tmp_path):
+    from lib import provenance
+    from tools.graphics.editorial_layout import credit_lines
+
+    img = tmp_path / "assets" / "images" / "p.jpg"
+    img.parent.mkdir(parents=True)
+    Image.new("RGB", (10, 10)).save(img)
+    provenance.record(tmp_path, img, kind="stock", source="pexels", licence="pexels-license",
+                      title="Black and white photo of hands molding clay, showcasing craftsmanship", creator="A. Das")
+
+    class B:
+        pd, images, issue = tmp_path, [str(img)], {}
+    lines = credit_lines(B())
+    assert lines[0] == "Photograph by A. Das - Pexels. Pexels License."
+    assert not any("molding" in ln for ln in lines)
