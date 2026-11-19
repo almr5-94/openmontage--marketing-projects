@@ -1,0 +1,28 @@
+/* OpenMontage curated type library. Generated from FONTS.yaml; every face is OFL-1.1.
+   Paths are relative to this file. Copy the whole fonts/ folder next to a layout, or
+   let editorial_layout do it. No other font may be used for visible text (AP-4). */
+@font-face { font-family: "Bodoni Moda"; src: url("bodonimoda/BodoniModa-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: block; }
+@font-face { font-family: "Bodoni Moda"; src: url("bodonimoda/BodoniModa-Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: block; }
+@font-face { font-family: "Bodoni Moda"; src: url("bodonimoda/BodoniModa-Italic.ttf") format("truetype"); font-weight: 400; font-style: italic; font-display: block; }
+@font-face { font-family: "Bodoni Moda Display"; src: url("bodonimoda/BodoniModa-Display.ttf") format("truetype"); font-weight: 500; font-style: normal; font-display: block; }
+@font-face { font-family: "Bodoni Moda Display"; src: url("bodonimoda/BodoniModa-DisplayItalic.ttf") format("truetype"); font-weight: 500; font-style: italic; font-display: block; }
+@font-face { font-family: "EB Garamond"; src: url("ebgaramond/EBGaramond-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: block; }
+@font-face { font-family: "EB Garamond"; src: url("ebgaramond/EBGaramond-Medium.ttf") format("truetype"); font-weight: 500; font-style: normal; font-display: block; }
+@font-face { font-family: "EB Garamond"; src: url("ebgaramond/EBGaramond-Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: block; }
+@font-face { font-family: "EB Garamond"; src: url("ebgaramond/EBGaramond-Italic.ttf") format("truetype"); font-weight: 400; font-style: italic; font-display: block; }
+@font-face { font-family: "Cormorant Garamond"; src: url("cormorantgaramond/CormorantGaramond-Light.ttf") format("truetype"); font-weight: 300; font-style: normal; font-display: block; }
+@font-face { font-family: "Cormorant Garamond"; src: url("cormorantgaramond/CormorantGaramond-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: block; }
+@font-face { font-family: "Cormorant Garamond"; src: url("cormorantgaramond/CormorantGaramond-SemiBold.ttf") format("truetype"); font-weight: 600; font-style: normal; font-display: block; }
+@font-face { font-family: "Cormorant Garamond"; src: url("cormorantgaramond/CormorantGaramond-Italic.ttf") format("truetype"); font-weight: 400; font-style: italic; font-display: block; }
+@font-face { font-family: "Hanken Grotesk"; src: url("hankengrotesk/HankenGrotesk-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: block; }
+@font-face { font-family: "Hanken Grotesk"; src: url("hankengrotesk/HankenGrotesk-Medium.ttf") format("truetype"); font-weight: 500; font-style: normal; font-display: block; }
+@font-face { font-family: "IBM Plex Mono"; src: url("ibmplexmono/IBMPlexMono-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: block; }
+@font-face { font-family: "IBM Plex Mono"; src: url("ibmplexmono/IBMPlexMono-Medium.ttf") format("truetype"); font-weight: 500; font-style: normal; font-display: block; }
+@font-face { font-family: "Amiri"; src: url("amiri/Amiri_400Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: block; }
+@font-face { font-family: "Amiri"; src: url("amiri/Amiri_700Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: block; }
+@font-face { font-family: "IBM Plex Sans Arabic"; src: url("ibmplexsansarabic/IBMPlexSansArabic_400Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: block; }
+@font-face { font-family: "IBM Plex Sans Arabic"; src: url("ibmplexsansarabic/IBMPlexSansArabic_700Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: block; }
+@font-face { font-family: "Cairo"; src: url("cairo/Cairo_400Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: block; }
+@font-face { font-family: "Cairo"; src: url("cairo/Cairo_700Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: block; }
+@font-face { font-family: "Almarai"; src: url("almarai/Almarai_400Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: block; }
+@font-face { font-family: "Almarai"; src: url("almarai/Almarai_700Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: block; }

@@ -29,13 +29,16 @@
   --accent-ink: #ffffff;
   --rule: #d9d5cc;
 
-  /* Type. Local fonts only by default, so a render never depends on the network.
-     Drop .woff2/.ttf files in assets/fonts/ and add @font-face to use others. */
-  --font-display: "FreeSerif", "Noto Serif", Georgia, serif;
-  --font-text: "FreeSerif", "Noto Serif", Georgia, serif;
-  --font-sans: "DejaVu Sans", "Noto Sans", Arial, sans-serif;
-  --font-arabic-text: "Noto Naskh Arabic", "Noto Sans Arabic", serif;
-  --font-arabic-display: "Noto Kufi Arabic", "Noto Sans Arabic", sans-serif;
+  /* Type. Only the curated OFL library in print-studio/fonts/ (link fonts/fonts.css next to
+     this file). Fallback faces such as Noto, DejaVu or Arial are banned for visible text
+     (AP-4), so there is deliberately no generic fallback that could hide a missing glyph:
+     the anti-AI-tells font audit catches any substitution in the PDF. */
+  --font-display: "Bodoni Moda Display", "Bodoni Moda";
+  --font-text: "EB Garamond";
+  --font-sans: "EB Garamond";            /* labels: the text face in small caps, not a grey sans */
+  --font-mono: "IBM Plex Mono";
+  --font-arabic-text: "IBM Plex Sans Arabic";
+  --font-arabic-display: "Amiri";
 
   --size-body: 9.6pt;
   --leading-body: 1.42;

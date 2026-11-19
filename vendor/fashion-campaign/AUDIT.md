@@ -20,3 +20,4 @@
 
 - Record provenance as URL + SHA-256 + fetch date instead of a commit SHA.
 - brand_lint also scans for living-artist names in exported prompts.
+- The SHA-256 above is of the file as downloaded (CRLF line endings). The committed copy is LF-normalised by git.

@@ -52,8 +52,11 @@ projects/<id>/
 └── renders/              PDFs, PNG/JPG deliverables, <name>_pages/ previews
 ```
 
-Copy `print-studio/css/print-base.css` into `layout/` and link it relatively
-(`<link rel="stylesheet" href="print-base.css">`). Images are referenced relatively
+Copy `print-studio/css/print-base.css` and the whole `print-studio/fonts/` folder into `layout/`
+and link both relatively (`<link rel="stylesheet" href="fonts/fonts.css">` then
+`<link rel="stylesheet" href="print-base.css">`). Only the curated OFL families in
+`print-studio/fonts/FONTS.yaml` may set visible text; Noto, DejaVu, Arial, Roboto, Inter and other
+fallback faces are banned (AP-4) and the anti-AI-tells gate fails any PDF that embeds them. Images are referenced relatively
 (`../assets/images/p01-cover.png`). Never link outside the project folder: a project must
 render the same after the repo moves.
 
@@ -107,7 +110,7 @@ the wrong picture.
 - **Fixed-height columns** use `.cols-2`/`.cols-3` plus `.cols-fill`; free-height columns
   balance by default.
 - **Arabic.** Set `dir="rtl" lang="ar"` on the page or block. Fonts: `--font-arabic-text`
-  (Noto Naskh Arabic) for body, `--font-arabic-display` (Noto Kufi Arabic) for headlines. No
+  (IBM Plex Sans Arabic) for body, `--font-arabic-display` (Amiri, calligraphic Naskh) for headlines. No
   letter-spacing on Arabic, no uppercase transforms, no hyphenation. Write digits as Latin
   `0-9`. Keep number groups on one line with `<span class="nowrap">230 × 300</span>` —
   do not force them left-to-right; the browser's bidi order is the natural reading order.

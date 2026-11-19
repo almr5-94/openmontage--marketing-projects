@@ -9,9 +9,11 @@ After the brief. Produce `studio_proposal` + `decision_log`; get approval. No pa
 
 Each direction specifies:
 
-- **Typography** — display face, text face, Arabic faces if any (locally installed: FreeSerif,
-  DejaVu Sans, Noto Naskh Arabic, Noto Kufi Arabic; any other font must be added as a file in
-  `assets/fonts/` with its licence noted).
+- **Typography** — one Latin display face and one Latin text face, plus one Arabic display and
+  one Arabic text face if the issue has Arabic, all from `print-studio/fonts/FONTS.yaml`
+  (curated OFL library). At most two families per script. Fallback faces (Noto, DejaVu, Arial,
+  Roboto, Inter...) are banned (AP-4). A new font must be OFL or similarly licensed, added as a
+  file with its licence and registered in FONTS.yaml.
 - **Grid** — columns per page (2 for brochures, 3 for magazines), margins, gutter.
 - **Image strategy** — photo-real generated, illustrated, stock photography, the user's photos,
   or typographic; the cover treatment specifically.

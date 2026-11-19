@@ -1,0 +1,23 @@
+# The curated type library. The anti-AI-tells font audit allows ONLY these families
+# (matched by PDF base-font name, subset prefix stripped). Each publication declares at
+# most two families per script, chosen from here, in house.yaml or the issue brief.
+# Banned for visible text (AP-4): Noto (all scripts), DejaVu, Arial, Helvetica, Roboto,
+# Open Sans, Inter, system-ui, Tahoma, Segoe UI, Calibri, Times New Roman, Liberation, FreeSerif.
+source:
+  latin: "google/fonts @ cc5661d43cd4f9aad5567033a8e15ca28dc35c86 (static styles cut from the variable masters with fontTools.varLib.instancer)"
+  arabic: "~/.claude/skills/arabic-fonts (the owner's Arabic typography standard)"
+families:
+  - {family: Bodoni Moda, superfamily: Bodoni Moda, script: latin, role: display, character: "high-contrast Didone; optical size 28 for text-size heads", licence: OFL-1.1, dir: bodonimoda}
+  - {family: Bodoni Moda Display, superfamily: Bodoni Moda, script: latin, role: display, character: "optical size 96, hairline contrast for covers and openers", licence: OFL-1.1, dir: bodonimoda}
+  - {family: EB Garamond, superfamily: EB Garamond, script: latin, role: text, character: "Garamond revival with true small caps (font-variant: small-caps) and old-style figures", licence: OFL-1.1, dir: ebgaramond}
+  - {family: Cormorant Garamond, superfamily: Cormorant Garamond, script: latin, role: display_or_text, character: "light, tall, elegant display Garamond", licence: OFL-1.1, dir: cormorantgaramond}
+  - {family: Hanken Grotesk, superfamily: Hanken Grotesk, script: latin, role: quiet_sans, character: "quiet grotesk for labels and captions", licence: OFL-1.1, dir: hankengrotesk}
+  - {family: IBM Plex Mono, superfamily: IBM Plex Mono, script: latin, role: quiet_mono, character: "mono for colophons, plate numbers and specs", licence: OFL-1.1, dir: ibmplexmono}
+  - {family: Amiri, superfamily: Amiri, script: arabic, role: display, character: "classical Naskh with calligraphic quality (Bulaq press tradition); 13pt and above", licence: OFL-1.1, dir: amiri}
+  - {family: IBM Plex Sans Arabic, superfamily: IBM Plex Sans Arabic, script: arabic, role: text, character: "clean modern Arabic text and captions", licence: OFL-1.1, dir: ibmplexsansarabic}
+  - {family: Cairo, superfamily: Cairo, script: arabic, role: marketing, character: "geometric sans, modern official/marketing", licence: OFL-1.1, dir: cairo}
+  - {family: Almarai, superfamily: Almarai, script: arabic, role: dense, character: "compact Gulf-institutional", licence: OFL-1.1, dir: almarai}
+# Noto Naskh Arabic is the arabic-fonts standard's body default, but AP-4 bans every Noto face
+# for this system's publications, so it is deliberately not shipped here.
+defaults:
+  magazine: {latin_display: Bodoni Moda Display, latin_text: EB Garamond, arabic_display: Amiri, arabic_text: IBM Plex Sans Arabic}
