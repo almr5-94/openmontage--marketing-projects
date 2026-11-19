@@ -182,3 +182,23 @@ def test_colophon_credits_stock_photographer_not_alt_text(tmp_path):
     lines = credit_lines(B())
     assert lines[0] == "Photograph by A. Das - Pexels. Pexels License."
     assert not any("molding" in ln for ln in lines)
+
+
+def test_face_gate_sends_the_vision_model_a_small_copy(tmp_path):
+    # the vision server answers HTTP 400 to full-size print files; the cartoon check gets a <=1600 px JPEG
+    from lib.face_gate import _vision_copy
+
+    big = tmp_path / "print.png"
+    Image.new("RGB", (2900, 3700), (200, 190, 170)).save(big)
+    small = _vision_copy(big)
+    with Image.open(small) as im:
+        assert max(im.size) <= 1600 and im.format == "JPEG"
+    jpg = tmp_path / "ok.jpg"
+    Image.new("RGB", (800, 600)).save(jpg)
+    assert _vision_copy(jpg) == jpg
+
+
+def test_urgency_lint_is_about_the_call_not_the_word():
+    assert lint_copy("Hurry, only 3 left!")
+    assert not lint_copy("Nothing in the pictures is in a hurry.")
+    assert not lint_copy("There is no hurry at low tide.")

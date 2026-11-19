@@ -58,3 +58,21 @@ def test_run_critique_with_fake_local_models(tmp_path, monkeypatch):
     out = json.loads((tmp_path / "qa/maison_critique.json").read_text())
     assert {c["critic"] for c in out["critics"]} == {"claude", "local"}
     assert (tmp_path / "qa/maison_critique.md").read_text().startswith("# Maison critique: PASS")
+
+
+def test_local_questions_only_where_they_apply(tmp_path, monkeypatch):
+    # a text-free single-page ad: no typography to judge, and one page is not a set
+    p = tmp_path / "p0.png"
+    Image.new("RGB", (420, 594), (240, 236, 228)).save(p)
+    asked = []
+    monkeypatch.setattr(cq.lm, "see", lambda img, q, **k: asked.append(q) or ("no" if "yes or no" in q else "4"))
+    monkeypatch.setattr(cq.lm, "chat", lambda prompt, **k: "SCORE: 4 | EVIDENCE: 'x'")
+    sc = cq.local_scores([p], {}, "", "", tmp_path, kinds=[{"image": True, "text": False}])
+    assert "not_applicable" in sc["typography"]
+    assert "not_applicable" in sc["cohesion"] and "not_applicable" in sc["archive_dialogue"]
+    assert sc["craft"]["score"] == 4 and sc["one_idea"]["score"] == 4
+    assert not any("typography" in q.lower() for q in asked)
+    # a colophon page with text and no picture is not scored for imagery
+    sc2 = cq.local_scores([p, p], {}, "", "", tmp_path,
+                          kinds=[{"image": True, "text": True}, {"image": False, "text": True}])
+    assert "pages [1]" in sc2["craft"]["evidence"]

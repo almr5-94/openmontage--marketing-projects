@@ -12,6 +12,7 @@ caller moves it to components/ and records why.
 
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 from typing import Any, Callable
 
@@ -31,6 +32,20 @@ PHOTO_CHECKS: list[tuple[str, str, bool]] = [
               "If no teeth are visible, answer no. Answer yes or no.", False),
     ("limbs", "Is any arm, leg or body part missing, duplicated, or bent in an impossible way? Answer yes or no.", False),
 ]
+
+
+def _vision_copy(image: Path, longest: int = 1600) -> Path:
+    """A JPEG copy no larger than ``longest`` px: the vision server rejects (HTTP 400) full-size print files."""
+    from PIL import Image
+
+    with Image.open(image) as im:
+        if max(im.size) <= longest and im.format == "JPEG":
+            return image
+        out = Path(tempfile.gettempdir()) / f"facegate-{image.stem}-{abs(hash(str(image))) % 10**8}.jpg"
+        im = im.convert("RGB")
+        im.thumbnail((longest, longest))
+        im.save(out, quality=90)
+        return out
 
 
 def _default_ask(p: Path, q: str) -> str:
@@ -125,7 +140,7 @@ def run_face_gate(image: str | Path, mode: str = "auto", ask: Callable[[Path, st
     if mode == "cartoon":
         from scripts.style_refs.generate_scene import face_is_whole
 
-        ok = face_is_whole(image)
+        ok = face_is_whole(_vision_copy(image))
         return {"pass": ok, "mode": "cartoon", "person": True, "checks": {"face_is_whole": {"ok": ok}},
                 "failed": [] if ok else ["face_is_whole"], "image": str(image)}
     checks, failed = {}, []

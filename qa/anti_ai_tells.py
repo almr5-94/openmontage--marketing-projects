@@ -70,7 +70,7 @@ COPY_RULES_EN = [
     (r"\b(get in touch|contact us|call us|message us|dm us|reach out)\b", "CTA"),
     (r"\b(sign up|register now|book (a|your) (call|demo|consultation)|order now|buy now|shop now|learn more|click here|"
      r"apply now|subscribe now|join now|start (your )?free)\b", "CTA"),
-    (r"\b(limited[- ]time|act now|hurry|last chance|don'?t miss|only \d+ left|while stocks last|today only)\b", "urgency"),
+    (r"\b(limited[- ]time|act now|(?<!in a )(?<!no )hurry(?! of\b)|last chance|don'?t miss|only \d+ left|while stocks last|today only)\b", "urgency"),
     (r"\b(\d+% off|discount|sale ends|special offer|free shipping|promo code|best price)\b", "discount"),
     (r"\b(step \d+|steps? to|how it works|in \d+ (easy|simple) steps)\b", "instructions"),
     (r"\b(whatsapp|customer service|support team|help ?desk|faq)\b", "support register"),
@@ -88,6 +88,7 @@ COPY_RULES_AR = [
     (r"(واتساب|خدمة العملاء|الدعم الفني)", "support register"),
     (r"(الخطوة \S+|خطوات|كيف يعمل)", "instructions"),
 ]
+# "hurry" is urgency as a call ("Hurry, last pieces"), not as description ("nothing here is in a hurry")
 URGENCY_ANYWHERE = {"urgency", "discount"}
 
 

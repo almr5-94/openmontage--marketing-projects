@@ -251,6 +251,7 @@ class ImageCrop(BaseTool):
             "engine": {"type": "string", "enum": ["pillow", "imagemagick"], "default": "pillow"},
             "op": {"type": "string", "enum": ["resize", "format", "strip", "auto_orient", "crop", "thumbnail"]},
             "width": {"type": "integer"}, "height": {"type": "integer"},
+            "box": {"type": "array", "items": {"type": "number"}, "description": "op crop: exact [x0,y0,x1,y1] fractions"},
             "to": {"type": "string", "enum": ["png", "jpg", "webp", "tif"]},
             "quality": {"type": "integer", "default": 92},
             "shape": {"type": "string", "enum": SHAPES},
@@ -430,6 +431,10 @@ class ImageCrop(BaseTool):
                 im = im.resize((int(w), int(h)), Image.LANCZOS)
             elif op == "thumbnail":
                 im.thumbnail((int(inputs.get("width", 400)), int(inputs.get("height", 400))), Image.LANCZOS)
+            elif op == "crop" and inputs.get("box"):
+                # an exact rectangle, [x0, y0, x1, y1] as fractions: no rescaling, every source pixel kept
+                x0, y0, x1, y1 = inputs["box"]
+                im = im.crop((round(x0 * im.width), round(y0 * im.height), round(x1 * im.width), round(y1 * im.height)))
             elif op == "crop":
                 tw, th = _parse_size(inputs["target"])
                 scale, box = smart_crop_box(im, tw, th, inputs.get("gravity", "attention"))
@@ -445,7 +450,7 @@ class ImageCrop(BaseTool):
                 im.convert("RGB").save(out, quality=int(inputs.get("quality", 92)))
             else:
                 im.save(out)
-            self._record(inputs, out, [src], {"op": f"batch:{op}", "params": {k: inputs.get(k) for k in ("width", "height", "target", "to")}})
+            self._record(inputs, out, [src], {"op": f"batch:{op}", "params": {k: inputs.get(k) for k in ("width", "height", "target", "to", "box")}})
             outs.append(str(out))
         return ToolResult(success=True, data={"paths": outs}, artifacts=outs)
 

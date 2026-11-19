@@ -466,6 +466,9 @@ def maison_export(project_id: str, issue: Optional[dict[str, Any] | str] = None,
     if issue is None:
         ij = _latest_issue(pd)
     nm = name or (ij.name.replace(".issue.json", "") if ij else "issue")
+    # the export never overwrites the PDF that was reviewed and gated: its hash is what the verdicts certify
+    if not nm.endswith("-final"):
+        nm += "-final"
     house = yaml.safe_load((pd / "house.yaml").read_text(encoding="utf-8"))
     stock = proof_stock or (house.get("production") or {}).get("paper_stock", "uncoated_offwhite")
     return export_pdf(project_id, str(ij) if ij else issue, nm, ["print_pdf", "screen_pdf", "pngs", "proofs"], stock)

@@ -68,21 +68,57 @@ def contact_sheet(pngs: list[Path], out: Path) -> Path:
     return Path(r.data["path"])
 
 
-def local_scores(pngs: list[Path], house: dict[str, Any], copy_text: str, arabic_text: str, work: Path) -> dict[str, Any]:
+# A page question is only asked where it can apply: imagery questions on pages that carry a picture,
+# typography on pages that carry type. A colophon has no image to judge for craft; a text-free ad has no type.
+APPLIES = {"restraint": "any", "one_idea": "image", "craft": "image", "typography": "text"}
+
+
+def page_kinds(pdf: Path) -> list[dict[str, bool]]:
+    import pdfplumber
+
+    if not Path(pdf).exists():  # no PDF to read: every question applies to every page
+        return []
+    with pdfplumber.open(str(pdf)) as d:
+        # a picture is a raster image or drawn vector art (code-drawn shapes are exactly what craft must judge);
+        # a few hairline rules on a contents page are not a picture
+        return [{"image": bool(pg.images) or (len(pg.curves) + len(pg.rects)) > 8,
+                 "text": bool((pg.extract_text() or "").strip())} for pg in d.pages]
+
+
+def local_scores(pngs: list[Path], house: dict[str, Any], copy_text: str, arabic_text: str, work: Path,
+                 kinds: Optional[list[dict[str, bool]]] = None) -> dict[str, Any]:
     scores: dict[str, Any] = {}
+    kinds = kinds or [{"image": True, "text": True} for _ in pngs]
     for crit, q in PAGE_Q.items():
-        vals = [v for v in (_num(lm.see(p, q, max_tokens=6)) for p in pngs) if v]
-        if vals:
+        want = APPLIES[crit]
+        idx = [i for i in range(len(pngs)) if want == "any" or (i < len(kinds) and kinds[i][want])]
+        if not idx:
+            scores[crit] = {"not_applicable": f"no page in this target carries {want}"}
+            continue
+        got = [(i + 1, _num(lm.see(pngs[i], q, max_tokens=6))) for i in idx]
+        got = [(pg, v) for pg, v in got if v]
+        if got:
+            vals = [v for _, v in got]
             med = int(statistics.median_low(vals))
-            worst = min(range(len(vals)), key=lambda i: vals[i])
-            scores[crit] = {"score": med, "evidence": f"vision model, per page {vals} (median {med}; weakest p{worst + 1})",
+            worst = min(got, key=lambda t: t[1])[0]
+            scores[crit] = {"score": med, "evidence": f"vision model, pages {[pg for pg, _ in got]} scored {vals} "
+                                                      f"(median {med}; weakest p{worst})",
                             "send_back_to": SEND_BACK[crit]}
+    if len(pngs) < 2:
+        for crit in SET_Q:  # a set question on one page is not a set; the Claude critic judges it
+            scores[crit] = {"not_applicable": "single-page target: set criteria need two or more pages"}
+        return _rest(scores, pngs, house, copy_text, arabic_text)
     sheet = contact_sheet(pngs, work / "critic-sheet.jpg")
     for crit, q in SET_Q.items():
         v = _num(lm.see(sheet, q, max_tokens=6))
         if v:
             scores[crit] = {"score": v, "evidence": f"vision model on the contact sheet of {len(pngs)} pages: {v}",
                             "send_back_to": SEND_BACK[crit]}
+    return _rest(scores, pngs, house, copy_text, arabic_text)
+
+
+def _rest(scores: dict[str, Any], pngs: list[Path], house: dict[str, Any], copy_text: str,
+          arabic_text: str) -> dict[str, Any]:
     flagged = [i + 1 for i, p in enumerate(pngs) if lm.yes(lm.see(p, ORIGINALITY_Q, max_tokens=4))]
     scores["originality"] = {"score": 2 if flagged else 5,
                              "evidence": (f"vision model sees real-house trade dress on p{flagged}" if flagged
@@ -164,7 +200,7 @@ def run_critique(project_dir: str | Path, pdf: str | Path, house_yaml: str | Pat
         critics.append({"critic": "claude", "model": claude_scores.get("model", "claude"), "scores": claude_scores["scores"]})
     if local:
         text, ar = pdf_text(pdf)
-        ls = local_scores(pngs, house, text, ar, work)
+        ls = local_scores(pngs, house, text, ar, work, kinds=page_kinds(pdf))
         for crit in CRITERIA:  # a 7B answer that would not parse is no score, not a crash; the other critic still rules
             if not ls.get(crit):
                 ls[crit] = {"not_applicable": "local model gave no usable score for this criterion"}
