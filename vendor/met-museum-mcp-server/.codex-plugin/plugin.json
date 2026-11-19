@@ -1,0 +1,25 @@
+{
+  "name": "met-museum-mcp-server",
+  "version": "0.10.1",
+  "description": "Search the Metropolitan Museum of Art collection, browse it by department or update date, fetch full artwork records and open-access images via MCP. STDIO or Streamable HTTP.",
+  "author": {
+    "name": "cyanheads",
+    "email": "casey@caseyjhand.com",
+    "url": "https://github.com/cyanheads"
+  },
+  "homepage": "https://github.com/cyanheads/met-museum-mcp-server#readme",
+  "repository": "https://github.com/cyanheads/met-museum-mcp-server",
+  "license": "Apache-2.0",
+  "keywords": ["met", "metropolitan-museum", "art", "museum", "mcp", "mcp-server", "model-context-protocol"],
+  "mcpServers": "./.codex-plugin/mcp.json",
+  "interface": {
+    "displayName": "met-museum-mcp-server",
+    "shortDescription": "Search the Metropolitan Museum of Art collection, browse it by department or update date, fetch full artwork records and open-access images via MCP. STDIO or Streamable HTTP.",
+    "longDescription": "Search the Metropolitan Museum of Art collection, browse it by department or update date, fetch full artwork records and open-access images via MCP. STDIO or Streamable HTTP.",
+    "developerName": "cyanheads",
+    "category": "data",
+    "capabilities": ["Read"],
+    "websiteURL": "https://github.com/cyanheads/met-museum-mcp-server",
+    "defaultPrompt": []
+  }
+}

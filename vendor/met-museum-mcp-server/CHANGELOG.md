@@ -1,0 +1,95 @@
+# Changelog
+
+All notable changes to this project. Each entry links to its full per-version file in [changelog/](changelog/).
+
+## [0.10.1](changelog/0.10.x/0.10.1.md) — 2026-11-14
+
+met_get_object keeps a multi-line dimensions value's line breaks in content[], and every field value there reads back as written. medium is described as the Met's object-type grouping, not the classification field. mcp-ts-core ^0.13.22.
+
+## [0.10.0](changelog/0.10.x/0.10.0.md) — 2026-11-04 · ⚠️ Breaking
+
+met_search_collections gains matchField artistOrCulture, and met_get_object returns every fetched record and drops its deferred output field. A limit above 500 reads a 500-ID page with no advertised maximum, unless MET_CLAMP_LIMITS=false. The server publishes a met-museum-guide agent skill; mcp-ts-core ^0.13.18.
+
+## [0.9.0](changelog/0.9.x/0.9.0.md) — 2026-10-15 · ⚠️ Breaking
+
+An HTTP 429 that outlasts the retries fails as upstream_rate_limited on every tool, with the requested wait in the message; met_get_object accepts up to 500 IDs and met_search_collections and met_list_objects a limit up to 10,000, each disclosing what it did not serve; records gain reign and portfolio; mcp-ts-core ^0.13.15.
+
+## [0.8.0](changelog/0.8.x/0.8.0.md) — 2026-10-04 · ⚠️ Breaking
+
+met_get_object can attach up to three CC0 images and returns attribution, rights, revision-date, and departmentId fields; met_search_collections answers zero matches as a success; a Met 5xx outage fails as upstream_unavailable on every tool.
+
+## [0.7.0](changelog/0.7.x/0.7.0.md) — 2026-09-30
+
+met_list_objects browses the collection by department and update date with no paging limit, every tool call runs under one MET_CALL_DEADLINE_MS budget, and a Met firewall 403 fails as upstream_blocked instead of inviting a retry.
+
+## [0.6.0](changelog/0.6.x/0.6.0.md) — 2026-09-24 · ⚠️ Breaking
+
+met_search_collections moves to the Met's /v1.1/search before /v1 retires on 2026-10-01: upstream paging within a 10,000-match window, isPublicDomain and the search_timeout reason removed, and a no_results hint that names the filters that zeroed the query.
+
+## [0.5.3](changelog/0.5.x/0.5.3.md) — 2026-09-19
+
+mcp-ts-core bumps to ^0.13.6: met_search_collections and met_get_object accept parameter aliases, an out-of-schema argument returns InvalidParams, tool error text closes with the failure reason, and modeled outcomes like a zero-match search log below error.
+
+## [0.5.2](changelog/0.5.x/0.5.2.md) — 2026-09-13 · ⚠️ Breaking
+
+mcp-ts-core bumps to ^0.13.1: the Bun engines floor rises to >=1.4.0, createApp declares sessionMode: 'stateless', and the dev skill tree moves to framework-skills/.
+
+## [0.5.1](changelog/0.5.x/0.5.1.md) — 2026-09-09
+
+met_search_collections intersects filtered results against an unfiltered control run, removing objects that don't match the query (#21)
+
+## [0.5.0](changelog/0.5.x/0.5.0.md) — 2026-09-09 · ⚠️ Breaking
+
+met_get_object: byte-bounded batch responses with deferred[], de-duplicated objectIDs, new geography and measurements fields
+
+## [0.4.0](changelog/0.4.x/0.4.0.md) — 2026-09-09 · ⚠️ Breaking
+
+met_get_object: nullable objectBeginDate/objectEndDate, Markdown-escaped content[] text, null tag URLs normalized
+
+## [0.3.0](changelog/0.3.x/0.3.0.md) — 2026-09-09 · ⚠️ Breaking
+
+true-only isPublicDomain/isHighlight filters, blank-input rejection, and offset-beyond-result-set signaling for met_search_collections
+
+## [0.2.6](changelog/0.2.x/0.2.6.md) — 2026-08-22
+
+MCP 2026-07-28 support, explicit stateless HTTP serving, and current schema, error, and fetch behavior through @cyanheads/mcp-ts-core ^0.12.3
+
+## [0.2.5](changelog/0.2.x/0.2.5.md) — 2026-07-16
+
+content[] now renders every met_get_object and met_search_collections output field with placeholders for empty/null/false values; tool descriptions tightened to descriptive voice across all three tools
+
+## [0.2.4](changelog/0.2.x/0.2.4.md) — 2026-07-16
+
+met_search_collections: offset pagination, departmentId validation, and a fail-fast search timeout with recovery hints
+
+## [0.2.3](changelog/0.2.x/0.2.3.md) — 2026-07-16
+
+Fix: met_get_object preserves requested objectID order; adopt mcp-ts-core ^0.10.14 with Socket install scanning and a release-age hold
+
+## [0.2.2](changelog/0.2.x/0.2.2.md) — 2026-06-20
+
+Maintenance: adopt @cyanheads/mcp-ts-core ^0.10.9 — re-sync vendored devcheck scripts and skills, enable plugin-manifest packaging checks
+
+## [0.2.1](changelog/0.2.x/0.2.1.md) — 2026-06-12
+
+Maintenance: adopt @cyanheads/mcp-ts-core ^0.10.6, reclassify invalid_date_range as ValidationError, add Docker HEALTHCHECK and .mcpb cleanup
+
+## [0.2.0](changelog/0.2.x/0.2.0.md) — 2026-06-08 · ⚠️ Breaking
+
+BREAKING: met_search renamed to met_search_collections; adds isOnView filter to restrict results to works currently on display
+
+## [0.1.3](changelog/0.1.x/0.1.3.md) — 2026-06-04 · ⚠️ Breaking
+
+BREAKING: met_get_object renames hasImages → hasCC0Image; adds all_not_found error distinguishing 404s from network failures
+
+## [0.1.2](changelog/0.1.x/0.1.2.md) — 2026-06-02
+
+Public hosted endpoint at met-museum.caseyjhand.com/mcp
+
+## [0.1.1](changelog/0.1.x/0.1.1.md) — 2026-06-01
+
+Public launch — Met Museum collection search, object fetch, and department listing via MCP
+
+## [0.1.0](changelog/0.1.x/0.1.0.md) — 2026-05-31
+
+Initial release — MET Museum MCP server scaffolded on @cyanheads/mcp-ts-core

@@ -1,0 +1,1002 @@
+# met-museum-mcp-server — Design
+
+## MCP Surface
+
+### Tools
+
+| Name | Description | Key Inputs | Annotations |
+|:-----|:------------|:-----------|:------------|
+| `met_search_collections` | Search the Met collection by keyword and filters; returns total count and one page of matched object IDs | `q`, `matchField`, `hasImages`, `isHighlight`, `isOnView`, `medium`, `departmentId`, `geoLocation`, `dateBegin`, `dateEnd`, `limit`, `offset` | `readOnlyHint: true`, `idempotentHint: true` |
+| `met_list_objects` | Browse without a keyword: every object ID in one department, every object created or revised on or after a date, or both; ascending, paged with no depth limit | `departmentId`, `updatedSince`, `limit`, `offset` | `readOnlyHint: true`, `idempotentHint: true` |
+| `met_get_object` | Fetch full records for one or more object IDs (batch, concurrency-limited, partial-success), optionally with up to 3 CC0 images as image content | `objectIDs` (array, max 500; the first 20 distinct are fetched), `includeImages` | `readOnlyHint: true`, `idempotentHint: true` |
+| `met_list_departments` | Return the 19 curatorial departments with their IDs and display names | — | `readOnlyHint: true`, `idempotentHint: true` |
+
+### Resources
+
+None defined. All data is reachable through the tool surface; the object-by-ID pattern doesn't add meaningful value as a stable resource URI beyond what `met_get_object` already provides. The published skill (below) adds `skill://met-museum-guide/SKILL.md`, which the SDK serves.
+
+### Prompts
+
+None. The domain is read-only research with no recurring interaction pattern that benefits from a structured template.
+
+### Skills
+
+`met-museum-guide` (`skills/met-museum-guide/SKILL.md`), served with `createApp({ skills: 'skills' })` through `skills/list` and as `skill://met-museum-guide/SKILL.md` in `resources/list`. Its gates: fetch only the records an answer needs; read the attribution before naming a maker; pad date windows, then select by overlap; split a search past 10,000 matches; take a `geoLocation` match from the filter. See Decision #25.
+
+---
+
+## Overview
+
+The Met Collection API exposes over 500,000 artworks from The Metropolitan Museum of Art (`/v1/objects` reported 502,828 on 2026-09-24) — spanning 5,000 years of human creativity across 19 curatorial departments. The API is keyless and public. Roughly 400,000 of these objects are released under CC0 open access, with direct high-resolution image URLs for public-domain works. The `/v1.1/search` index reports 536,643 matches for `q=*` (2026-11-04), but any one search pages through only its first 10,000 matches.
+
+Target users: art researchers, educators, students, designers sourcing CC0 imagery, and agents answering questions like "show me Van Gogh's work at the Met" or "what Egyptian artifacts are in the collection?"
+
+---
+
+## Requirements
+
+- No API key required — fully public, keyless REST
+- Collection root: `https://collectionapi.metmuseum.org/public/collection/`; each endpoint carries its own version (`/v1.1/search`, `/v1/objects`, `/v1/objects/{id}`, `/v1/departments`)
+- Search returns object IDs only, one `offset`/`limit` page at a time; full records require a per-ID fetch (`/v1/objects/{id}`)
+- Batch-fetch pattern (array input + a concurrency-limited worker pool that records each ID's outcome) is essential to avoid N+1 after a search
+- The documented rate limit is 80 requests per second, but the Met's firewall has blocked a burst far below it (Decision #19) — cap concurrency (5 parallel by default) and keep bursts small
+- `hasImages=true` includes copyrighted works with restricted images. CC0 status is not a search filter (`/v1.1/search` ignores `isPublicDomain`); it is read per object from `isPublicDomain`/`hasCC0Image` on `met_get_object`
+- Attribution: CC0 means no attribution is legally required, but crediting "The Metropolitan Museum of Art" is courteous
+
+---
+
+## Services
+
+| Service | Wraps | Used By |
+|:--------|:------|:--------|
+| `MetService` | Met Collection API — search, object ID lists, object fetch, departments — and the Met image host, for `met_get_object`'s opt-in image content | All four tools |
+
+---
+
+## Config
+
+| Env Var | Required | Description |
+|:--------|:---------|:------------|
+| `MET_BASE_URL` | No | Override the API root (default: `https://collectionapi.metmuseum.org/public/collection`); each endpoint appends its own version. A value ending in `/v1` or `/v1.1` is read as its root. Useful for local stubs in tests. |
+| `MET_REQUEST_TIMEOUT_MS` | No | Per-request timeout in milliseconds (default: `10000`). |
+| `MET_CALL_DEADLINE_MS` | No | Wall-clock budget in milliseconds for one tool call, shared by every Met API request it makes, retries and backoff included (default: `30000`). See Decision #18. |
+| `MET_BATCH_CONCURRENCY` | No | Max parallel fetches in `met_get_object` (default: `5`). |
+| `MET_CLAMP_LIMITS` | No | `true` (default): a `limit` above 500 on `met_search_collections` or `met_list_objects` reads a 500-ID page with a notice, and the schema advertises no maximum. `false`: `limit` advertises and enforces a maximum of 500. See Decision #24. |
+
+No API keys. The server needs no auth env vars for normal operation.
+
+---
+
+## Implementation Order
+
+1. Config (`src/config/server-config.ts`) — four optional env vars with defaults
+2. `MetService` (`src/services/met/met-service.ts`) — `search()`, `listObjects()`, `getObject()`, `getDepartments()`, `getValidDepartmentIds()`, `countKeywordMatches()`, and `keepDepartmentMembers()`, with retry, the per-call deadline, firewall-block and 5xx-outage classification, and the cached object-ID lists
+3. `met_list_departments` — trivial; validates the service layer works end-to-end
+4. `met_search_collections` — exercises the search endpoint and output shaping
+5. `met_list_objects` — the keyword-less browse over `/v1/objects`, paged from the sorted, cached list
+6. `met_get_object` — batch path, partial-success output, concurrency gate
+7. Tests (`tests/`)
+
+---
+
+## Tool Specifications
+
+### `met_search_collections`
+
+**Purpose:** Search the Met collection and return matching object IDs. Always chain to `met_get_object` to get full records.
+
+**Upstream endpoint:** `GET /v1.1/search?q=…&offset=…&limit=…&[filters]` — one request per page
+
+**Input schema** (describes abbreviated; the definition file carries the full text):
+
+```ts
+z.object({
+  q: z.string().min(1)
+    .describe('Keyword query, matched across title, artist name, culture, medium, tags, and other text fields; matchField narrows it to titles, tags, or artists and cultures. "*" matches every object, for a search narrowed by filters alone (still the first 10,000 matches). An accession number ranks its object first, near-numbered objects after it — confirm from accessionNumber on met_get_object.'),
+  matchField: z.enum(['title', 'tags', 'artistOrCulture']).optional()
+    .describe('Restrict the keyword match to titles (title=true), subject tags (tags=true), or the attributed artist or the culture (artistOrCulture=true; qualified attributions such as "Style of" match, a sitter does not). Combines with every filter; no effect when q is "*".'),
+  hasImages: z.boolean().optional()
+    .describe('true: objects with at least one image, copyrighted works included; false: objects with none. CC0 status is per object on met_get_object.'),
+  isHighlight: z.literal(true).optional()
+    .describe('Opt-in filter, true only — the search ignores false. Objects the Met designates as highlights.'),
+  isOnView: z.boolean().optional()
+    .describe('true: objects on display in a Met gallery; false: objects not on view.'),
+  medium: z.string().optional()
+    .describe('One object type, case-sensitive and spelled as the Met spells it ("Paintings", "Watercolors") — not a material like "Oil on canvas", nor a "|"-joined list. The filter is the evidence for a match: a match\'s classification can be empty or name another type, and one object can match several values, so counts split by medium can double-count (Decision #2).'),
+  departmentId: z.number().int().min(1).optional()
+    .describe('One curatorial department; valid IDs come from met_list_departments, and an unknown ID is rejected (invalid_department). 7 and 17 search as one combined set: objectIDs keeps the requested department, total and paging count both (Decision #21).'),
+  geoLocation: z.array(z.string()).max(1).optional()
+    .describe('One place, whole and case-sensitive as the Met spells it, as a one-element array. A different case, a fragment, a "|"-joined list, or an adjective ("Japanese") matches nothing; a matching record may show the place in none of its fields.'),
+  dateBegin: z.number().int().optional()
+    .describe('First year of the window (inclusive; negative = BCE). Requires dateEnd. Only objects whose whole date span (objectBeginDate–objectEndDate) lies inside the window match; a "ca." date can be stored as a 20-year span, and a window spanning year 0 matches undated records.'),
+  dateEnd: z.number().int().optional()
+    .describe('Last year of the window (inclusive; negative = BCE). Requires dateBegin. Same containment rule as dateBegin.'),
+  limit: z.number().int().min(1).default(20) // no maximum; .max(500) under MET_CLAMP_LIMITS=false (Decision #24)
+    .describe('Page size, at most 500 IDs (the Met search maximum); a larger value reads a 500-ID page and the notice says so (Decision #24). Paging reaches only the first 10,000 matches; a page that would cross 10,000 is cut short there.'),
+  offset: z.number().int().min(0).default(0)
+    .describe('Zero-based index of the first match to return; pass nextOffset to continue. An offset at or beyond 10,000 or total returns an empty page, not an error. Tied relevance can repeat or skip an ID at a page boundary.'),
+})
+```
+
+**Output schema:**
+
+```ts
+z.object({
+  total: z.number().int()
+    .describe('Total matching objects — can exceed 10,000, the most that paging reaches.'),
+  objectIDs: z.array(z.number().int())
+    .describe('Object IDs for this page, up to `limit` results and never more than 500; for departmentId 7 or 17 only that department\'s, so possibly fewer, or none, while more remain.'),
+  returned: z.number().int()
+    .describe('Count of object IDs in this page.'),
+  truncated: z.boolean()
+    .describe('True when reachable matches remain after this page: offset + positions read < min(total, 10,000). Positions read equal returned, except for departmentId 7 or 17 (the combined set before the department filter). An empty page reports false.'),
+  remaining: z.number().int()
+    .describe('Reachable matches after this page: min(total, 10,000) − (offset + positions read), floored at 0; an empty page reports 0.'),
+  nextOffset: z.number().int().nullable()
+    .describe('The offset to pass on the next call (offset + positions read, which for 7 or 17 can exceed returned), or null when no further page is reachable.'),
+  offset: z.number().int()
+    .describe('The resolved offset. Nonzero and at or beyond min(total, 10,000), the page is empty because the offset ran past what paging reaches.'),
+})
+// enrichment: {
+//   notice?: string — limit above 500 with matches remaining past the page: the page was read with limit 500,
+//                     continue from nextOffset (Decision #24);
+//                     total 0: the zero-match guidance, composed from the levers the call used, with a correction
+//                     for medium, geoLocation, and the date window (Decision #17);
+//                     total > 10,000: the window; departmentId 7 or 17: the combined set — total counts both
+//                     departments and a page can hold fewer than limit IDs, or the department filter could not
+//                     be applied (Decision #21). Every notice for one response is joined into one string;
+//                     content[] carries it escaped, so it reads back as written (Decision #17).
+//   effectiveQuery?: string — every success: q and each filter set, `name=` + JSON-encoded value, schema order,
+//                     without limit/offset (`q="sunflower", medium="Paintings", departmentId=11`).
+// }
+```
+
+**Error contract:**
+
+```ts
+errors: [
+  {
+    reason: 'invalid_date_range',
+    code: JsonRpcErrorCode.ValidationError,
+    when: 'dateBegin or dateEnd provided without the other, or dateBegin > dateEnd',
+    recovery: 'Provide both dateBegin and dateEnd as integer years, with dateBegin ≤ dateEnd.',
+  },
+  {
+    reason: 'invalid_filter',
+    code: JsonRpcErrorCode.ValidationError,
+    when: 'q is whitespace-only, or medium or geoLocation was supplied blank',
+    recovery: 'Supply a non-blank value for the named field, or omit the optional filter entirely.',
+  },
+  {
+    reason: 'invalid_department',
+    code: JsonRpcErrorCode.ValidationError,
+    when: 'departmentId is provided but is not one of the Met department IDs',
+    recovery: 'Call met_list_departments to get valid department IDs, then retry with one of the returned IDs.',
+  },
+  {
+    reason: 'upstream_blocked',
+    code: JsonRpcErrorCode.ServiceUnavailable,
+    retryable: false,
+    thrownBy: 'service', // Decision #19
+    when: "The Met API's firewall refused the request with HTTP 403 — it blocks this server's address, not one endpoint.",
+    recovery: 'Wait several minutes before retrying, and send fewer requests.',
+  },
+  {
+    reason: 'upstream_unavailable',
+    code: JsonRpcErrorCode.ServiceUnavailable,
+    thrownBy: 'service', // Decision #20
+    when: 'The Met API answered HTTP 500, 502, 503, or 504 to the department lookup or the search until the retry ladder ran out — an outage on its side.',
+    recovery: 'The Met API is failing on its side, so changing the request will not help. Wait a few minutes before retrying.',
+  },
+  {
+    reason: 'upstream_rate_limited',
+    code: JsonRpcErrorCode.RateLimited,
+    thrownBy: 'service', // Decision #23
+    when: "The Met API answered HTTP 429 to the department lookup or the search until the retry ladder ran out, or asked for a wait longer than the ladder or the call's time budget allows — it throttles this server's address, not one query.",
+    recovery: 'Wait the period this error names, or about a minute when it names none, then retry with fewer requests at once.',
+  },
+  {
+    reason: 'retry_deadline_exceeded',
+    code: JsonRpcErrorCode.Timeout,
+    thrownBy: 'service', // Decision #18
+    when: "The call's time budget ran out, retries and backoff included, before the Met API returned a successful response to the department lookup or the search.",
+    recovery: "The call's time budget ran out before the Met API returned a successful response, retries included. Retry after a short wait; if it keeps happening, the Met API is likely down or overloaded.",
+  },
+]
+```
+
+**Annotations:** `{ readOnlyHint: true, idempotentHint: true }`
+
+**Notes:** (measured against `/v1.1/search`, 2026-09-24)
+- An empty page arrives as HTTP 200 `{ total, objectIDs: null }` — for no match, and for an `offset` at or past the reachable window (`q=horse&offset=10000` → `total` 14,398, `objectIDs: null`). The service normalizes `null` to `[]`, and an empty page ends paging wherever it falls (`remaining` 0, `nextOffset` null): continuing from one would hand back the offset just read, and a caller following `nextOffset` would loop. A `total` of 0 is an empty success carrying the zero-match notice; an empty page of a nonzero `total` carries none.
+- `format()` marks a page `(truncated)`, `(offset beyond result set)` when `offset` is nonzero and at or past `min(total, 10,000)`, `(window end)` for a last page that stops at the window short of `total`, and `(complete)` otherwise — a zero result read from offset 0 included.
+- Paging is upstream: `limit` caps at 500 (an absent one defaults to 100, so the service always sends it), a page is clipped where `offset + limit` crosses 10,000 (`q=horse&offset=9900&limit=500` → 100 IDs), and `total` stays the full count. Continuation fields are computed against `min(total, 10,000)`; a `total` above it adds an `enrichment.notice`.
+- Every advertised filter is honored: `hasImages` and `isOnView` on both arms (`q=sunflower`: `hasImages` 153/25 of 178), `isHighlight` on `true` only (`false` is ignored → 178), `medium` case-sensitively (`Paintings` 11, `Painting` 0, `paintings` 0), `departmentId`, a single `geoLocation`, and `dateBegin`+`dateEnd` together. A filtered result is a subset of the keyword's unfiltered matches — there is no query-independent floor on `/v1.1` (`q=zzzqqqxyz` plus any filter → 0).
+- `medium`, `geoLocation`, and the date window each match one exact value (2026-11-04). `geoLocation` is one whole, case-sensitive place: `q=vase` with `Greece` → 1,330, with `greece`, `GREECE`, `Gree`, or `Greece|France` → 0; `q=Hokusai` with `Japan` → 468, with `Japanese` → 0. The Met matches it against a place index `met_get_object` does not return (Known Limitations). `medium` is one object type (Decision #2): `q=Hokusai` with `Prints` / `Paintings` → 310 / 90, with `Prints|Paintings`, raw or `%7C` → 0, though the Met's API docs show that form. The date window is containment, not overlap: an object matches only when `objectBeginDate ≥ dateBegin` and `objectEndDate ≤ dateEnd`. `54305` (Hokusai, "ca. 1832", stored 1822–1842) is in `q=Hokusai` 1822–1842 (85) and absent from 1832–1832 (0), 1830–1835, 1822–1841, and 1823–1842; `q=*` with 0–0 → 1,390 undated records, stored 0–0 and null on `met_get_object`. Adjacent windows therefore don't partition a search: `q=Hokusai` 1800–1832 → 91 and 1833–1880 → 52, against 337 for 1800–1880, the only one of the three holding `54305`. Each description says so, and the zero-match notice adds a correction for each one it names (Decision #17).
+- `matchField` sends `title=true`, `tags=true`, or `artistOrCulture=true`, one flag per request (2026-10-04: `q=sunflower` → 36 and 23 of 178, each a subset of the 178; 2026-11-04: `q=Rembrandt` → 372 of 646 with `artistOrCulture`), composes with the filters (`title` with `hasImages=true` → 20, the intersection), and counts as a filter in the zero-match notice; the keyword-only count is sent without it. It has no effect on `q=*` (536,643 with or without `artistOrCulture`, 2026-11-04). See Decisions #1 and #4.
+- The search ignores `isPublicDomain` (`true`, `false`, and absent all → 178 for `q=sunflower`), repeats of `geoLocation` past the first (`France&Japan` → 35, the same as `France`), an unknown `departmentId`, and a blank value (`medium=` → 178). Each silently widens the search, which is why the tool drops `isPublicDomain`, caps `geoLocation` at one element, validates `departmentId`, and rejects blanks.
+- `departmentId` 7 (The Cloisters) and 17 (Medieval Art) answer one combined set: `q=tapestry` → the same 165 IDs in the same order for either, 40 on department 7's `/v1/objects` list (2,350 IDs) and 125 on 17's (7,129), no ID on both (2026-10-04). Each 7/17 page keeps the IDs on the requested department's list — the sorted, cached list `met_list_objects` pages, read after the search and only for a page holding IDs — while `total`, `remaining`, `truncated`, and `nextOffset` stay in the combined space, advancing by the positions the page read. A page can therefore hold fewer than `limit` IDs, or none, with `truncated: true`; the zero-match notice still keys on the Met's `total: 0` alone. Every 7/17 response carries a notice saying so, or, when the list cannot be loaded, that the page is unfiltered. Walked live in 60-ID pages: department 7 → 23 + 10 + 7 = 40 IDs, the Unicorn Tapestries (467638–467642) included, department 17 → 37 + 50 + 38 = 125, each walk reading positions 60 + 60 + 45 = 165 with one list request per department. Decision #21.
+- Tied relevance scores are ordered nondeterministically across requests, so an ID can occasionally repeat or be skipped at a page boundary. It can't be fixed across independent calls; the `offset` description discloses it.
+- Search relevance is basic keyword match — not semantic. Long queries do not improve results; shorter terms and filters do.
+- `q=*` matches the whole index and combines with the filters, which serves questions with no keyword that `met_list_objects` cannot filter for (highlight, on-view, images): `{ q: "*", isHighlight: true, isOnView: true, departmentId: 10 }` → 98 (2026-10-04), still inside the 10,000-match window. An accession number as `q` ranks its own object first and near-numbered neighbours after it (`29.100.5` → `436573`, accession `29.100.5`, first of 31), so the match is confirmed from `accessionNumber` on `met_get_object`. Both notes ride the `q` description and the server `instructions`; `q` stays required (Decision #15).
+
+---
+
+### `met_list_objects`
+
+**Purpose:** Browse the collection without a keyword — every object ID in one curatorial department, every object whose record was created or revised on or after a date, or both. Chain to `met_get_object` for full records.
+
+**Upstream endpoint:** `GET /v1/objects?[departmentIds=…]&[metadataDate=…]` — one request per filter set, sorted and cached; pages are sliced locally
+
+**Input schema** (describes abbreviated; the definition file carries the full text):
+
+```ts
+// inputAliases: { metadataDate: 'updatedSince' } — the Met API's name for the same filter
+z.object({
+  departmentId: z.number().int().min(1).optional()
+    .describe('One curatorial department; valid IDs come from met_list_departments, and an unknown ID is rejected (invalid_department).'),
+  updatedSince: blankAsUnset(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional())
+    .describe('Objects whose record was created or revised on or after this date, the day itself included, as YYYY-MM-DD with no time part. It compares the UTC date of each record\'s metadataDate, which met_get_object returns. A date later than the newest update returns an empty list, not an error.'),
+  limit: z.number().int().min(1).default(20) // no maximum; .max(500) under MET_CLAMP_LIMITS=false (Decision #24)
+    .describe('Page size, at most 500 IDs; a larger value reads a 500-ID page and the notice says so (Decision #24).'),
+  offset: z.number().int().min(0).default(0)
+    .describe('Zero-based index of the first ID; pass nextOffset to continue. Every ID is reachable; an offset at or past total returns an empty page, not an error.'),
+})
+```
+
+**Output schema:**
+
+```ts
+z.object({
+  total: z.number().int()
+    .describe('Objects matching the filters. Paging reaches every one — there is no 10,000 window here.'),
+  objectIDs: z.array(z.number().int())
+    .describe('Object IDs for this page in ascending order, up to `limit` results and never more than 500.'),
+  returned: z.number().int()
+    .describe('Count of object IDs in this page.'),
+  offset: z.number().int()
+    .describe('The resolved offset. At or beyond a nonzero total the page is empty because the offset ran past the list.'),
+  remaining: z.number().int()
+    .describe('IDs after this page: total − (offset + returned), floored at 0.'),
+  truncated: z.boolean()
+    .describe('True when IDs remain after this page: offset + returned < total.'),
+  nextOffset: z.number().int().nullable()
+    .describe('The offset to pass on the next call, or null when this page ends the list.'),
+})
+// enrichment: {
+//   notice?: string — total 0: the filters that matched nothing and how to widen the list; limit above 500
+//                     with IDs remaining past the page: the page was read with limit 500, continue from
+//                     nextOffset (Decision #24). The two never apply together.
+//   effectiveQuery?: string — every success: the filters as sent (updatedSince after its clamp to 1753-01-01),
+//                     `name=` + JSON-encoded value (`departmentId=10, updatedSince="2026-09-01"`), or
+//                     `no filter (whole collection)` — a blank updatedSince, read as unset, included.
+// }
+```
+
+**Error contract:**
+
+```ts
+errors: [
+  {
+    reason: 'invalid_department',
+    code: JsonRpcErrorCode.ValidationError,
+    when: 'departmentId is provided but is not one of the Met department IDs.',
+    recovery: 'Call met_list_departments to get valid department IDs, then retry with one of the returned IDs.',
+  },
+  {
+    reason: 'invalid_date',
+    code: JsonRpcErrorCode.ValidationError,
+    when: 'updatedSince has the YYYY-MM-DD shape but names no calendar day, such as 2026-02-30.',
+    recovery: 'Pass updatedSince as a real calendar date in YYYY-MM-DD form, such as 2026-09-01.',
+  },
+  {
+    reason: 'upstream_blocked',
+    code: JsonRpcErrorCode.ServiceUnavailable,
+    retryable: false,
+    thrownBy: 'service', // Decision #19
+    when: "The Met API's firewall refused the request with HTTP 403 — it blocks this server's address, not one endpoint.",
+    recovery: 'Wait several minutes before retrying, and send fewer requests.',
+  },
+  {
+    reason: 'upstream_unavailable',
+    code: JsonRpcErrorCode.ServiceUnavailable,
+    thrownBy: 'service', // Decision #20
+    when: 'The Met API answered HTTP 500, 502, 503, or 504 to the department lookup or the ID list until the retry ladder ran out — an outage on its side.',
+    recovery: 'The Met API is failing on its side, so changing the request will not help. Wait a few minutes before retrying.',
+  },
+  {
+    reason: 'upstream_rate_limited',
+    code: JsonRpcErrorCode.RateLimited,
+    thrownBy: 'service', // Decision #23
+    when: "The Met API answered HTTP 429 to the department lookup or the ID list until the retry ladder ran out, or asked for a wait longer than the ladder or the call's time budget allows — it throttles this server's address, not one filter.",
+    recovery: 'Wait the period this error names, or about a minute when it names none, then retry with fewer requests at once.',
+  },
+  {
+    reason: 'retry_deadline_exceeded',
+    code: JsonRpcErrorCode.Timeout,
+    thrownBy: 'service', // Decision #18
+    when: "The call's time budget ran out, retries and backoff included, before the Met API returned a successful response to the department lookup or the ID list.",
+    recovery: "The call's time budget ran out before the Met API returned a successful response, retries included. Retry after a short wait; if it keeps happening, the Met API is likely down or overloaded.",
+  },
+]
+```
+
+**Format markers:** `content[]` marks the page `(truncated)` when IDs remain after it, `(offset beyond result set)` when `offset` is nonzero and at or past `total` — an empty list read from offset 50 included — and `(complete)` otherwise, including an empty list read from offset 0, whose `notice` says why it is empty.
+
+**Annotations:** `{ readOnlyHint: true, idempotentHint: true }`
+
+**Implementation notes:**
+- `departmentId` is checked against the cached department set (`getValidDepartmentIds()`) before any `/v1/objects` request: upstream answers an unknown department with an empty list, indistinguishable from a real department with nothing to show.
+- `updatedSince` is shape-checked by the schema — a time part or any other date format is rejected there — and calendar-checked in the handler (`2026-02-30` → `invalid_date`). A future date is not an error; it returns `total: 0` with the notice. A blank value from a form client is read as unset (`blankAsUnset`), but the advertised pattern still rejects `""`, so the description does not offer it.
+- `metadataDate` filters nothing before `1753-01-01` (`METADATA_DATE_FLOOR`): any earlier date answers `total: 0`, and the floor itself answers the whole collection. The handler sends an earlier `updatedSince` as the floor, after the calendar check, so the clamped date is both the URL parameter and the cache key — every pre-1753 date shares the floor's cached list. A date on or after the floor is sent unchanged. An empty list for a date at or before the floor gets a notice saying that date already covers every record and pointing to `departmentId` (or, with none set, saying the Met returned nothing for the collection), never to an earlier date.
+- An empty list arrives as `objectIDs: []`; a `null` in its place is read the same way rather than failing the load.
+- `/v1/objects` returns the whole ID set in a different order on every call, so the service sorts each list ascending into an `Int32Array` and slices every page from it. That gives a stable order across pages and no depth limit.
+- Sorted lists are cached per `departmentId` + `updatedSince` for one hour, bounded to 16 MiB of retained `Int32Array` bytes with least-recently-used eviction. A list larger than the whole bound is returned but not retained.
+- Concurrent callers of one filter set share one in-flight load. The load runs under its own `MET_CALL_DEADLINE_MS` budget and a signal no caller owns, so a caller that cancels or runs out of budget ends alone while the load finishes for the rest. A failed load fails every waiting caller and is not cached. A caller whose signal has already aborted starts no load, so every load has a caller attached and none can reject unobserved.
+- One call deadline (Decision #18) covers both the department lookup and the list request.
+
+---
+
+### `met_get_object`
+
+**Purpose:** Fetch full records for one or more object IDs. Batch-fetches up to 20 distinct IDs per call with concurrency limiting and partial-success, and accepts a full 500-ID page, returning the distinct IDs past the first 20 unrequested in `remainingIDs` — the intended follow-on to `met_search_collections` and `met_list_objects`.
+
+**Upstream endpoint:** `GET /v1/objects/{id}` (per ID)
+
+**Input schema:**
+
+```ts
+z.object({
+  objectIDs: z.array(z.number().int().positive()).min(1).max(500)
+    .describe('One or more Met object IDs to fetch, up to 500 — a full met_search_collections or met_list_objects page. A repeated ID is fetched and returned once, at its first position. The first 20 distinct IDs are fetched; the rest come back unrequested in remainingIDs. Partial failures are reported per ID rather than failing the whole batch.'),
+  includeImages: z.boolean().default(false)
+    .describe('Also attach the web-display image (primaryImageSmall, about 600 px on the long edge) of the first 3 returned records that have hasCC0Image true, in request order, as image blocks in content[], each after a caption naming its objectID. images[] reports what happened for every returned record. The image bytes ride content[] only, so a client that hands the model only structuredContent will not show the images. Default false: no image is fetched.'),
+})
+```
+
+**Output schema:**
+
+```ts
+z.object({
+  objects: z.array(z.object({
+    objectID: z.number().int()
+      .describe('Unique Met object identifier.'),
+    title: z.string()
+      .describe('Object title as catalogued.'),
+    isPublicDomain: z.boolean()
+      .describe('True when the object is released under CC0 open access. Only true objects return usable image URLs.'),
+    hasCC0Image: z.boolean()
+      .describe('True when a CC0 open-access image URL is available (primaryImage is non-empty). Distinct from met_search_collections\'s hasImages filter, which matches objects that have any image including copyrighted works.'),
+    primaryImage: z.string()
+      .describe('Full-resolution image URL (CC0 objects only; empty string for non-public-domain works).'),
+    primaryImageSmall: z.string()
+      .describe('Web-display image URL (about 600 px on the long edge; CC0 objects only; empty string for non-public-domain works).'),
+    additionalImages: z.array(z.string())
+      .describe('Additional image URLs (detail shots, alternate views). CC0 objects only.'),
+    objectURL: z.string()
+      .describe('Canonical metmuseum.org page URL for human follow-up.'),
+    department: z.string()
+      .describe('Curatorial department as the record names it (e.g., "European Paintings", "Egyptian Art"). Five departments carry a different name on their records than in met_list_departments — "The American Wing", "The Michael C. Rockefeller Wing", "Costume Institute", "Robert Lehman Collection", "Modern and Contemporary Art" — so match departments by departmentId, not by name.'),
+    departmentId: z.number().int().nullable()
+      .describe('The department\'s numeric ID, resolved from department, for the departmentId filter of met_list_objects and met_search_collections. Null when the record\'s department name was not recognized — never a guess.'),
+    objectName: z.string()
+      .describe('The kind of object, as the Met names it (e.g., "Painting", "Statuette"). It need not echo the medium value met_search_collections matched: a "Watercolors" match can be a "Drawing".'),
+    classification: z.string()
+      .describe('The Met\'s classification category (e.g., "Paintings", "Ceramics"), empty on some records. Not what the medium filter of met_search_collections matches: a "Watercolors" match can be classified "Drawings", and a "Paintings" match can carry no classification.'),
+    isHighlight: z.boolean()
+      .describe('True when the Met designates this a collection highlight.'),
+    isTimelineWork: z.boolean()
+      .describe('True when the work appears in the Met\'s art timeline.'),
+    artistPrefix: z.string()
+      .describe('Qualifier the Met places before artistDisplayName (e.g., "Style of", "Workshop of", "Attributed to", "Published by"). Read the two together: "Style of" with "Rembrandt" is a work in Rembrandt\'s style, not one by him. Empty when the attribution is unqualified.'),
+    artistDisplayName: z.string()
+      .describe('Name of the person or firm the attribution names (e.g., "Vincent van Gogh"), without the qualifier in artistPrefix or the text in artistSuffix — read those and artistRole with it. Pass it as q to met_search_collections with matchField "artistOrCulture" to find other works attributed to this name, qualified attributions such as "Style of" included; that match reads the lead attribution and the culture field, not every name in constituents. Empty for anonymous or unknown works.'),
+    artistSuffix: z.string()
+      .describe('Text the Met places after artistDisplayName (e.g., "(r. 1876–1909)", ", Paris", "(?)"). Empty when the Met records none.'),
+    artistRole: z.string()
+      .describe('The named person\'s role for this object (e.g., "Artist", "Maker", "Publisher", "Patron") — a patron or publisher is not the maker. Empty when the record names no one.'),
+    artistDisplayBio: z.string()
+      .describe('Artist biographical summary including nationality, birth/death place and year (e.g., "Dutch, Zundert 1853–1890 Auvers-sur-Oise"). Empty for anonymous works.'),
+    artistNationality: z.string()
+      .describe('Artist\'s nationality (e.g., "Dutch", "French"). Empty for anonymous works.'),
+    artistBeginDate: z.string()
+      .describe('Birth year of the person artistDisplayName names, or a firm\'s founding year, as a string (e.g., "1853") — that person\'s even when artistPrefix qualifies the attribution. Occasionally a full date (e.g., "1928-01-10"). Empty for anonymous works.'),
+    artistEndDate: z.string()
+      .describe('Death year of the person artistDisplayName names, or a firm\'s closing year, as a string (e.g., "1890") — that person\'s even when artistPrefix qualifies the attribution. Occasionally a full date (e.g., "1928-01-10"). Empty for a living artist, a firm still active, or an anonymous work.'),
+    constituents: z.array(z.object({
+      constituentID: z.number().int()
+        .describe('The Met\'s identifier for the constituent.'),
+      role: z.string()
+        .describe('Role in relation to the object (e.g., "Artist", "Maker", "Designer").'),
+      name: z.string()
+        .describe('Constituent display name.'),
+      constituentULAN_URL: z.string()
+        .describe('Getty ULAN (Union List of Artist Names) URL for the constituent. Empty when no ULAN record exists.'),
+      constituentWikidata_URL: z.string()
+        .describe('Wikidata entity URL for the constituent. Useful for enrichment via wikidata-mcp-server. Empty when no Wikidata record exists.'),
+      gender: z.string()
+        .describe('Gender of the constituent. Usually empty string — sparsely populated in the Met catalogue.'),
+    })).nullable()
+      .describe('All persons associated with the object. Null for anonymous or unknown attribution.'),
+    objectDate: z.string()
+      .describe('Human-readable date string (e.g., "1887", "ca. 1295–1294 B.C.", "1700–1800").'),
+    objectBeginDate: z.number().int().nullable()
+      .describe('Earliest date as an integer year (negative = BCE). Null when the Met has no machine-readable date for the work — read objectDate for what is known instead, and do not treat null as year zero or substitute a default.'),
+    objectEndDate: z.number().int().nullable()
+      .describe('Latest date as an integer year (negative = BCE). Null under the same condition as objectBeginDate — the two are null together.'),
+    medium: z.string()
+      .describe('Materials and techniques (e.g., "Oil on canvas", "Bronze", "Limestone").'),
+    dimensions: z.string()
+      .describe('Dimensions as a formatted string (e.g., "16 x 12 1/2 in. (40.6 x 31.8 cm)").'),
+    culture: z.string()
+      .describe('Cultural origin when not attributed to an individual (e.g., "Japanese", "Roman"). Often empty for Western art with named artists.'),
+    period: z.string()
+      .describe('Historical period (e.g., "New Kingdom, Ramesside", "Meiji period"). Often empty.'),
+    dynasty: z.string()
+      .describe('Dynasty for applicable cultures (e.g., "Dynasty 19"). Often empty.'),
+    reign: z.string()
+      .describe('Reign the object dates to, for applicable cultures (e.g., "Joint reign of Hatshepsut and Thutmose III"). Often empty.'),
+    portfolio: z.string()
+      .describe('Print series or portfolio the object belongs to, with its plate or number (e.g., "Birds of America, plate LXXI"). Often empty.'),
+    accessionNumber: z.string()
+      .describe('The Met\'s accession number for the object.'),
+    accessionYear: z.string()
+      .describe('Year the Met acquired the object, as sent (e.g., "1960") — occasionally a full date (e.g., "2005-02-15"). Can differ from the year in creditLine. Empty when the Met records none.'),
+    creditLine: z.string()
+      .describe('Provenance and gift/bequest attribution.'),
+    rightsAndReproduction: z.string()
+      .describe('Rights holder and reproduction notice (e.g., "© 2026 Pollock-Krasner Foundation / Artists Rights Society (ARS), New York"). Most copyrighted records carry none, so an empty value does not make a work free to reuse — isPublicDomain decides that.'),
+    country: z.string()
+      .describe('Country of origin. Often empty.'),
+    region: z.string()
+      .describe('Geographic region of origin. Often empty.'),
+    geography: z.object({
+      geographyType: z.string()
+        .describe('How the object relates to the place (e.g., "From", "Original", "Probably originally from"). Empty when the Met records no findspot.'),
+      city: z.string()
+        .describe('City of origin or findspot (e.g., "Damascus", "Constantinople (?)", "Springfield"). The most widely populated field of this block outside the archaeological departments; empty when the Met records no city.'),
+      state: z.string()
+        .describe('State or province of origin (e.g., "Massachusetts"). Sparse, and concentrated in departments that catalogue a manufacturing place. Empty when the Met records none.'),
+      county: z.string().describe('County of origin. Empty on nearly every record.'),
+      subregion: z.string()
+        .describe('Sub-region or site within the region (e.g., "Saqqara", "Deir el-Bahri"). Commonly populated for archaeological departments, empty elsewhere.'),
+      locale: z.string()
+        .describe('Named place within the site (e.g., "Late Period cemetery, Tomb of Harkhebit"). Excavated objects only.'),
+      locus: z.string()
+        .describe('Specific findspot within the locale (e.g., "burial chamber"). Excavated objects only.'),
+      excavation: z.string()
+        .describe('Excavation that recovered the object (e.g., "MMA excavations, 1928-29"). Excavated objects only.'),
+      river: z.string().describe('Associated river. Empty on nearly every record.'),
+    }).describe('Findspot detail beyond the top-level country and region, which are not repeated here. Every field is an empty string when the Met records nothing; population concentrates in the archaeological departments.'),
+    measurements: z.array(z.object({
+      elementName: z.string()
+        .describe('Which part of the object was measured (e.g., "Overall", "Other", "Length").'),
+      elementDescription: z.string()
+        .describe('Qualifier distinguishing this element from a sibling with the same name (e.g., "Print" vs "Negativ"). Empty when the Met records none.'),
+      elementMeasurements: z.record(z.string(), z.number()) // key: axis ("Height", "Width", …); value: centimeters for spatial axes, kilograms for weight
+        .describe('Measured axes for this element. Which keys are present varies element to element, so read the keys rather than assuming a fixed set. Empty object when the Met records no values.'),
+    })).nullable()
+      .describe('Structured element measurements — the numeric counterpart to the formatted dimensions string. Null when the Met records none.'),
+    tags: z.array(z.object({
+      term: z.string()
+        .describe('Tag label (e.g., "Men", "Self-portraits", "Flowers").'),
+      AAT_URL: z.string()
+        .describe('Getty Art & Architecture Thesaurus URL for the term.'),
+      Wikidata_URL: z.string()
+        .describe('Wikidata entity URL for the term. Useful for enrichment.'),
+    })).nullable()
+      .describe('Controlled vocabulary tags applied to the object. Null when no tags assigned.'),
+    objectWikidata_URL: z.string()
+      .describe('Wikidata entity URL for the object itself. Enables enrichment via wikidata-mcp-server.'),
+    GalleryNumber: z.string()
+      .describe('Gallery room number at the museum. Empty string for objects not currently on display.'),
+    metadataDate: z.string()
+      .describe('When the Met last created or revised this record: an ISO 8601 UTC timestamp, as sent (e.g., "2026-10-01T04:59:29.693Z"; fractional seconds run from none to three digits). Its UTC date is what met_list_objects updatedSince compares, that day included. Empty when the Met sends none.'),
+  })).describe('Successfully fetched objects.'),
+
+  failed: z.array(z.object({
+    objectID: z.number().int()
+      .describe('Object ID that could not be fetched.'),
+    error: z.string()
+      .describe('Error detail and suggested recovery action.'),
+  })).describe('Object IDs that failed to fetch with per-ID error context.'),
+
+  remainingIDs: z.array(z.number().int()).optional()
+    .describe('The distinct object IDs past the first 20, in request order. These were not requested; they are separate from the failed[] entries an upstream block, throttle, or outage left unrequested, which fall within the first 20. Re-call met_get_object with them. Absent when the call held 20 or fewer distinct IDs.'),
+
+  images: z.array(z.object({
+    objectID: z.number().int()
+      .describe('Object ID of a returned record.'),
+    status: z.enum(['attached', 'no_cc0_image', 'over_cap', 'unavailable'])
+      .describe('attached: the image rides content[], after a caption naming the objectID. no_cc0_image: the record has no CC0 image, so nothing was fetched. over_cap: 3 earlier CC0 records took the image slots — request this ID among the first 3 CC0 records of another call to see its image. unavailable: the image host returned no image in time, or the URL was not on the Met image host.'),
+  })).optional()
+    .describe('Image outcome for each record in objects[], in request order; failed[] and remainingIDs get no entry. Present only when includeImages is true.'),
+})
+```
+
+**Enrichment block:**
+
+```ts
+enrichment: {
+  notice: z.string().optional()
+    .describe('Present when the call held more than 20 distinct object IDs: it says how many distinct IDs the call held and that the ones past the first 20 are in remainingIDs, not requested.'),
+}
+```
+
+**Error contract:**
+
+```ts
+errors: [
+  {
+    reason: 'all_not_found',
+    code: JsonRpcErrorCode.NotFound,
+    when: 'Every requested objectID returned a 404 — all IDs are stale or invalid.',
+    recovery: 'The search index can carry IDs the object endpoint no longer serves, so searching again returns the same IDs. Drop these IDs rather than re-checking them with met_search_collections.',
+    severity: 'notice',
+  },
+  {
+    reason: 'all_failed',
+    code: JsonRpcErrorCode.ServiceUnavailable,
+    when: 'No object was fetched, no failure was a firewall block, an HTTP 429 rate limit, or a 500/502/503/504 outage, and the failures were neither all 404s nor all time-budget expiries — network errors, other HTTP errors, or 404s beside expiries.',
+    recovery: 'Retry after a brief delay. If one ID keeps failing across retries, drop it from the batch.',
+  },
+  {
+    reason: 'upstream_blocked',
+    code: JsonRpcErrorCode.ServiceUnavailable,
+    retryable: false,
+    // Raised by the handler with ctx.fail once the batch fetched nothing — Decision #19
+    when: "No object was fetched and the Met API's firewall refused requests with HTTP 403 — it blocks this server's address, not one object.",
+    recovery: 'Wait several minutes before retrying, and send fewer requests.',
+  },
+  {
+    reason: 'upstream_rate_limited',
+    code: JsonRpcErrorCode.RateLimited,
+    // Raised by the handler with ctx.fail once the batch fetched nothing — Decision #23
+    when: "No object was fetched and the Met API answered HTTP 429 until a fetch's retries ran out, or asked for a wait longer than the retries or the call's time budget allow — it throttles this server's address, not one object.",
+    recovery: 'Wait the period this error names, or about a minute when it names none, then retry with fewer requests at once.',
+  },
+  {
+    reason: 'upstream_unavailable',
+    code: JsonRpcErrorCode.ServiceUnavailable,
+    // Raised by the handler with ctx.fail once the batch fetched nothing — Decision #20
+    when: "No object was fetched and a fetch exhausted its retries on HTTP 500, 502, 503, or 504 — an outage on the Met API's side, not a problem with the IDs.",
+    recovery: 'The Met API is failing on its side, so changing the request will not help. Wait a few minutes before retrying.',
+  },
+  {
+    reason: 'retry_deadline_exceeded',
+    code: JsonRpcErrorCode.Timeout,
+    // Raised by the handler with ctx.fail — Decision #18
+    when: "No object was fetched and every fetch ran out of the call's time budget, retries and backoff included — an ID whose fetch would have started after the budget was spent counts too.",
+    recovery: "The call's time budget ran out before the Met API returned a successful response, retries included. Retry after a short wait; if it keeps happening, the Met API is likely down or overloaded.",
+  },
+]
+```
+
+**Annotations:** `{ readOnlyHint: true, idempotentHint: true }`
+
+**Implementation notes:**
+- A fixed pool of workers (default 5, configurable via `MET_BATCH_CONCURRENCY`) drains the IDs; each fetch runs in its own `try`/`catch`, so one 404 or failed fetch becomes that ID's outcome instead of failing the batch.
+- A 404 from the API returns `{"message":"ObjectID not found"}` with HTTP 404 — classify as a per-item failure in `failed[]`, not a tool-level throw.
+- `/v1.1/search` indexes IDs the object endpoint does not serve: `q=*` totals about 536,265 while `/v1/objects` lists about 502,886, and object `706047`, returned by a department-16 search, answers 404 (2026-10-04). Running the search again returns the same IDs, so neither the per-ID not-found text nor the `all_not_found` recovery sends the caller back to `met_search_collections` to verify an ID: both say the search index can still list it and to drop it.
+- Non-public-domain objects (`isPublicDomain: false`) return empty strings for `primaryImage`, `primaryImageSmall`, and `additionalImages` — normalize and derive `hasCC0Image: Boolean(primaryImage)`.
+- `constituents` and `tags` are `null` on the wire for anonymous/untagged objects — pass through as nullable; don't coerce to `[]`.
+- Inside a populated `tags[]`, `AAT_URL` and `Wikidata_URL` are themselves nullable on the wire (a term with no Getty/Wikidata record) — normalize each item's URLs to `''`, matching every other absent string. `constituents[]` sub-fields send `''` and need no per-item guard, but `name` alone arrives entity-encoded (`Tiffany &amp; Co.` on object `20121`, whose `artistDisplayName` reads `Tiffany & Co.`; `World&#39;s Views Series` on `288322`). Each item's `name` is decoded with `decodeHtmlEntities` (`src/utils/html-entities.ts`): one left-to-right pass over the five predefined names and decimal/hex numeric references, refusing U+0000, control characters, surrogates, and code points past U+10FFFF; everything else stays literal. `escapeMarkdown` escapes the decoded text again in `content[]`.
+- `objectBeginDate`/`objectEndDate` are `0`/`0` when the Met has no machine-readable date. The Met's date model skips year zero (object `250240` encodes "1st century BCE" as `-100` to `-1`), so zero is never a real year and is free to carry the sentinel. Normalize that pair to `null`/`null` and render `objectDate` alone in `content[]`; a single zero bound is left as sent.
+- `artistEndDate` carries `9999` for a maker still living or active (object `20121`, "1837–present") and occasionally another future year (object `79199`, `2112`). No death or closing year lies in the future, so a bare integer later than the current UTC year normalizes to `''`, the field's documented empty value; a year up to the current one and a full date (`2005-08-01`) pass through. `artistBeginDate` is left as sent. `content[]` renders a range with one bound open (`1837–`, `–1890`) and `—` only when both are empty.
+- The attribution arrives in four flat fields: `artistPrefix` (`Style of`, `Published by`), `artistDisplayName`, `artistSuffix` (`(r. 1876–1909)`, `, Paris`), and `artistRole` (`Patron`, `Publisher`). Each is free text, `''` when absent, kept raw on the record; `artistDisplayName` stays the bare name and `constituents[].name` stays as sent (the Met writes the prefix into it, not the suffix). `content[]` joins them on the Artist line: the trimmed prefix and name with a space, the trimmed suffix directly after a leading comma and after a space otherwise, the bio in parentheses as before, then ` | **Artist role:** <role>` — `**Artist:** Style of Rembrandt (Dutch, ca. 1655) | **Artist role:** Artist` for `437403`, `**Artist:** Sultan Abdülhamid II (r. 1876–1909) | **Artist role:** Patron` for `456947`. The Artist dates line is unchanged: `artistBeginDate`/`artistEndDate` belong to the person `artistDisplayName` names (Rembrandt's 1606–1669 on the "Style of" work), which their descriptions say. In the Open Access CSV, 23% of records with an artist carry a prefix on their first-listed constituent, 2.3% a suffix, and 42% a role other than `Artist`.
+- `rightsAndReproduction` (free text, so italic-stripped like other prose), `metadataDate`, and `accessionYear` pass through as strings, `''` when absent. The rights line names the holder of a copyrighted work (`488978`: `© 2026 Pollock-Krasner Foundation / Artists Rights Society (ARS), New York`); most non-public-domain records carry none, so an empty value is not a reuse grant. `metadataDate` is an ISO 8601 UTC timestamp sent as is — its fraction runs from none (`2025-03-06T04:54:30Z`) to three digits — and its UTC date is what `met_list_objects` `updatedSince` (`/v1/objects` `metadataDate`) compares, that day included, which the `updatedSince` description says. `accessionYear` is a year on nearly every record, a full date on a few (`286850`: `2005-02-15`), and on 18% of CSV records the credit line names a different year or none (`437403`: credit `…Timken, 1959`, `accessionYear` `1960`); neither date is reformatted. `content[]` renders `**Accession:** <number> | **Accession year:** <year>`, then Credit, `**Rights:**`, and `**Metadata date:**` lines, each `—` when empty.
+- `reign` and `portfolio` are free text like `period` and `dynasty` (italic-stripped, `''` when absent), and `content[]` renders them as `**Reign:**` and `**Portfolio:**` lines after Dynasty, `—` when empty. Both are sparse: in a 32-record sample (2026-10-15), `reign` was set on 3, all Egyptian Art (`544442`: `Joint reign of Hatshepsut and Thutmose III`), and `portfolio` on 1 (`383857`: `Birds of America, plate LXXI`), a series grouping the record otherwise carries only inside its title.
+- `departmentId` is resolved from `department` through a static exact-match map (`DEPARTMENT_ID_BY_NAME`): the 19 `met_list_departments` names plus the five names records carry instead (see the table under `met_list_departments`). A name the map does not hold, an empty one included, resolves to `null`, never a guess and never `0`: a `0` reads as an ID a caller can pass on, and fails `met_list_objects` input validation (`min(1)`) instead of saying the name was not recognized. Reading the 19 `/v1/objects?departmentIds=` lists would be exact without a map, but costs 19 requests per cache window, close to the burst that has drawn the firewall block (Decision #19). `content[]` renders `**departmentId:** <id>` on the Department line, `—` for `null`.
+- Free-text fields can carry raw `<i>…</i>` pairs marking foreign terms (object `21814`'s title: `Sword guard (<i>Tsuba</i>) …`). The exact `<i>` and `</i>` tokens, either case, are removed from every free-text string of the record — URL-shaped fields, `accessionNumber`, `accessionYear`, `metadataDate`, `GalleryNumber`, and the artist date bounds excepted. Both surfaces are plain text and Markdown, never HTML, so this is presentation cleanup, not sanitization: any other `<` text stays literal and is escaped at render, and a value with no token is unchanged. For `constituents[].name` the entity decode runs first: the name arrives encoded as a whole, markup included, so its `<i>` pair reaches the server as `&lt;i&gt;` and is stripped once decoded.
+- Upstream catalog text is escaped at the `content[]` render boundary — real titles carry complete Markdown sequences. `structuredContent` keeps the raw value. Every field but `dimensions` goes through `escapeMarkdown` (`src/utils/markdown.ts`), which collapses a line break to a space (a hard break would end the `##` title heading or split a `|`-, `;`-, or `,`-joined line), then escapes the one remaining line with the framework's `escapeMarkdownInline`, so a CommonMark parse reads the collapsed value back exactly: edge spaces go out as `&#32;`, so a trailing run never ends a field's line in a hard break, and an entity-shaped `&` is escaped, so `&amp;` reads back as typed. **2026-11-14:** `escapeMarkdown` kept its own escape set until then, which left both of those through. `dimensions` goes through the framework's `escapeMarkdownInline` (`@cyanheads/mcp-ts-core/utils`), which writes each line break as a hard break (`\` + LF) and escapes a block marker that opens a later line, so a multi-part value keeps one line per part inside the record's paragraph. **2026-11-14:** `dimensions` collapsed like every other field until then, the choice of issue #18, made to keep `#`, `>`, `-`, `+` off a line start; that ran multi-part values (`Image:` / `Mount:` on `285835`, `Sheet:` / `Plate:` / `Image:` on `742412`) together on one line while `structuredContent` kept the breaks. The framework escaper keeps the breaks and still escapes those markers.
+- The nine URL-shaped fields (`objectURL`, `primaryImage`, `primaryImageSmall`, `additionalImages[]`, `objectWikidata_URL`, `tags[].AAT_URL`, `tags[].Wikidata_URL`, `constituents[].constituentULAN_URL`, `constituents[].constituentWikidata_URL`) are free catalog text, not identifiers — object `288322` sends `(not assigned)` in a constituent's ULAN field. Validate each with `isHttpUrl` before rendering: an `http`/`https` value becomes a link destination unescaped, anything else renders through the prose escaper. Escaping a destination is not an option — a backslash inside one breaks the link.
+- The nine findspot fields beyond `country`/`region` ship as a nested `geography` block, each defaulting to `''` when absent (see Decision #7). `country` and `region` stay top-level and are not duplicated into the block.
+- `measurements` is `null` on the wire when the Met records none — pass through as nullable like `tags`/`constituents`. Within a populated array, `elementDescription` is itself nullable on the wire (object `544683`'s `Overall` element) and normalizes to `''`; `elementMeasurements` is an open `Record<string, number>` because sibling elements of one record carry different axis keys, and its keys are upstream text, so `format()` escapes them alongside the element name and description.
+- Every record fetched among the first 20 distinct IDs is returned whole, in request order (see Decision #12), so the 20-ID cap is what bounds a response. The 20-record page Decision #12 measures came to 66,563 bytes of `structuredContent` and 44,981 of `content[]` text; twenty of the heaviest record sampled (`288322`, 7,438 bytes) would come to about 149 KB of `structuredContent`.
+- `includeImages` (default `false`) runs after the record fetches settle (Decision #22). Among the returned records, in request order, the first 3 with `hasCC0Image: true` have `primaryImageSmall` fetched by `MetService.fetchImage()`; each one that arrives becomes a text block `Image of object <objectID> (primaryImageSmall)` followed by `ctx.content.image(data, mimeType)`, emitted after all three settle so `content[]` keeps request order. `images[]` gives every returned record `attached`, `no_cc0_image`, `over_cap`, or `unavailable`, rendered as `## Images` after the failed and over-cap sections; failed and over-cap IDs get no entry. A fetch that fails still spends its slot. Off, nothing is fetched and the response carries no `images` field and no caption or image block.
+- `objectIDs` is de-duplicated before fetching, first occurrence keeping its position (see Decision #13), so a repeated ID is fetched once and appears in exactly one of `objects[]`/`failed[]`/`remainingIDs`.
+- The first 20 distinct IDs are the call's requested IDs; the rest go to `remainingIDs` in request order, before any fetch, so the partition never depends on the upstream (Decision #24). Everything else in this list — the worker queue, the 403/429/5xx skips, image slots — runs on the 20 alone. The notice reads "Requested the first 20 of 25 distinct object IDs, the per-call cap; the other 5 are in remainingIDs and were not requested. Re-call met_get_object with them.", the whole notice, and `content[]` renders `## Over the per-call cap — not requested` with the IDs after the failed section. A batch that throws returns no `remainingIDs`: its message counts only the requested IDs and ends "The other 5 of 25 distinct object IDs, past the per-call cap of 20, were not requested."
+- Every fetch in a call shares one `MET_CALL_DEADLINE_MS` budget (Decision #18). An ID whose fetch runs out of it, or starts after it is spent, lands in `failed[]`; when that is every ID, the call throws `retry_deadline_exceeded`. A caller cancellation ends the call as cancelled rather than as a partial success.
+- A `failed[]` entry is the failure's message and its recovery, with one period between them. An `upstream_blocked` entry carries that reason's recovery instead of "Retry after a brief delay", and once one ID is blocked the IDs not yet started fail with it and send no request (Decision #19).
+- An `upstream_unavailable` entry (a ladder that ended on HTTP 500/502/503/504) likewise carries that reason's recovery. Once one ID's ladder ends that way, the IDs not yet started wait for every fetch still in flight; if the Met has then answered no ID in the call — no record, no 404 — they fail with the outage and send no request, so a 5xx outage costs at most `MET_BATCH_CONCURRENCY` × 4 requests (20 at the default) however many IDs were asked for. A ladder whose last attempt timed out or was reset carries no status and engages no skip; the call deadline bounds that case. Any answer turns the skip off, one that lands after the first ladder ended included, since the 5xx may then belong to one record (Decision #20).
+- An `upstream_rate_limited` entry (a ladder that ended on HTTP 429, a `Retry-After` too long to wait included) carries that reason's recovery, and its message names the wait the Met asked for. Once one ID's ladder ends that way, the IDs not yet started fail with it and send no request, as after a 403: a throttle covers the server's address, never one record. With a long `Retry-After` each first-wave ladder is one request, so a throttled batch costs at most `MET_BATCH_CONCURRENCY` requests (5 at the default); without one, `MET_BATCH_CONCURRENCY` × 4 (20) (Decision #23). A ladder the call's budget cuts after 429 answers still ends as `retry_deadline_exceeded`, and the IDs not yet started then fail as expiries without a request.
+- When nothing was fetched, the call throws in this order: `all_not_found` (every ID a 404), `upstream_blocked` (any 403), `upstream_rate_limited` (any 429-ended ladder), `retry_deadline_exceeded` (every ID ran out of budget), `upstream_unavailable` (any 5xx outage), then `all_failed`. `upstream_rate_limited` and `upstream_unavailable` carry the first such failure's `status` and `retryAfter`.
+- `GalleryNumber` is `""` (not null) when off display — preserve as-is; an empty string is meaningful ("not on display").
+
+---
+
+### `met_list_departments`
+
+**Purpose:** Return the 19 curatorial departments with their numeric IDs and display names. Use to discover valid `departmentId` values before calling `met_search_collections` or `met_list_objects`.
+
+**Upstream endpoint:** `GET /v1/departments`
+
+**Input schema:** None (no parameters).
+
+**Output schema:**
+
+```ts
+z.object({
+  departments: z.array(z.object({
+    departmentId: z.number().int()
+      .describe('Numeric department ID for the departmentId parameter of met_search_collections and met_list_objects.'),
+    displayName: z.string()
+      .describe('Human-readable department name (e.g., "European Paintings", "Egyptian Art", "Arms and Armor").'),
+  })).describe('All 19 curatorial departments at The Metropolitan Museum of Art.'),
+})
+```
+
+**Error contract:** No domain failures — the endpoint is static data. Four infrastructure failures are declared, so each carries its recovery; the rest bubble as `ServiceUnavailable`.
+
+```ts
+errors: [
+  {
+    reason: 'upstream_blocked',
+    code: JsonRpcErrorCode.ServiceUnavailable,
+    retryable: false,
+    thrownBy: 'service', // Decision #19
+    when: "The Met API's firewall refused the request with HTTP 403 — it blocks this server's address, not one endpoint.",
+    recovery: 'Wait several minutes before retrying, and send fewer requests.',
+  },
+  {
+    reason: 'upstream_unavailable',
+    code: JsonRpcErrorCode.ServiceUnavailable,
+    thrownBy: 'service', // Decision #20
+    when: 'The Met API answered HTTP 500, 502, 503, or 504 until the retry ladder ran out — an outage on its side.',
+    recovery: 'The Met API is failing on its side, so changing the request will not help. Wait a few minutes before retrying.',
+  },
+  {
+    reason: 'upstream_rate_limited',
+    code: JsonRpcErrorCode.RateLimited,
+    thrownBy: 'service', // Decision #23
+    when: "The Met API answered HTTP 429 until the retry ladder ran out, or asked for a wait longer than the ladder or the call's time budget allows — it throttles this server's address, not one endpoint.",
+    recovery: 'Wait the period this error names, or about a minute when it names none, then retry with fewer requests at once.',
+  },
+  {
+    reason: 'retry_deadline_exceeded',
+    code: JsonRpcErrorCode.Timeout,
+    thrownBy: 'service', // Decision #18
+    when: "The call's time budget ran out, retries and backoff included, before the Met API returned a successful response.",
+    recovery: "The call's time budget ran out before the Met API returned a successful response, retries included. Retry after a short wait; if it keeps happening, the Met API is likely down or overloaded.",
+  },
+]
+```
+
+**Annotations:** `{ readOnlyHint: true, idempotentHint: true }`
+
+**Verified departments (live API, 2026-10-04):**
+
+| ID | Name | Record `department` (object), where it differs |
+|:---|:-----|:-----|
+| 1 | American Decorative Arts | The American Wing (`512`) |
+| 3 | Ancient West Asian Art | |
+| 4 | Arms and Armor | |
+| 5 | Arts of Africa, Oceania, and the Americas | The Michael C. Rockefeller Wing (`307454`) |
+| 6 | Asian Art | |
+| 7 | The Cloisters | |
+| 8 | The Costume Institute | Costume Institute (`100153`) |
+| 9 | Drawings and Prints | |
+| 10 | Egyptian Art | |
+| 11 | European Paintings | |
+| 12 | European Sculpture and Decorative Arts | |
+| 13 | Greek and Roman Art | |
+| 14 | Islamic Art | |
+| 15 | The Robert Lehman Collection | Robert Lehman Collection (`458994`) |
+| 16 | The Libraries | |
+| 17 | Medieval Art | |
+| 18 | Musical Instruments | |
+| 19 | Photographs | |
+| 21 | Modern Art | Modern and Contemporary Art (`488978`) |
+
+Note: ID 20 does not exist — the sequence is not contiguous. Each record name in the third column was read from a live record on that department's `/v1/objects?departmentIds=` list; `met_get_object` resolves all 24 names to `departmentId`.
+
+**Implementation note:** The department list is stable (static catalogue taxonomy). `met_list_departments` fetches it live on each call to remain accurate if the Met reorganizes. `departmentId` validation reads the set of valid IDs through `MetService.getValidDepartmentIds()`, which caches it in memory for one hour.
+
+---
+
+## Domain Mapping
+
+| Noun | Operations | API Endpoint | Tool |
+|:-----|:-----------|:-------------|:-----|
+| Object | search by keyword + filters | `GET /v1.1/search` | `met_search_collections` |
+| Object | list IDs by department and/or update date | `GET /v1/objects` with `departmentIds` and `metadataDate` (inclusive: a record updated on that day is listed, verified live) | `met_list_objects` |
+| Object | fetch by ID (single or batch) | `GET /v1/objects/{id}` | `met_get_object` |
+| Department | list all | `GET /v1/departments` | `met_list_departments` |
+
+---
+
+## Workflow Analysis
+
+**Common chain:** `met_list_departments` (once, to get ID) → `met_search_collections` (get IDs) → `met_get_object` (get records)
+
+**Browse chain:** `met_list_departments` → `met_list_objects` (IDs by department and/or update date) → `met_get_object`
+
+The object fetch is the only multi-upstream-call tool. For a batch of N IDs:
+
+| # | Call | Purpose | Concurrency |
+|:--|:-----|:--------|:------------|
+| 1…N | `GET /v1/objects/{id}` | Fetch full record per ID | Up to `MET_BATCH_CONCURRENCY` in parallel |
+| +1…3 | `GET https://images.metmuseum.org/…` (`includeImages` only) | `primaryImageSmall` of the first 3 returned CC0 records | All at once, after the record fetches settle (Decision #22) |
+
+A fixed pool of workers drains the IDs, each result written at its input position. Successes → `objects[]`. 404s, network errors, a spent call budget, a firewall block, a rate limit, and a 5xx outage → `failed[]`. If `failed` is non-empty but `objects` has results, return partial success. If nothing was fetched, throw, first match winning: `all_not_found` when every ID was a 404, `upstream_blocked` when any fetch met the firewall block, `upstream_rate_limited` when any fetch's ladder ended on HTTP 429, `retry_deadline_exceeded` when every ID ran out of the call's budget, `upstream_unavailable` when any fetch's ladder ended on HTTP 500/502/503/504, and `all_failed` otherwise.
+
+---
+
+## Decisions Log
+
+### 1. Exclude `artistOrCulture` search filter
+
+The Met API documents `artistOrCulture=true` as a flag that restricts keyword matching to artist name and culture fields. Live probing (2026-06-01) showed it returns `{ total: 0, objectIDs: null }` for every tested query — including `Rembrandt`, `Japanese`, `Dutch`, `Egyptian` — regardless of whether those terms clearly match artist or culture records. The baseline `q` query without the flag does return results for the same terms. Conclusion: the parameter is either broken or requires an undocumented query syntax. Excluded from the tool surface to prevent agents from hitting a dead end. If the Met fixes it in a future API version, adding it to `met_search_collections` input is a non-breaking addition. Re-confirmed returning zero results for all tested queries on 2026-06-08, and on `/v1.1/search` on 2026-09-24 and 2026-10-04 (`q=sunflower&artistOrCulture=true` → `{ total: 0, objectIDs: null }`), so it stays out of `matchField` (Decision #4).
+
+**Reversed (2026-11-04): a third `matchField` value.** The `/v1.1` re-checks probed only `q=sunflower`, which no artist or culture carries, so that zero was the right answer. With keywords that do: `q=Rembrandt` → 646, with the flag 372, all among the 646 (with `hasImages=true` as well, 360, all among the 372); `q=Japanese` → 6,558 with the flag; `q=Attic` → 17,420, the first `240180`, which has no artist (`artistDisplayName` empty, `constituents` null) and culture "Greek, Attic". The flag matches the attributed artist, not every constituent: it keeps `437403`, a "Style of" Rembrandt, and drops `742412` (Charles-Albert Waltner, with Rembrandt as Sitter) and `770799` *Head of Rembrandt* (Andrew Geddes). `matchField` gains `"artistOrCulture"`, sent as `artistOrCulture=true`; its description names the attributed-artist rule and points to `artistPrefix` on `met_get_object` for qualified attributions. A value of the enum, not a separate boolean: upstream honors one flag per request, and sent beside `title=true` it answers the `artistOrCulture` set alone (`q=Japanese`: 6,558, the same first 100 IDs in the same order; `title=true` alone → 446), so the one-of enum already expresses the exclusivity. It has no effect on `q=*` (536,643 either way).
+
+### 2. Expose `medium` as a classification filter, not a materials filter
+
+The Met API documents `medium` as a search filter parameter. Live probing showed that passing actual material descriptions ("Oil on canvas", "Watercolor") returns 0 results, but passing classification category names ("Paintings", "Drawings", "Prints", "Ceramics", "Sculpture", "Photographs", "Textiles") returns results correctly. The `medium` parameter maps to the `classification` field on the object, not the `medium` (materials/technique) text field — a naming mismatch in the API. The filter is included in `met_search_collections` with documentation that explains classification values are required.
+
+**Addendum (2026-09-24, `/v1.1/search`).** The match is also case-sensitive and spelling-exact, and the Met's classification names are not uniformly plural: `q=sunflower` with `Paintings` → 11, `Painting` / `paintings` / `Oil on canvas` → 0; `q=horse` with `Sculpture` → 604, `Sculptures` → 0. The `medium` description says so, and the zero-match notice names `medium` with that correction whenever it was among the filters that removed a matching keyword's results (Decision #17). The Met exposes no classification list to validate against, so the value is not checked up front.
+
+**Addendum (2026-11-04).** One classification per call: the `|`-joined form the Met's API docs show (`Quilts|Silk|Bedcovers`) answers 0 on `/v1.1`, raw or `%7C`-encoded (`q=Hokusai`: `Prints` 310, `Paintings` 90, `Prints|Paintings` 0). The description, the server `instructions`, and the zero-match correction say "one" classification and name the `|` form; the schema stays a string, so no call accepted before is refused.
+
+**Addendum (2026-11-14): an object-type grouping, not the `classification` field.** The Met's API docs describe `medium` as returning objects "of the specified medium or object type", and a match's `classification` does not track the value. `q=James M. Hart` with `artistOrCulture`: `Paintings` → 11004, 11006, 11007, 11008, 13454, 12544; `Watercolors` → 11004, 12544; 11004, 11006, and 12544 carry `classification` "". `q=*` with `departmentId=9` and `Watercolors` → 10,115, first ID 11069 (`classification` "Drawings", `objectName` "Drawing", `medium` "Watercolor on cardboard"). One object matches several values, so totals split by `medium` overlap. `q=*` totals: `Paintings` 15,266, `Drawings` 37,061, `Prints` 177,458, `Ceramics` 29,354, `Sculpture` 26,545, `Photographs` 54,884, `Textiles` 33,311, `Watercolors` 15,496, `paintings` 0. The `medium` description, the tool description, the zero-match correction, the blank-`medium` `invalid_filter` message, and the README name an object type; none points to `classification` on `met_get_object` to check a match, and the description says the filter is the evidence for a match and that counts split by `medium` can double-count. The skill gains a gate for both (Decision #25). Wording only: the schema, every request URL, and the notice's sentence order are unchanged.
+
+### 3. `isPublicDomain` and `isHighlight` are `true`-only opt-ins
+
+**Under-inclusiveness (original finding).** `isPublicDomain + departmentId` can be combined, but the combination returns far fewer results than expected. Live probing: `q=painting&isPublicDomain=true` → 96 results; `q=painting&isPublicDomain=true&departmentId=11` → 9 results. The search index only indexes a subset of public-domain objects with department tags. The combination does not return zero results. Tool descriptions note that `isPublicDomain` is more reliable used alone, with department filtering applied post-fetch on the returned object records.
+
+**Extension: the under-inclusiveness is not department-specific.** `q=sunflower` → 97 matches unfiltered; `q=sunflower&isPublicDomain=true` → 4, and object `436580` — whose own record reports `isPublicDomain: true` — is absent from that arm. So the `true` arm is a partial index even with no department filter, and describing it as a guarantee of CC0 coverage overstates it.
+
+**The `true` arm is CC0-sound but was not query-sound.** Every object it returns is genuinely public domain — `437261`, `436529`, `228990`, `436043` all report `isPublicDomain: true` with populated image URLs — but three of those four came back for *any* keyword, including one that matches nothing. That query-independent floor reached every filter parameter on `/v1`, not just this one, and went away with the move to `/v1.1` (Decisions #14, #15). The narrowing decision below is independent of it: the floor was present on the `true` arm either way.
+
+**The `false` arm is unsound.** `q=sunflower&isPublicDomain=false` → 1 match, object `436580`, whose record reports `isPublicDomain: true` — a wrong answer, not an empty one. `isHighlight=false` fails identically: `q=sunflower&isHighlight=false` returns objects `337700` and `309959`, both of which report `isHighlight: true`.
+
+**Decision.** Both parameters are narrowed to a `true`-only literal on the input schema and on `SearchInput`, so the unsound value can never reach `buildSearchUrl` and the constraint is advertised in `tools/list` rather than enforced only at runtime. The `true` arm is kept — narrow, and sound on the CC0 claim — rather than removing the filters or verifying post-fetch, which would change the caller's declared search semantics. `hasImages` and `isOnView` stay plain booleans: neither reproduced a wrong-answer defect on either arm across `q=sunflower` and `q=vase` (six `hasImages=false` records with no image URLs, five `isOnView=false` records with an empty `GalleryNumber`). Both share the query-irrelevant floor of #21, which is not what this decision narrows.
+
+**Reversed for `isPublicDomain` (2026-09-24).** `/v1.1/search` ignores `isPublicDomain` on both arms (`q=sunflower`: `true`, `false`, and absent all → 178), so the filter is removed from the input schema and `SearchInput` rather than advertised as a no-op; CC0 status is read per object from `met_get_object`. `isHighlight` stays `true`-only: `/v1.1` honors `true` (3) and ignores `false` (178).
+
+### 3a. Blank filter values are rejected, not forwarded
+
+A blank parameter value is not an absent one to the Met index. Live probing against `q=sunflower` (baseline 97): `&isPublicDomain=` → 31, `&geoLocation=` → 19, `&zzz=1` → 34, `&bogusParam=true` → 0. A blank or unrecognized value silently selects a different result set, and the figure shifts with the exact string sent, so there is no safe blank to forward. `buildSearchUrl`'s truthiness checks separately *drop* a blank `medium` or an empty `geoLocation` array, silently widening the search to unfiltered.
+
+**Decision.** `met_search_collections` rejects a whitespace-only `q`, a blank `medium`, an empty `geoLocation` array, and any blank `geoLocation` element, via a declared `invalid_filter` reason. The check lives in the handler rather than the Zod schema: this file already validates semantically there (date-range pairing, department membership), a schema `.refine()` would surface as a bare JSON-RPC `-32602` with no `data.reason` and no recovery hint, and only a handler check can name the offending field dynamically under one shared reason. The advertised `inputSchema` is therefore unchanged by this decision — only runtime behavior narrows.
+
+**Still holds on `/v1.1` (2026-09-24), for a different reason.** `/v1.1/search` ignores a blank value rather than selecting a different set (`q=sunflower&medium=` → 178, the unfiltered total), so a forwarded blank now silently widens the search — the same outcome the dropped blank already had. Refusing it remains the only handling that can't be mistaken for a correct answer.
+
+### 4. Exclude `title` search filter
+
+The Met API documents `title=true` as a flag that restricts keyword matching to the title field. Live probing showed it returns `{ total: 0, objectIDs: null }` for every tested query including "Portrait", "Self-Portrait", "Madonna", "Vase" — queries that clearly return results without the flag. Same behavior as `artistOrCulture`. Excluded from the tool surface until confirmed functional. Re-confirmed broken on 2026-06-08.
+
+**Revisit note (2026-09-24).** On `/v1.1/search`, `title=true` and `tags=true` now answer (`q=sunflower` → 36 and 23 of 178). Neither is added in the `/v1.1` migration, which only moves the existing surface; adding them is a separate, non-breaking decision.
+
+**Reversed (2026-10-04): `matchField`.** Both flags are exposed as one optional input, `matchField: 'title' | 'tags'`, sent as `title=true` or `tags=true` — a caller after a named work or a subject otherwise gets title and tag hits buried under incidental text matches. Each answers a subset of the unfiltered set and composes with the filters (`q=sunflower`: `title` 36, `tags` 23, `title` + `hasImages=true` 20, the intersection), and neither affects `q=*`. One enum rather than two `true`-only booleans named after the Met's parameters: with both flags the Met answers the title set alone (36 IDs, identical to `title=true`) and silently drops `tags`, so the enum puts the exclusivity in the schema instead of a handler check. The Met ignores `title=false` and `tags=false` (178), so there is no false arm. `artistOrCulture` became the third value on 2026-11-04 (Decision #1). `matchField` counts as a filter in the zero-match notice (Decision #17), while the keyword-only count stays all-fields.
+
+### 5. Batch input on `met_get_object` (20 fetched per call)
+
+The API has no batch endpoint — each object ID requires its own HTTP GET. The search-returns-IDs-only design of the Met API makes serial fetching impractical (a 20-result search would take 20 serial round trips). Batch input drained by a fixed pool of workers, each recording its ID's outcome, solves this cleanly. 20 per call is a practical cap: 20 × ~150ms = ~3s worst case at concurrency 1, or ~600ms at concurrency 5. Larger batches should be multiple tool calls.
+
+The cap was set for *latency*, and it also bounds response size: every fetched record is returned (Decision #12), so a response carries at most 20. A record's cost is driven by its `constituents`/`tags`/`additionalImages`/`measurements` counts, so three composite objects can cost more than twenty sparse ones; twenty of the heaviest record sampled come to about 149 KB of `structuredContent`. The schema itself accepts up to 500 IDs and the IDs past the first 20 distinct come back in `remainingIDs` (Decision #24).
+
+### 6. Exclude `/objects` (full corpus enumeration) from the tool surface
+
+The endpoint returns every object ID (502,828 on 2026-09-24). There is no practical agent workflow that needs to enumerate the full collection — it's too large to consume and produces no useful output on its own. Search + department filtering covers all real use cases. The `/objects?departmentIds=&metadataDate=` variant (filtering by department and update date) is marginally useful but also excluded — an agent wanting "all Egyptian Art objects" should use `met_search_collections` with `departmentId=10`.
+
+**Reversed (2026-09-30).** Search moved to `/v1.1` (Decision #15), which pages only the first 10,000 matches of a search, needs a keyword, and cannot filter by update date. `/objects` answers the questions search can't: every object in a department, and every record created or revised since a date. `met_list_objects` exposes it with one `departmentIds` value and `metadataDate`; with neither filter it lists the whole collection, paged with no depth limit.
+
+### 7. Geography fields are department-stratified, not universally empty — expose them as a nested block
+
+**Original decision.** The API record has 10+ geography fields (`city`, `state`, `county`, `locale`, `locus`, `excavation`, `river`, etc.), read as almost universally empty and excluded to keep the output focused; `country` and `region` were retained as the semantically meaningful pair, plus `culture` for non-Western works.
+
+**Revision.** "Almost universally empty" holds for `county` and `river`, empty in every record drawn so far. Population of the rest is department-stratified: `subregion` was populated in every draw from the two archaeological departments (Ancient West Asian Art, Egyptian Art), and object `548211` (Sarcophagus of Harkhebit) carried `geographyType`, `country`, `region`, `subregion`, `locale`, `locus`, and `excavation` at once. `city` and `state` look empty only from an archaeological or costume sample — a later draw across Islamic Art, Medieval Art, Asian Art, Arms and Armor, and the Michael C. Rockefeller Wing found `city` on three of six records (`452102` Damascus, `472562` Constantinople (?), `788174` Springfield) and `state` on one (`788174` Massachusetts), making `city` the block's most widely populated field outside the archaeological departments. A researcher who finds a work through `geoLocation` and then fetches it was losing the field that explained the match. Costume Institute records populated none of the nine, so the original reasoning describes those departments correctly.
+
+**Decision.** All nine excluded fields ship, nested under `geography` rather than flattened, so nine sparse fields read as one block instead of nine top-level siblings. `country` and `region` stay exactly where they are and are **not** duplicated into the block — a second copy would force a choice about which is authoritative for no functional gain. Each field defaults to `''` when absent, and `format()` omits an empty one from the rendered Geography line rather than printing a placeholder for it; nine dashes would bury the two fields that usually are populated. Like every other field, the added cost is bounded by the 20-record cap (Decisions #5, #12).
+
+### 8. No resource definitions
+
+Object-by-ID lookups are already first-class via `met_get_object`. The data is not naturally "injectable context" (it's fetched on demand, not a stable background reference). The small tool surface and the absence of deeply addressable sub-resources means resources would add implementation overhead with no workflow value for tool-only clients (which is the dominant client type).
+
+### 9. No prompt definitions
+
+The domain is factual retrieval. There is no recurring "how should I approach analyzing this data" pattern worth encoding as a reusable prompt template — the natural flow is search → fetch → present, which agents handle directly.
+
+### 10. `GalleryNumber` preserved as `""` rather than `null`
+
+An empty string is meaningful: it signals the object is not currently on display at the museum. Coercing it to `null` would lose that signal. The field is kept as-is from the API, typed as `z.string()`.
+
+### 11. `constituents` vs flat artist fields — include both
+
+The API provides flat `artistDisplayName`, `artistDisplayBio`, `artistNationality`, `artistBeginDate`, `artistEndDate` fields as well as a `constituents` array (which includes role, constituentID, and Wikidata/ULAN URLs). Both are retained. The flat fields are convenient for the 90% case (single artist, well-known work). The `constituents` array is necessary for multi-artist works and for enrichment chains via Wikidata. Many objects omit the `constituents` array (`null`) — primarily anonymous archaeological objects — so it is nullable.
+
+**Extended (2026-10-04).** The flat fields now carry the attribution's qualifier and role too: `artistPrefix` (`Style of`, `Published by`), `artistSuffix` (`(r. 1876–1909)`, `, Paris`), and `artistRole` (`Patron`, `Publisher`), which the lead Artist line renders. With the bare name alone, both surfaces presented a "Style of" painting as the named artist's own work and a patron as its maker; the prefix survived only inside `constituents[].name`, and the suffix and role nowhere. `artistDisplayName` stays the bare name, since search, ULAN/Wikidata matching, and the dates key on it.
+
+### 12. Return every fetched record; the 20-ID cap bounds the response
+
+**Original decision.** The per-record cost is set by four upstream arrays with no length cap (`constituents`, `tags`, `additionalImages`, `measurements`), and a live 20-ID batch once produced a 159,464-byte response. The tool admitted whole records in request order against a cumulative 60,000-byte budget on serialized `structuredContent` and listed each fetched record that did not fit in a `deferred[]` array with its size, to be re-requested. Lowering the input cap, truncating the heavy arrays, a field selector, and a compact default shape were rejected.
+
+**Reversed (2026-11-04).** A record the budget withheld had already been fetched, so the re-call `deferred[]` asked for sent its request again, to an API whose firewall blocks small bursts (Decision #19). The 20-distinct-ID cap already bounds a call: the heaviest of 27 records sampled (`288322`, 38 constituents) normalizes to 7,438 bytes, so twenty that size come to about 149 KB of `structuredContent`, and a client that receives a result larger than it wants can handle it. Measured on the 20 IDs `met_search_collections` returns for `{ q: "Group of Stereograph Views", matchField: "title", departmentId: 19 }`: the budget returned 17 records (58,034 bytes) and withheld `288248`, `288249`, and `288264` (2,468, 2,602, and 3,414 bytes); returned whole, the 20 cost 66,563 bytes of `structuredContent` and 44,981 of `content[]` text.
+
+**Decision.** Return every record fetched among the first 20 distinct IDs, whole and in request order, with no `deferred[]` field and no budget notice. A record is still never truncated, a repeated ID is still fetched once (Decision #13), and every distinct requested ID lands in exactly one of `objects[]`, `failed[]`, and `remainingIDs` (Decision #24). The caller sets the response size through the IDs it sends.
+
+Rejected: raising the budget, since any byte budget still cuts below the 20 IDs asked for and discards records already fetched; and a field selector for lighter records, which no sampled record earns (none reaches 8 KB).
+
+### 13. De-duplicate `objectIDs` rather than rejecting a repeat
+
+A repeated ID in one call fetched the object twice and could return it twice, or in both `objects[]` and `failed[]` when its two fetches ended differently. That breaks the batch's partition: every distinct requested ID in exactly one of `objects[]`, `failed[]`, and `remainingIDs`.
+
+**Decision.** De-duplicate in the handler, first occurrence keeping its position, and advertise it in the `objectIDs` description. A `.refine()` rejecting duplicates was the alternative and is worse on two counts: it narrows the advertised `inputSchema` for input a caller could previously send, and it answers a request with an obvious reading — a repeated ID means the caller wants that record, once — with an error. De-duplicating also halves the upstream calls for such input.
+
+### 14. A filtered search is one search request, with no unfiltered control run
+
+**Decision.** A search carrying filters sends one `/v1.1/search` request, as an unfiltered one does, and returns what it answers. The call adds a request only for a fact the search does not give: the cached department lookup that validates `departmentId`, the keyword-only count behind a filtered zero result (Decision #17), and the requested department's cached `/v1/objects` list for a 7 or 17 page that holds IDs (Decision #21). `/v1.1/search` has no query-independent floor to correct: `q=zzzqqqxyz` plus each filter → 0, and every filtered set measured is a subset of its unfiltered one (2026-09-24).
+
+**Reverses** the `/v1` control run. Adding any filter to `/v1/search` returned the genuine keyword matches plus a fixed floor per parameter and value (`q=zzzqqqxyz`, which matches nothing, returned 3 IDs under `isPublicDomain=true`, 338 under `medium=Paintings`, and 29 under `dateBegin=1800&dateEnd=1900`), so every filtered search also ran `q` alone in parallel and kept only the filtered IDs the control run held. It intersected rather than subtracting a cached floor, because the floor also held genuine matches (`q=cat&hasImages=true`: 87 of the 128-ID floor matched the keyword). The control run was best-effort: on `/v1` it downloaded every match of the bare keyword (`q=the`: 2.7 MB in 12.7 s, past the request timeout, against 0.44 s for `q=the&departmentId=11`), so a failed control run fell back to the filtered IDs with a notice. None of that applies to `/v1.1`, so the control run, the intersection, and their notice were removed with the move to it (Decision #15). Decision #3's partial-index caveat went with them: its evidence (`436580`) is not a `/v1.1` `sunflower` match at all.
+
+### 15. Search runs on `/v1.1/search`, paged upstream
+
+The Met deprecated `GET /v1/search` on 2026-09-04 and retires it on 2026-10-01. Its replacement, `/v1.1/search`, runs on a different backend and pages upstream: `offset`/`limit` (at most 500 per page), nothing past `offset + limit = 10,000`, `total` still the full count, and HTTP 200 `objectIDs: null` for a page at or past the window.
+
+**Decision.** The tool's `limit`/`offset` pass straight through, one request per page, `limit` always sent (the upstream default is 100); a `limit` above 500 is sent as 500 and disclosed (Decision #24). `remaining`, `truncated`, and `nextOffset` are computed against `min(total, 10,000)`, and a `total` above 10,000 adds an `enrichment.notice` naming the window; `format()` gains a fourth marker, `(window end)`, for a last page that stops at the window short of `total`. `offset` stays uncapped in the schema because upstream still answers `total` past the window. `q` stays required: a blank keyword is the whole index, and filter-only browsing through search would reach only its first 10,000 results.
+
+**Base URL.** `/v1/objects` and `/v1/departments` are not deprecated (`/v1.1/objects/{id}` → 404), so no single versioned base serves every endpoint. `MET_BASE_URL` now names the collection root and the service owns each path's version; a value ending in `/v1` — the old default's shape — is reduced to its root so existing overrides keep resolving. A value ending in `/v1.1` is reduced the same way: kept, it would nest every endpoint under it (`/v1.1/v1/objects/{id}` → 404), and `met_get_object` would report every ID as not found. Rewriting a trailing `/v1` to `/v1.1` for search was rejected: it breaks for a suffix-less local stub.
+
+**Reverses** the local offset slicing over a full ID array (issues #9 and #17): `/v1.1` never returns the full array, so paging is upstream. #17's decision survives in the format markers — an exhausted page and an out-of-range offset still render differently, now across four states. `geoLocation` is capped at one element, because `/v1.1` applies only the first repeated value (`France&Japan` → 35, `Japan&France` → 6).
+
+### 16. Timeout-coded failures take the ordinary retry ladder
+
+**Reverses** `search_timeout` (issue #11), because the upstream endpoint changed: on `/v1` one search downloaded every matching ID (`q=*` is 1.3 MB compressed and took 14.7 s on 2026-09-24), so a timeout was deterministic for that query and was surfaced non-retryable. A `/v1.1` page is at most 500 IDs (1.6 KB compressed for `q=horse`), so a timeout says nothing about the size of the result set. The relabel is removed and `search_timeout` leaves the error contract; an upstream 504/408/425 and the request timer's own abort (`errorSource: 'FetchTimeout'`) are retried by `withRetry` like any transient failure and, if they persist, surface as the upstream error — a persistent 504 as `upstream_unavailable` (Decision #20). Keying the relabel on `FetchTimeout` alone was rejected: it fixes the 504 case but keeps a transient timer abort non-retryable with a misleading "narrow the query" hint.
+
+### 17. Compose the zero-match guidance from the levers the call used
+
+A zero result has two causes a caller fixes differently: the keyword matches nothing, or the filters removed every match. A hint keyed on which inputs were set misfires on the first cause — it tells the caller to fix a valid filter.
+
+**Decision.** When a filtered search returns `total: 0`, the handler issues one extra `/v1.1/search?q=…&limit=1` request and reads the keyword-only `total`. Zero → a keyword hint naming no filter. Positive → a hint naming every filter the call set, in one sentence, so one retry clears it; `medium` adds its correction (one case-sensitive object type as the Met spells it, not a material or a `|`-joined list; Decision #2), and so do `geoLocation` and the date window (below). If the extra request fails, the hint names the filters used — the caller did set them — and the call still answers; a caller abort during it is not such a failure and ends the call as cancelled. An unfiltered zero needs no extra request. The extra request is one attempt, not a retry ladder: it only words a hint for an answer that is already a miss.
+
+**Reverses** the `isPublicDomain` recovery branch (issue #20): the filter is gone (Decision #3), and a branch keyed on the input alone fired even when the keyword itself matched nothing. Validating `medium` against a list of object types up front was rejected: the Met exposes no endpoint listing them, and a hardcoded list would go stale and reject values that work.
+
+**Revised (2026-10-04): zero matches are a success.** Zero matches is a valid answer, and `met_list_objects` already returns its empty list as one; reporting it as `isError: true` (`no_results`, `-32001`) led a client that reads `isError` as a failed call to retry or report a failure. A `total` of 0 now returns `objectIDs: []` with the guidance above, wording unchanged, as `enrichment.notice`, and `no_results` leaves the error contract — breaking for a caller keyed on the reason or the code. The notice keys on the Met's `total: 0` alone, never on an empty page, so an `offset` past the end of a nonzero `total` stays an empty page without it, and `format()` marks a zero result `(complete)` at offset 0 and `(offset beyond result set)` only at a nonzero offset. `notice` is last-wins, so the handler collects every notice for a response and writes them once, joined. Every success also echoes the applied query as `enrichment.effectiveQuery` (declared optional, written on every success path: a required enrichment field fails output validation on any path that forgets it), on `met_list_objects` too, where it is the only way to tell a blank `updatedSince` read as unset from the filter the caller meant. `met_get_object`'s `all_not_found` stays an error: there the caller named the IDs, so not finding them is a genuine miss.
+
+**Revised (2026-11-04): corrections for `geoLocation` and the date window.** Each was named in the hint with nothing to say why it removed every match, and each misses for a reason a caller would not guess (Notes). `geoLocation` adds that it takes one place, whole and case-sensitive as the Met spells it, so `greece` or a fragment such as `Gree` matches nothing; the date window adds that it keeps only objects whose whole span (`objectBeginDate` to `objectEndDate`) lies inside it and that a "ca." date can be stored as a 20-year span, so widen the window. The sentences follow the filter list's order (`medium`, `geoLocation`, then the dates), on both the "removed every match" and the "may have removed every match" lead, and never on the keyword branch, which names no filter.
+
+**Rendering in `content[]` (2026-11-04).** The notice quotes the caller's `q`, and the `content[]` trailer is Markdown, so a `q` holding `*`, `_`, a link, a code span, an entity, or HTML rendered as markup there while `structuredContent` carried it raw. The tool's `enrichmentTrailer.notice.render` escapes the whole joined notice and quotes each line (a `render` replaces the built-in block quote), so the line reads back as exactly the raw string; `structuredContent.notice` is unchanged. The whole string is escaped, not only `q`, because the render sees only the joined notice; the escaper's read-back guarantee leaves the server's own sentences reading as written, changing only bytes (the `medium` correction's `|` is written `\|`). Escaping in the handler was rejected: it would put the backslashes into `structuredContent`. `q` has no length bound; the escaper, the framework's `escapeMarkdownInline` (`@cyanheads/mcp-ts-core/utils`), runs in linear time on any input since 0.13.19.
+
+### 18. One wall-clock budget per tool call
+
+Each `MetService` retry ladder makes 4 attempts at `MET_REQUEST_TIMEOUT_MS` plus 5.25–8.75 s of backoff, so an upstream that stops answering costs about 47 s per ladder, and `met_get_object` runs one ladder per ID in waves of `MET_BATCH_CONCURRENCY`. MCP TypeScript SDK clients time a request out at 60 s by default, so a hung upstream reached the caller as an opaque transport timeout instead of the server's classified error.
+
+**Decision.** A tool call fixes one deadline, `MET_CALL_DEADLINE_MS` (default 30,000 ms) from its start, and every service method takes it as a required argument. Each ladder hands `withRetry` the time left as its `deadlineMs`, and each attempt's request timeout is capped by it. Expiry is `Timeout` (`-32004`) with `data.reason: 'retry_deadline_exceeded'`. A ladder that starts with the budget spent fails the same way without a request. `met_search_collections`, `met_list_objects`, and `met_list_departments` declare the reason (`thrownBy: 'service'`), so the expiry reaches their callers with a recovery hint. In `met_get_object` it lands the ID in `failed[]`. When nothing was fetched and every failure is the expiry — an ID whose fetch never started included — the handler throws one batch-level `retry_deadline_exceeded` with the same recovery, after the `all_not_found`, `upstream_blocked`, and `upstream_rate_limited` (Decision #23) checks: N copies of one spent budget are one timeout, not N upstream faults, so the caller gets the `Timeout` code and the budget's recovery rather than `all_failed`'s advice about failing IDs. A 404 or an upstream error beside the expiries takes the batch past the expiry, to `upstream_unavailable` when any failure was a 5xx outage (Decision #20) and to `all_failed` otherwise. The recovery says the budget ran out before a successful response, not that the API did not answer: a ladder of fast 5xx answers spends a short budget too. The keyword-only count stays one attempt, capped the same way and skipped when nothing is left. The default is half the SDK's 60 s and above the ~9 s a fast-failing ladder (an upstream 503) needs, so a fast failure still surfaces as the outage it is (`upstream_unavailable`) rather than as the expiry. The argument is required rather than defaulted: a default would quietly bring back per-ladder budgets.
+
+Rejected: a budget per ladder, which stacks per wave (a 20-ID batch waits `ceil(20 / MET_BATCH_CONCURRENCY) ×` the budget); and a lower `maxRetries`, which bounds attempts, not time, and drops retries that succeed after a transient blip. A caller cancellation stays a cancellation: `met_get_object`'s per-ID catch rethrows once the call's signal has aborted, so a cancelled batch never returns as a partial success.
+
+### 19. A 403 from the Met API is a firewall block, not a failed request
+
+The Collection API takes no credentials, so a 403 is its firewall refusing this server's address. A burst of about 22 requests in 3 minutes drew a 403 HTML block page on every endpoint for about 20 minutes, far below the documented 80 requests per second. The trigger is undetermined. Passing the 403 through told `met_get_object` callers to "retry after a brief delay", which cannot succeed.
+
+**Decision.** `MetService` classifies an HTTP 403 as `upstream_blocked` (`ServiceUnavailable`, `retryable: false`, so `withRetry` never retries it), with a message naming the firewall and no block page in `data`. Every tool declares it with one recovery: wait several minutes, and send fewer requests. It makes no claim that retrying extends the block, which is unmeasured. In `met_get_object`, a blocked ID's `failed[]` entry carries that recovery. Once any ID is blocked, the IDs not yet started fail with the same reason and send no request, since the block covers the server's address and the remaining requests could only add traffic. A batch that fetched nothing throws `upstream_blocked` when any failure was the block, after the `all_not_found` check.
+
+### 20. A 5xx that outlasts the retry ladder is an outage, and `met_get_object` stops feeding it
+
+Against an upstream answering 503 to everything, each ID in a `met_get_object` batch ran its own four-attempt ladder: 8 IDs sent 32 requests and 20 IDs sent about 80, stopped only by the 30 s budget — the kind of burst that has drawn the firewall block (Decision #19). The other tools passed the failure through unclassified, with the upstream error page in `data.body` and `data.responseBody`, and an all-5xx batch ended as `all_failed`, whose recovery pointed at the IDs.
+
+**Decision.** `MetService.retry()` rethrows a ladder that ends on HTTP 500, 502, 503, or 504 — every attempt spent, or a `Retry-After` too long to wait — as `upstream_unavailable` (`ServiceUnavailable`, no `retryable` flag, since a later call can succeed). Its `data` is `{ reason, status }`, plus the upstream's `retryAfter` when it sent a `Retry-After`; the exhausted error, page included, rides as the `cause`, which reaches the log and never the caller. A persistent 504 moves from `-32004` to `-32000`, and the ladder itself is unchanged (Decision #16). 501 is permanent and 505 a protocol mismatch, so neither is an outage and both keep their own code and message (the page kept off the client envelope, like every HTTP failure's; Decision #26). Every tool declares the reason with one recovery: the failure is the Met's, so changing the request will not help; wait a few minutes. In `met_get_object`, once an ID's ladder ends that way, the IDs not yet started wait for every fetch still in flight; if the Met has then answered no ID in the call — no record, no 404 — they fail with the outage and send no request, which bounds an outage at `MET_BATCH_CONCURRENCY` × 4 requests (20 at the default; both batches above now send 20). Any answer turns the skip off, one that lands after the first ladder ended included, so which answer arrives first never decides the outcome. A batch that fetched nothing throws `upstream_unavailable` after the `all_not_found`, `upstream_blocked`, `upstream_rate_limited` (Decision #23), and all-expiry checks, and before `all_failed`.
+
+Rejected: one attempt per queued ID, which still adds a request per remaining ID into the outage; an unconditional skip, which would fail healthy IDs if a 5xx were ever specific to one record (none observed); and deciding the skip the moment the first ladder ends, which fails healthy queued IDs whenever another first-wave fetch answers a moment later, and lets arrival order pick the outcome. Accepted cost: a batch whose whole first wave hit record-level 5xx fails its remaining IDs unrequested.
+
+### 21. Departments 7 and 17: filter each page by department membership, page in the combined space
+
+`/v1.1/search` answers `departmentId` 7 (The Cloisters) and 17 (Medieval Art) with one set, the union of both, in the same order (2026-10-04: `q=tapestry` → 165 for either; `q=*` → 9,558 for either, first 500 identical). `/v1/objects` lists them apart — 2,350 and 7,129 IDs, no overlap — so a Cloisters search returned mostly Medieval Art, the Unicorn Tapestries came back under 17, and the `departmentId` description's one curatorial department was wrong for both. Departments 3, 15, 16, and 21, sampled, return only their own objects.
+
+**Decision.** For 7 or 17, the handler keeps the page IDs on the requested department's `/v1/objects` list (`MetService.keepDepartmentMembers()`): the sorted, cached list `met_list_objects` pages — no new cache, one load per department per hour — checked by binary search (about 12 µs for a 500-ID page against 2,350 IDs, 62 µs against 7,129). `total` stays the Met's combined count, and `truncated`, `remaining`, and `nextOffset` advance by the combined positions the page read, so walking `nextOffset` reads every combined position once and a page can hold fewer than `limit` IDs, or none, with `truncated: true`. The zero-match notice keys on the Met's `total: 0` alone, never on an emptied page. Every 7/17 response carries a notice naming both departments, saying `total` counts both and a page can hold fewer than `limit` IDs, and pointing to `met_list_objects` for exact membership; it joins any other notice in one string (`notice` is last-wins). Every other `departmentId`, and a search with none, sends the same requests and returns the same IDs and paging fields as before, with no department notice.
+
+The list is requested after the search, and only when the page holds IDs. Requested beside the search, it would put two requests in flight at once against a firewall that blocks small bursts (Decision #19), and a miss, an offset past the end, or a failed search would still send it; after the search, the call's requests stay sequential and those cases send none. The latency cost — one list request, 143 ms and 240 ms live — falls on the first 7/17 call per department per hour. The filter is best-effort: a list that cannot be loaded — a 5xx outage (`upstream_unavailable`), a firewall block (`upstream_blocked`), or a wait on the shared load longer than one request timeout — leaves the page unfiltered, with a notice saying the department filter was not applied. After a load fails, the filter sends no list request for that department for a minute (a later successful load, `met_list_objects`' included, ends the wait early): a list-only outage would otherwise cost every 7/17 search a full retry ladder, up to four requests and about 7 s, and a paging walk would send them as a burst. A call waits on the list for at most one request timeout (`MET_REQUEST_TIMEOUT_MS`); the shared load keeps going and caches for the next call. A failed search still fails the call, and a caller abort still cancels it.
+
+Rejected: an exact per-department `total` and dense pages, which needs every page of the union in relevance order — up to 20 requests per call for `q=*`, near the ~22-request burst that drew the block, and still inexact, since tied relevance reorders between requests. Disclosure alone, which leaves three quarters of a Cloisters `tapestry` page in the wrong department. A hybrid that is exact when the union fits one page, which gives one `departmentId` two meanings depending on keyword breadth. Accepted costs: short and empty pages; search-index IDs on neither list drop out of 7/17 pages (`q=*`: 9,558 combined against 9,479 listed, so at least 79), though a sampled index-only ID returns 404 from `/v1/objects/{id}` and so could not be fetched anyway; and a list up to an hour stale.
+
+### 22. Opt-in image content on `met_get_object`: 3 per call, one pinned host, `content[]` only
+
+`met_get_object` returned image URLs only, so a vision-capable model could not look at the work it was describing without a fetch the client may not offer.
+
+**Decision.** An `includeImages` input, default `false`, attaches the `primaryImageSmall` (web-large) rendition of the first 3 CC0 records among those returned, in request order, as `ctx.content` image blocks, each after a caption text block that carries no upstream text. An optional `images[]` output gives every returned record's outcome (`attached`, `no_cc0_image`, `over_cap`, `unavailable`), so both surfaces agree on what happened.
+
+- **Cap 3, counted in images.** The rendition is pixel-bounded (five CC0 records, 2026-10-04: long edge 599–625 px, 25.5–184.9 KB, 34–247 KB as base64), so its vision cost is roughly fixed while bytes vary sevenfold; three images run about 295 KB of base64 at the sampled mean and 740 KB at the maximum, and are enough for a side-by-side comparison. A code constant, not an env var: a deploy-tunable cap would drift the tool's response shape between environments. A fetch that fails keeps its slot, so which records are tried never depends on the network.
+- **Host pin.** Image URLs are free catalog text (object `288322` carries `(not assigned)` in a URL field), so a server-side fetch of whatever the field holds would let a record steer the hosted server's requests. `MetService.fetchImage()` requests a URL only when its parsed origin is exactly `https://images.metmuseum.org`, with `redirect: 'error'` so no redirect leaves that host; any other value is `unavailable` without a request. One attempt, no retry, its timeout the per-request timeout capped by the time left in the call's budget (Decision #18). A non-2xx, a non-`image/*` body, a redirect, a timeout, or a spent budget is `unavailable` and logged, never a failed call; a 403 from the image host is about one file, not Decision #19's firewall block. A caller abort still cancels the call.
+- **Bytes ride `content[]` only.** They never enter `structuredContent`. A client that hands the model only `structuredContent` will not show them, which the input description says.
+
+The 3 image fetches run concurrently: the cap bounds them, they go to the image CDN rather than the firewalled API, and running them in turn would stack their latencies inside the shared budget.
+
+Rejected: a separate image tool, which leaves this contract untouched but costs every client one more tool definition, and costs each image a second call plus either a record fetch from the firewall-sensitive API or a URL input needing the same pin. A byte cap, which tracks the wrong cost driver for a pixel-bounded rendition. Out of scope: `additionalImages` and the full-resolution `primaryImage`.
+
+### 23. A 429 that ends the retry ladder is a rate limit, and `met_get_object` stops feeding it
+
+The Met documents no 429, but the framework maps one to `RateLimited` (`-32003`) and honors its `Retry-After`, failing fast when the wait exceeds the 30 s backoff cap or the call's remaining budget. Against a controlled upstream answering 429 with `Retry-After: 120`, the three single-request tools returned `-32003` with no `data.reason` and no recovery, and their text omitted the wait; `met_get_object` returned `all_failed`, whose recovery says to retry after a brief delay, and dropped `retryAfter`. Without the header, a 20-ID batch sent 80 requests, four per ID, since only a 403 or a 5xx stopped the queue.
+
+**Decision.** `MetService.retry()` rethrows a ladder that ends on HTTP 429 — every attempt spent, or a `Retry-After` too long for the backoff cap or the remaining budget — as `upstream_rate_limited` (`RateLimited`, no `retryable` flag, since a later call can succeed). Its `data` is `{ reason, status: 429 }`, plus the raw `Retry-After` value when the Met sent one; the exhausted error, page included, rides as the `cause`. The message is "The Met API is rate-limiting requests from this server (HTTP 429)", plus "and asked for a 120-second wait" (or "an 8-second wait": the article follows how the number is read aloud) when the header parses as delta-seconds or an HTTP-date (counted from now) to a wait of at least a second and at most a day, which is what carries the wait to `content[]`; a longer one reads "and asked for a wait of more than a day", and a wait of 0 (an HTTP-date already past included) or an unparseable value names none and stays raw in `data.retryAfter`, so the recovery's "about a minute" applies. The ladder is unchanged: a `Retry-After` that fits is still waited out, and a deadline that cuts the ladder after 429 answers still ends it as `retry_deadline_exceeded`. Every tool declares the reason with one static recovery: wait the period the error names, or about a minute when it names none, then retry with fewer requests at once. In `met_get_object`, once an ID's ladder ends on 429, the IDs not yet started fail with it and send no request, as after a 403 (Decision #19): a throttle covers the server's address, never one record, so the answered-nothing gate a 5xx needs (Decision #20) does not apply. That bounds a throttled batch at `MET_BATCH_CONCURRENCY` requests with a long `Retry-After` (5 at the default) and `MET_BATCH_CONCURRENCY` × 4 without one (20). A batch that fetched nothing throws `all_not_found`, `upstream_blocked`, `upstream_rate_limited`, the all-expiry `retry_deadline_exceeded`, `upstream_unavailable`, then `all_failed`, first match winning: the throttle names a wait, so it wins over a 5xx in the same batch, and a 429-ended ID is never an expiry, so the all-expiry check cannot match beside it. The batch throw carries the first throttled ID's `status` and `retryAfter`, as the outage throw does.
+
+Rejected: a per-throw recovery hint carrying the number, which duplicates the message on both surfaces and makes the four contracts differ; and a server-wide cooldown that holds every concurrent call after a 429, a cross-call change beyond one call's request budget. Accepted cost: healthy IDs queued behind a throttled one fail unrequested.
+
+### 24. Serve a capped input up to its cap and name the remainder; only an ID list keeps a ceiling
+
+`met_get_object` with 21 IDs, and either list tool with `limit: 501`, failed validation before any work, and 21 copies of one ID failed before de-duplication could collapse them. Each rejection cost the caller a round trip for a request with one obvious reading.
+
+**Decision.** Each input keeps its per-call cap; above it, the tool does the capped part and discloses the rest in the enrichment `notice`, joined with any other notice in one string. Only `objectIDs` keeps a schema ceiling past its cap.
+
+| Input | Per-call cap | Ceiling | Why |
+|:--|:--|:--|:--|
+| `met_get_object.objectIDs` | 20 distinct IDs | 500 entries | One full search or list page, the largest ID list any tool here produces. `remainingIDs` echoes every distinct ID past the cap, so the ceiling also bounds the response |
+| `met_search_collections.limit` | 500 | None; 500 with `MET_CLAMP_LIMITS=false` | Any value above 500 reads the same 500-ID page, so a larger one has one reading and costs nothing extra. The 10,000-match window bounds paging, not `limit` |
+| `met_list_objects.limit` | 500 | None; 500 with `MET_CLAMP_LIMITS=false` | As for search. Its list has no 10,000 window, so a 10,000 ceiling refused pages it serves (`departmentId: 19` lists 39,583 IDs) |
+
+`met_get_object` de-duplicates, then takes the first 20 distinct IDs; the rest go to a new optional output field, `remainingIDs`, in request order. They differ from the `failed[]` entries a 403, 429, or 5xx left unrequested, which sit inside the 20. A batch that throws names the over-cap count and counts only the requested IDs, so "All 20 requested object IDs not found" never tells a caller to drop IDs nobody checked. A list tool's `limit` above 500 is sent as 500 — the Met search does the same silently (`q=horse&limit=600` returned the same 500 IDs as `limit=500`, 2026-10-15) — and `returned`, `remaining`, `truncated`, and `nextOffset` (offset + IDs served) describe the page served. The notice, "limit 600 is above the 500-ID page maximum, so this page was read with limit 500; continue from nextOffset.", appears only when matches remain past the page: a page that already ends paging is what the caller's `limit` would have returned too.
+
+An `objectIDs` list past 500 entries, wrong types, a `limit` below 1, non-positive or non-integer IDs, and an empty `objectIDs` still fail validation. Both `limit` inputs first carried a 10,000 ceiling, the search window (#50); #57 dropped it, because `limit: 10001` failed the whole call with a recovery hint that only repeated the error, though the value has one reading. While `MET_CLAMP_LIMITS` is on (the default), `limit` advertises no maximum; each call made with a clamped `limit` adds 1 to the `met.limit.clamped` counter by `mcp.tool.name` when its page limit is set, before the upstream request (a clamped call that then fails upstream still counts, as the tool's info log line, which records `limit` beside `pageLimit`, still logs it). `MET_CLAMP_LIMITS=false` advertises and enforces `maximum: 500` instead, which refuses 501–10,000 where the 10,000 ceiling accepted them. The schema reads that setting from the parsed config on each validation and each `tools/list`, never at import: `tool()` emits input schemas when its module loads, before `setup()` parses the environment, and under Node before `.env` is loaded. The list tools disclose through `notice` rather than `ctx.enrich.truncated()`, whose enrichment key would collide with their own `truncated` output field. Rejected name for the new field: `notRequested`, which collides with the "was not requested" wording of the skipped `failed[]` entries. Out of scope: higher upstream concurrency.
+
+### 25. Publish one Agent Skill, `met-museum-guide`
+
+**Decision.** The server publishes `skills/met-museum-guide/SKILL.md`. It is served with `createApp({ skills: 'skills' })` and ships in the npm package (`files`), the Docker image, and the `.mcpb`. It carries six gates that span tools:
+- fetch only the records an answer needs
+- read the attribution before naming a maker
+- pad date windows, then select by overlap
+- split a search past 10,000 matches by department or by `hasImages`, never by adjacent date windows
+- take a `geoLocation` match from the filter
+- take a `medium` match from the filter, and never add up totals split by `medium` (Decision #2)
+
+Each gate traces to a decision here, a Known Limitation, or a closed issue, and each was checked against the live API on 2026-11-04, the `medium` gate and the attribution gate's multi-word-name bullet on 2026-11-14. `instructions` keeps its orientation lines, gains the rate posture (Decisions #5, #19) and a line naming the skill, and drops three sentences other surfaces already carry:
+- the accession-number sentence (the `q` description)
+- "isHighlight accepts true only" (the schema's literal)
+- the `medium` line (the `medium` description and its zero-match notice sentence)
+
+**Why.** A parameter description covers one parameter and `instructions` is one paragraph, so neither can say "read these fields on the fetched records before concluding X". One skill rather than two, because every gate fires on the same task: researching the Met's holdings.
+
+### 26. The framework keeps the upstream error page off the client
+
+**Decision.** `MetService` rethrows an HTTP failure it does not classify (a 501, a 505, a 4xx other than 403 and 429) as `fetchWithTimeout` raised it, `data.body` and `data.responseBody` included. From `@cyanheads/mcp-ts-core` 0.13.22 the framework marks both keys server-only, so `structuredContent.error.data` and `content[]` leave them out while the thrown error and the `Error in tool:<name>` record keep the page. The 403, 429, and 5xx paths still rebuild their errors with `{ reason, status }` and no page (Decisions #19, #20, #23).
+
+**Why.** Through 0.13.21 every key of a thrown error's `data` reached the client, so the service stripped the page itself (#45). Once the framework does that on every envelope, the local strip only duplicated it: the failure record holds the page either way, in `errorData.causeChain` before and in `errorData.body` now. Tests pin the client outcome per tool, so a framework regression shows as a leak rather than passing silently.
+
+---
+
+## Known Limitations
+
+- **Search relevance is basic keyword matching** — not semantic or ranked by quality. Very common terms return thousands of matches, most of which are peripheral. `departmentId` and `geoLocation` filters are more effective than longer keyword strings.
+- **Paging reaches only the first 10,000 matches of a search** — `/v1.1/search` serves nothing past `offset + limit = 10,000`, so the rest of a larger result set is reachable only by narrowing it (filters, a more specific keyword). `total` still reports the full count, and the response says so in a `notice` (Decision #15).
+- **Page boundaries can repeat or skip an ID** — tied relevance scores are ordered nondeterministically across requests; full 20-page walks of `q=horse` (500 per page) returned 9,995 and 9,997 unique IDs of 10,000 on 2026-09-24. Independent calls can't prevent it.
+- **`geoLocation` takes one whole, case-sensitive place** — `/v1.1` applies only the first repeated value, so the schema accepts a single location, and a different case, a fragment, a `|`-joined list, or an adjective ("Japanese") matches nothing. A match can't be confirmed from a record's place fields: the Met matches against a place index `met_get_object` does not return. `240180` (culture "Greek, Attic", every place field empty) is the one match for `q=74.51.593` with `geoLocation=Greece`, and 17,454 of the 17,755 matches for `q=Attic` match `Greece` (2026-11-04).
+- **`matchField: "artistOrCulture"` matches the attributed artist, not every constituent** — it keeps qualified attributions such as "Style of" (read `artistPrefix` on `met_get_object`) and drops a work whose keyword names only another constituent, such as its sitter (Decisions Log #1). A multi-word name can match another artist: `q=James M. Hart` returns 12544, by James M. Sommerville (2026-11-14), so the maker is read from `artistDisplayName`.
+- **`medium` is an object-type grouping, not the `classification` field** — one value, case-sensitive, not a material description. A match's `classification` can be empty or name another type (11069, "Drawings", matches `Watercolors`), and one object matches several values (11004 matches `Paintings` and `Watercolors`), so totals split by `medium` overlap and the filter is the only evidence for a match (Decisions Log #2).
+- **No public-domain search filter** — `/v1.1/search` ignores `isPublicDomain`. CC0 status is read per object from `isPublicDomain`/`hasCC0Image` on `met_get_object`; `hasImages=true` is the nearest search narrowing and includes copyrighted works.
+- **Non-public-domain objects have no image URLs** — the Met restricts images for works still under copyright. `primaryImage` and `primaryImageSmall` are empty strings; agents cannot display images for these works.
+- **Attached images reach only `content[]`** — `includeImages` puts at most 3 web-large renditions per call in `content[]`, never `structuredContent`, so a client that hands the model only `structuredContent` shows none of them; `images[]` still reports each outcome (Decision #22).
+- **An unknown or blank filter value widens the search upstream** — `/v1.1/search` ignores it and answers unfiltered, which is why `departmentId` is validated and blank values are rejected before any request (Decisions Log #3a).
+- **Departments 7 and 17 page through one combined result set** — `/v1.1/search` answers The Cloisters (7) and Medieval Art (17) with the union of both. Each page keeps only the requested department's IDs while `total` and paging count both, so a page can hold fewer than `limit` IDs, or none, while more remain. Search-index IDs on neither department's `/v1/objects` list drop out (at least 79 for `q=*`). If the department list cannot be loaded, the page comes back unfiltered with a notice (Decision #21).
+- **Object-ID lists are cached for an hour** — `met_list_objects`, and the department filter `met_search_collections` applies for 7 and 17, read each filter set's list from a cache for up to an hour, so a record created or revised very recently may not appear yet.
+
+---
+
+## API Reference
+
+**Collection root:** `https://collectionapi.metmuseum.org/public/collection/` — each endpoint carries its own version
+
+**Endpoints used:**
+
+| Endpoint | Method | Purpose |
+|:---------|:-------|:--------|
+| `/v1.1/search` | GET | Search — one `offset`/`limit` page, returns `{ total, objectIDs }` |
+| `/v1/objects` | GET | Every object ID matching `departmentIds` / `metadataDate` (every public object with neither), returns `{ total, objectIDs }` |
+| `/v1/objects/{id}` | GET | Single object record |
+| `/v1/departments` | GET | Static list of departments |
+
+**`/v1/objects`:**
+- Returns the whole matching ID set in one response, with no paging — 3.4 MB of JSON for the whole collection.
+- Answers an empty result as `objectIDs: []`, not `null`, and `total` equals the array's length.
+- `metadataDate` before `1753-01-01` answers `total: 0` (`1752-12-31`, `1000-01-01`, `0001-01-01`), and `metadataDate=1753-01-01` answers exactly the unfiltered ID set, so `met_list_objects` sends an earlier date as `1753-01-01`.
+- The order differs on every call, so the server sorts the list before paging it.
+
+**Error responses:**
+- 404: `{ "message": "ObjectID not found" }` — object does not exist
+- 403 with an HTML block page — the Met's firewall refusing this server's address, on every endpoint, for minutes at a time (Decision #19)
+- 500, 502, 503, 504 with an HTML error page — an outage on the Met's side; retried, then classified as `upstream_unavailable` with the page kept out of the error (Decision #20). 501 and 505 are passed through unclassified.
+- 429 — the API documents none, but the framework maps one to `RateLimited` and honors its `Retry-After`; retried while the wait fits the backoff cap and the call's budget, then classified as `upstream_rate_limited` with the requested wait in the message, the raw header value in `data.retryAfter`, and the page kept out of the error (Decision #23).
+- Every HTTP failure carries its page into `fetchWithTimeout`'s error as `data.body` and `data.responseBody`, and no client envelope carries either (Decision #26): a 501, a 505, or a 4xx other than 403 and 429 reaches the caller with its status-mapped code, its message, and `data.status`, the page staying on the server's thrown error and its failure record.
+- 200 with `{ total, objectIDs: null }` — an empty search page: zero matches, or an `offset` at or past the reachable window (not an HTTP error)
+
+**Rate limit.** The documented limit is 80 requests per second, but the firewall has blocked a burst far below it (Decision #19). Treat the API with care: no more than 5 parallel requests (handled by `MET_BATCH_CONCURRENCY`). The documentation names no 429 response; should the API or its CDN answer one, every tool surfaces it as `upstream_rate_limited` and `met_get_object` stops requesting the rest of the batch (Decision #23).
+
+**No auth.** No API key. No OAuth. Plain HTTPS GET.

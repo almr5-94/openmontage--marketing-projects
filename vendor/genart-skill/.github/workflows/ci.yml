@@ -1,0 +1,29 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  directory-policy:
+    # The repo root is the plugin folder. Anthropic's directory refuses, from
+    # non-Verified organizations, any file that is not Markdown, text, JSON,
+    # YAML or a PNG/JPEG/GIF/WebP/ICO image, and any file starting with #!.
+    # Catch it here, before the directory refuses a release.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: only text and allowed images
+        run: |
+          bad=$(git ls-files \
+            | grep -vE '\.(md|txt|json|ya?ml|png|jpe?g|gif|webp|ico)$' \
+            | grep -vxE '\.gitignore|LICENSE|\.claude-plugin/icon\.svg' || true)
+          shebang=$(git ls-files -z | xargs -0 grep -lI '^#!' -- 2>/dev/null \
+            | while read -r f; do head -c2 "$f" | grep -q '#!' && echo "$f"; done || true)
+          if [ -n "$bad$shebang" ]; then
+            echo "Refused by the directory policy:"; printf '%s\n' $bad $shebang
+            exit 1
+          fi
+          echo "ok"

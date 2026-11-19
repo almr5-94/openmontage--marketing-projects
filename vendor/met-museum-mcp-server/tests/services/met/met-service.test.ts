@@ -1,0 +1,3585 @@
+/**
+ * @fileoverview Tests for MetService — `/v1.1/search` paging and its 10,000
+ * window, retry of Timeout-coded failures, the keyword-only count behind the
+ * zero-match notice, cached department-ID validation, and object normalization.
+ * Exercises the real service with a mocked global fetch; the search-tool cases
+ * here run the tool over that real service through `runToolContract`, the seam
+ * that includes the URL building and window arithmetic under test.
+ * @module tests/services/met/met-service.test
+ */
+
+import type { AppConfig } from '@cyanheads/mcp-ts-core/config';
+import { JsonRpcErrorCode } from '@cyanheads/mcp-ts-core/errors';
+import {
+  createInMemoryStorage,
+  createMockContext,
+  runToolContract,
+} from '@cyanheads/mcp-ts-core/testing';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { z } from 'zod';
+import { metGetObject } from '@/mcp-server/tools/definitions/met-get-object.tool.js';
+import { metSearchCollections } from '@/mcp-server/tools/definitions/met-search-collections.tool.js';
+import {
+  DEPARTMENT_ID_BY_NAME,
+  getMetService,
+  initMetService,
+  OBJECT_IDS_CACHE_MAX_BYTES,
+} from '@/services/met/met-service.js';
+import { escapeMarkdown } from '@/utils/markdown.js';
+import { readMarkdownText } from '../../helpers/read-markdown-text.js';
+
+/** JSON response with a real body stream for fetchWithTimeout's deadline wrapper. */
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+/** A `/search` payload with `count` sequential IDs (1..count) and a reported total. */
+function idsResponse(total: number, count = total): Response {
+  return jsonResponse({ total, objectIDs: Array.from({ length: count }, (_, i) => i + 1) });
+}
+
+const COLLECTION_ORIGIN = 'https://collectionapi.metmuseum.org';
+const SEARCH_PATH = '/public/collection/v1.1/search';
+const DEPARTMENTS_PATH = '/public/collection/v1/departments';
+
+/** The parameters every search request carries; anything else is a filter. */
+const PAGING_PARAMS = new Set(['q', 'offset', 'limit']);
+
+/**
+ * One `/v1.1/search` page over `total` sequential matches (IDs 1..total), shaped
+ * the way the upstream answers: `offset`/`limit` read off the request, a `limit`
+ * above 500 silently read as 500 (2026-10-15: `q=horse&limit=600` returned the
+ * same 500 IDs as `limit=500`), the page clipped at the 10,000 window, and
+ * `objectIDs: null` for an empty page while `total` stays the full count.
+ */
+function searchPage(url: URL, total: number): Response {
+  const offset = Number(url.searchParams.get('offset'));
+  const limit = Math.min(Number(url.searchParams.get('limit')), 500);
+  const end = Math.min(offset + limit, total, 10_000);
+  const objectIDs = Array.from({ length: Math.max(0, end - offset) }, (_, i) => offset + i + 1);
+  return jsonResponse({ total, objectIDs: objectIDs.length > 0 ? objectIDs : null });
+}
+
+/**
+ * A fetch fake over the collection host, dispatching on origin + pathname. Any
+ * request no handler claims rejects, so a stray endpoint fails the test.
+ */
+function routes(handlers: Record<string, (url: URL) => Response>) {
+  return (request: unknown) => {
+    const url = new URL(String(request));
+    const handler = url.origin === COLLECTION_ORIGIN ? handlers[url.pathname] : undefined;
+    return handler
+      ? Promise.resolve(handler(url))
+      : Promise.reject(new Error(`unrouted fetch ${url.origin}${url.pathname}`));
+  };
+}
+
+/** `/v1.1/search` serving `total` sequential matches for every query. */
+const searchUpstream = (total: number) =>
+  routes({ [SEARCH_PATH]: (url) => searchPage(url, total) });
+
+/** The search requests a test issued, parsed. */
+function searchRequests(fetchMock: ReturnType<typeof vi.fn>): URL[] {
+  return fetchMock.mock.calls
+    .map((call) => new URL(String(call[0])))
+    .filter((url) => url.pathname === SEARCH_PATH);
+}
+
+/** Every text block of a tool result's `content[]`, joined. */
+function textOf(result: { content?: { type: string }[] }): string {
+  return (result.content ?? [])
+    .filter((block): block is { type: 'text'; text: string } => block.type === 'text')
+    .map((block) => block.text)
+    .join('\n');
+}
+
+/**
+ * A service call's trailing arguments: its context and a deadline at the
+ * default 30 s call budget, spread into a `MetService` method.
+ */
+function call(ctx = createMockContext()) {
+  return [ctx, { deadlineAt: Date.now() + 30_000, signal: ctx.signal }] as const;
+}
+
+/**
+ * Live object shapes, trimmed to the fields `normalizeObject` reads. Captured
+ * from `https://collectionapi.metmuseum.org/public/collection/v1/objects/<id>`
+ * rather than hand-invented, so the sparsity each one exercises is the API's.
+ */
+const rawObjects = {
+  /** 487659 — a tag with a null `AAT_URL` beside three fully populated siblings. */
+  nullTagUrl: {
+    objectID: 487659,
+    title: 'Indian Hunter and His Dog',
+    isPublicDomain: false,
+    primaryImage: '',
+    primaryImageSmall: '',
+    additionalImages: [],
+    objectURL: 'https://www.metmuseum.org/art/collection/search/487659',
+    department: 'Modern and Contemporary Art',
+    objectName: 'Sculpture',
+    classification: 'Sculpture',
+    isHighlight: false,
+    isTimelineWork: false,
+    artistDisplayName: 'Paul Manship',
+    artistDisplayBio: 'American, St. Paul, Minnesota 1885–1966 New York',
+    artistNationality: 'American',
+    artistBeginDate: '1885',
+    artistEndDate: '1966',
+    constituents: [
+      {
+        constituentID: 162095,
+        role: 'Artist',
+        name: 'Paul Manship',
+        constituentULAN_URL: 'http://vocab.getty.edu/page/ulan/500032239',
+        constituentWikidata_URL: 'https://www.wikidata.org/wiki/Q3371768',
+        gender: '',
+      },
+    ],
+    objectDate: '1926',
+    objectBeginDate: 1926,
+    objectEndDate: 1926,
+    medium: 'Bronze',
+    dimensions: '21 1/2 × 23 1/2 × 8 1/8 in. (54.6 × 59.7 × 20.6 cm)',
+    culture: '',
+    period: '',
+    dynasty: '',
+    accessionNumber: '29.162',
+    creditLine: 'Gift of Thomas Cochran, 1929',
+    country: '',
+    region: '',
+    tags: [
+      {
+        term: 'Bow and Arrow',
+        AAT_URL: null,
+        Wikidata_URL: 'https://www.wikidata.org/wiki/Q19827042',
+      },
+      {
+        term: 'Men',
+        AAT_URL: 'http://vocab.getty.edu/page/aat/300025928',
+        Wikidata_URL: 'https://www.wikidata.org/wiki/Q8441',
+      },
+      {
+        term: 'Hunting',
+        AAT_URL: 'http://vocab.getty.edu/page/aat/300239666',
+        Wikidata_URL: 'https://www.wikidata.org/wiki/Q36963',
+      },
+      {
+        term: 'Dogs',
+        AAT_URL: 'http://vocab.getty.edu/page/aat/300265714',
+        Wikidata_URL: 'https://www.wikidata.org/wiki/Q144',
+      },
+    ],
+    objectWikidata_URL: 'https://www.wikidata.org/wiki/Q116411921',
+    GalleryNumber: '765',
+  },
+
+  /** 436535 — every tag URL populated; a genuine CE date. */
+  populated: {
+    objectID: 436535,
+    title: 'Wheat Field with Cypresses',
+    isPublicDomain: true,
+    primaryImage: 'https://images.metmuseum.org/CRDImages/ep/original/DT1567.jpg',
+    primaryImageSmall: 'https://images.metmuseum.org/CRDImages/ep/web-large/DT1567.jpg',
+    additionalImages: ['https://images.metmuseum.org/CRDImages/ep/original/LC-93_21-002.jpg'],
+    objectURL: 'https://www.metmuseum.org/art/collection/search/436535',
+    department: 'European Paintings',
+    objectName: 'Painting',
+    classification: 'Paintings',
+    isHighlight: true,
+    isTimelineWork: true,
+    artistDisplayName: 'Vincent van Gogh',
+    artistDisplayBio: 'Dutch, Zundert 1853–1890 Auvers-sur-Oise',
+    artistNationality: 'Dutch',
+    artistBeginDate: '1853',
+    artistEndDate: '1890',
+    constituents: [
+      {
+        constituentID: 161947,
+        role: 'Artist',
+        name: 'Vincent van Gogh',
+        constituentULAN_URL: 'http://vocab.getty.edu/page/ulan/500115588',
+        constituentWikidata_URL: 'https://www.wikidata.org/wiki/Q5582',
+        gender: '',
+      },
+    ],
+    objectDate: '1889',
+    objectBeginDate: 1889,
+    objectEndDate: 1889,
+    medium: 'Oil on canvas',
+    dimensions: '28 7/8 × 36 3/4 in. (73.2 × 93.4 cm)',
+    culture: '',
+    period: '',
+    dynasty: '',
+    accessionNumber: '1993.132',
+    creditLine: 'Purchase, The Annenberg Foundation Gift, 1993',
+    country: '',
+    region: '',
+    tags: [
+      {
+        term: 'Landscapes',
+        AAT_URL: 'http://vocab.getty.edu/page/aat/300132294',
+        Wikidata_URL: 'https://www.wikidata.org/wiki/Q191163',
+      },
+      {
+        term: 'Cypresses',
+        AAT_URL: 'http://vocab.getty.edu/page/aat/300343641',
+        Wikidata_URL: 'https://www.wikidata.org/wiki/Q146911',
+      },
+    ],
+    objectWikidata_URL: 'https://www.wikidata.org/wiki/Q45585',
+    GalleryNumber: '822',
+  },
+
+  /** 547802 — `tags` null, `constituents` null, and a genuine BCE date. */
+  bceNullTags: {
+    objectID: 547802,
+    title: 'The Temple of Dendur',
+    isPublicDomain: true,
+    primaryImage: 'https://images.metmuseum.org/CRDImages/eg/original/DP239218.jpg',
+    primaryImageSmall: 'https://images.metmuseum.org/CRDImages/eg/web-large/DP239218.jpg',
+    additionalImages: [],
+    objectURL: 'https://www.metmuseum.org/art/collection/search/547802',
+    department: 'Egyptian Art',
+    objectName: 'Temple',
+    classification: '',
+    isHighlight: true,
+    isTimelineWork: true,
+    artistDisplayName: '',
+    artistDisplayBio: '',
+    artistNationality: '',
+    artistBeginDate: '',
+    artistEndDate: '',
+    constituents: null,
+    objectDate: 'completed by 10 CE',
+    objectBeginDate: -10,
+    objectEndDate: -10,
+    medium: 'Aeolian sandstone',
+    dimensions: 'Temple Proper: H. 6.4 m (21 ft.)',
+    culture: '',
+    period: 'Roman Period',
+    dynasty: '',
+    accessionNumber: '68.154',
+    creditLine:
+      'Given to the United States by Egypt in 1965, awarded to The Metropolitan Museum of Art in 1967, and installed in The Sackler Wing in 1978',
+    country: 'Egypt',
+    region: 'Nubia',
+    tags: null,
+    objectWikidata_URL: 'https://www.wikidata.org/wiki/Q1362653',
+    GalleryNumber: '131',
+  },
+
+  /** 61296 — the Met's `0`/`0` unknown-machine-readable-date shape. */
+  unknownDate: {
+    objectID: 61296,
+    title: 'Bodhisattvas of the Four Directions(?)',
+    isPublicDomain: false,
+    primaryImage: '',
+    primaryImageSmall: '',
+    additionalImages: [],
+    objectURL: 'https://www.metmuseum.org/art/collection/search/61296',
+    department: 'Asian Art',
+    objectName: 'Figure',
+    classification: 'Sculpture',
+    isHighlight: false,
+    isTimelineWork: false,
+    artistDisplayName: '',
+    artistDisplayBio: '',
+    artistNationality: '',
+    artistBeginDate: '',
+    artistEndDate: '',
+    constituents: null,
+    objectDate: 'date unknown',
+    objectBeginDate: 0,
+    objectEndDate: 0,
+    medium: 'Wood, plaster',
+    dimensions: 'H. 51 in. (129.5 cm); Diam. of base 13 in. (33 cm)',
+    culture: 'China',
+    period: '',
+    dynasty: '',
+    accessionNumber: '21.135',
+    creditLine: 'Rogers Fund, 1921',
+    country: '',
+    region: '',
+    tags: [
+      {
+        term: 'Bodhisattvas',
+        AAT_URL: 'http://vocab.getty.edu/page/aat/300264360',
+        Wikidata_URL: 'https://www.wikidata.org/wiki/Q178149',
+      },
+    ],
+    objectWikidata_URL: '',
+    GalleryNumber: '',
+  },
+
+  /**
+   * 548211 — the richest findspot in the sampled archaeological departments:
+   * seven geography fields populated at once, and a single measurements element
+   * carrying three axes.
+   */
+  geographyRich: {
+    objectID: 548211,
+    title: 'Sarcophagus of Harkhebit',
+    isPublicDomain: true,
+    primaryImage: 'https://images.metmuseum.org/CRDImages/eg/original/07.229.1a-b_EGDP011797.jpg',
+    primaryImageSmall: '',
+    additionalImages: [],
+    objectURL: 'https://www.metmuseum.org/art/collection/search/548211',
+    department: 'Egyptian Art',
+    objectName: 'Sarcophagus, Harkhebit',
+    classification: '',
+    isHighlight: false,
+    isTimelineWork: true,
+    artistDisplayName: '',
+    artistDisplayBio: '',
+    artistNationality: '',
+    artistBeginDate: '',
+    artistEndDate: '',
+    constituents: null,
+    objectDate: '595–526 BCE',
+    objectBeginDate: -595,
+    objectEndDate: -526,
+    medium: 'Greywacke',
+    dimensions: 'H. 256.5 cm  (101 in.); W. 127 cm (50 in.) at shoulders',
+    culture: '',
+    period: 'Late Period (Saite)',
+    dynasty: 'Dynasty 26, mid to late',
+    accessionNumber: '07.229.1a, b',
+    creditLine: 'Rogers Fund, 1907',
+    country: 'Egypt',
+    region: 'Memphite Region',
+    geographyType: 'From',
+    city: '',
+    state: '',
+    county: '',
+    subregion: 'Saqqara',
+    locale: 'Late Period cemetery, Tomb of Harkhebit',
+    locus: 'burial chamber',
+    excavation: 'Egyptian Antiquities Service excavations, 1902',
+    river: '',
+    measurements: [
+      {
+        elementName: 'Overall',
+        elementDescription: null,
+        elementMeasurements: { Height: 256.5405, Thickness: 132.0803, Width: 127.0003 },
+      },
+    ],
+    tags: null,
+    objectWikidata_URL: 'https://www.wikidata.org/wiki/Q28670008',
+    GalleryNumber: '123',
+  },
+
+  /**
+   * 544683 — three measurement elements whose axis keys differ from one another:
+   * two `Depth`-only siblings distinguished only by their descriptions, and one
+   * `Height`/`Width` element with a null description. The shape a fixed set of
+   * named measurement fields could not carry.
+   */
+  multiMeasurement: {
+    objectID: 544683,
+    title: 'Statue of two men and a boy that served as a domestic icon',
+    isPublicDomain: true,
+    primaryImage: 'https://images.metmuseum.org/CRDImages/eg/original/DP206147.jpg',
+    primaryImageSmall: '',
+    additionalImages: [],
+    objectURL: 'https://www.metmuseum.org/art/collection/search/544683',
+    department: 'Egyptian Art',
+    objectName: 'Statue group, two men, boy',
+    classification: '',
+    isHighlight: true,
+    isTimelineWork: true,
+    artistDisplayName: '',
+    artistDisplayBio: '',
+    artistNationality: '',
+    artistBeginDate: '',
+    artistEndDate: '',
+    constituents: null,
+    objectDate: 'ca. 1347–1330 BCE',
+    objectBeginDate: -1353,
+    objectEndDate: -1353,
+    medium: 'Limestone, paint',
+    dimensions: 'h. 17 cm (6 11/16 in); w. 12.5 cm (4 15/16 in)',
+    culture: '',
+    period: 'New Kingdom, Amarna Period',
+    dynasty: 'Dynasty 18',
+    accessionNumber: '11.150.21',
+    creditLine: 'Rogers Fund, 1911',
+    country: '',
+    region: 'Middle Egypt',
+    geographyType: 'Probably originally from',
+    city: '',
+    state: '',
+    county: '',
+    subregion: 'Amarna (Akhetaten)',
+    locale: '',
+    locus: '',
+    excavation: '',
+    river: '',
+    measurements: [
+      {
+        elementName: 'Other',
+        elementDescription: 'Depth nxt to boy',
+        elementMeasurements: { Depth: 4.8 },
+      },
+      {
+        elementName: 'Other',
+        elementDescription: 'Depth nxt to man',
+        elementMeasurements: { Depth: 5.7 },
+      },
+      {
+        elementName: 'Overall',
+        elementDescription: null,
+        elementMeasurements: { Height: 17, Width: 12.5 },
+      },
+    ],
+    tags: null,
+    objectWikidata_URL: 'https://www.wikidata.org/wiki/Q29385817',
+    GalleryNumber: '121',
+  },
+
+  /**
+   * 20121 — a firm still in business: `artistEndDate` carries the `9999`
+   * placeholder beside a real begin year, and the Maker constituent's name is
+   * entity-encoded while `artistDisplayName` is not. Trimmed to the artist and
+   * constituent fields.
+   */
+  stillActiveMaker: {
+    objectID: 20121,
+    title: 'Chocolate Pot',
+    artistDisplayName: 'Tiffany & Co.',
+    artistDisplayBio: 'American, New York, NY, 1837–present',
+    artistNationality: 'American',
+    artistBeginDate: '1837',
+    artistEndDate: '9999',
+    constituents: [
+      {
+        constituentID: 162539,
+        role: 'Maker',
+        name: 'Tiffany &amp; Co.',
+        constituentULAN_URL: 'http://vocab.getty.edu/page/ulan/500330306',
+        constituentWikidata_URL: 'https://www.wikidata.org/wiki/Q1066858',
+        gender: '',
+      },
+      {
+        constituentID: 7406,
+        role: 'Designer',
+        name: 'Designed by Charles Osborne',
+        constituentULAN_URL: '',
+        constituentWikidata_URL: '',
+        gender: '',
+      },
+    ],
+    objectDate: '1879',
+    objectBeginDate: 1879,
+    objectEndDate: 1879,
+  },
+
+  /** 16682 — the `9999` placeholder with an empty `artistBeginDate`. Trimmed to the artist fields. */
+  endOnlyPlaceholder: {
+    objectID: 16682,
+    title: 'Embroidered coverlet',
+    artistDisplayName: 'A. S. S.',
+    artistDisplayBio: '',
+    artistNationality: 'American',
+    artistBeginDate: '',
+    artistEndDate: '9999',
+  },
+
+  /** 79199 — a future year other than `9999` in `artistEndDate`. Trimmed to the artist fields. */
+  futureYearPlaceholder: {
+    objectID: 79199,
+    title: 'Purse',
+    artistDisplayName: 'Gucci',
+    artistDisplayBio: 'Italian, founded 1921',
+    artistNationality: 'Italian',
+    artistBeginDate: '1921',
+    artistEndDate: '2112',
+  },
+
+  /**
+   * 288322 — entity-encoded constituent names (`&amp;`, `&#39;`), trimmed to 4
+   * of its 38 constituents: three encoded, one plain with both URLs populated.
+   */
+  encodedConstituents: {
+    objectID: 288322,
+    title:
+      '[Group of 122 Stereograph Views of Egypt, the Holy Lands, and the Middle East, Including Palestine and Jerusalem]',
+    artistDisplayName: 'Unknown',
+    constituents: [
+      {
+        constituentID: 169986,
+        role: 'Artist',
+        name: 'Unknown',
+        constituentULAN_URL: 'http://vocab.getty.edu/page/ulan/500125274',
+        constituentWikidata_URL: 'https://www.wikidata.org/wiki/Q24238356',
+        gender: '',
+      },
+      {
+        constituentID: 59825,
+        role: 'Artist',
+        name: 'Strohmeyer &amp; Wyman',
+        constituentULAN_URL: '',
+        constituentWikidata_URL: '',
+        gender: '',
+      },
+      {
+        constituentID: 60033,
+        role: 'Publisher',
+        name: 'Good, Berners, &amp; Lant',
+        constituentULAN_URL: '',
+        constituentWikidata_URL: '',
+        gender: '',
+      },
+      {
+        constituentID: 60038,
+        role: 'Publisher',
+        name: 'World&#39;s Views Series',
+        constituentULAN_URL: '',
+        constituentWikidata_URL: '',
+        gender: '',
+      },
+    ],
+  },
+
+  /** 21814 — a raw `<i>…</i>` pair in `title` only. Trimmed to the text fields. */
+  italicTitle: {
+    objectID: 21814,
+    title: 'Sword guard (<i>Tsuba</i>) Depicting Bodhidharma (達磨図鐔)',
+    objectName: 'Sword guard (Tsuba)',
+    medium: 'Iron, gold, silver',
+    department: 'Arms and Armor',
+    objectDate: '18th century',
+    objectURL: 'https://www.metmuseum.org/art/collection/search/21814',
+  },
+
+  /**
+   * 21830 — `<i>…</i>` pairs in `title`, `objectName`, and `medium` (three in
+   * one value), beside a genuine 1701–1800 artist range. Trimmed to the text
+   * and artist fields.
+   */
+  italicFields: {
+    objectID: 21830,
+    title: '紅葉蒔絵鞘脇指拵 Mounting for a Short Sword (<i>Wakizashi</i>)',
+    objectName: 'Blade and mounting for a short sword (<i>Wakizashi</i>)',
+    medium:
+      'Steel, wood, lacquer, rayskin (<i>same</i>), thread, copper-gold alloy (<i>shakudō</i>), gold, copper-silver alloy (<i>shibuichi</i>)',
+    department: 'Arms and Armor',
+    artistDisplayName: '重武 Shigetake',
+    artistDisplayBio: 'Japanese, Edo, active 18th century',
+    artistBeginDate: '1701',
+    artistEndDate: '1800',
+    objectDate: 'blade, 18th century; mounting, 19th century',
+    objectURL: 'https://www.metmuseum.org/art/collection/search/21830',
+  },
+
+  /**
+   * 437403 — a "Style of" attribution: `artistPrefix` set, the dates Rembrandt's
+   * own, the prefix repeated in the constituent name, and a credit-line year
+   * (1959) that is not `accessionYear` (1960). Trimmed to the attribution,
+   * department, and acquisition fields.
+   */
+  styleOfAttribution: {
+    objectID: 437403,
+    title: 'Christ and the Woman of Samaria',
+    department: 'European Paintings',
+    artistRole: 'Artist',
+    artistPrefix: 'Style of',
+    artistDisplayName: 'Rembrandt',
+    artistDisplayBio: 'Dutch, ca. 1655',
+    artistSuffix: '',
+    artistNationality: 'Dutch',
+    artistBeginDate: '1606',
+    artistEndDate: '1669',
+    constituents: [
+      {
+        constituentID: 162297,
+        role: 'Artist',
+        name: 'Style of Rembrandt',
+        constituentULAN_URL: 'http://vocab.getty.edu/page/ulan/500011051',
+        constituentWikidata_URL: 'https://www.wikidata.org/wiki/Q5598',
+        gender: '',
+      },
+    ],
+    accessionNumber: '60.71.14',
+    accessionYear: '1960',
+    creditLine: 'Bequest of Lillian S. Timken, 1959',
+    rightsAndReproduction: '',
+    metadataDate: '2025-09-17T04:49:46.407Z',
+  },
+
+  /**
+   * 456947 — a patron: `artistSuffix` carries the reign, `artistRole` is
+   * `Patron`, and the second constituent's prefix rides in its name. Trimmed to
+   * the attribution, department, and acquisition fields.
+   */
+  patronAttribution: {
+    objectID: 456947,
+    title: "Sitara, Interior Door Curtain of the Ka'ba",
+    department: 'Islamic Art',
+    artistRole: 'Patron',
+    artistPrefix: '',
+    artistDisplayName: 'Sultan Abdülhamid II',
+    artistDisplayBio: '',
+    artistSuffix: '(r. 1876–1909)',
+    artistNationality: 'Ottoman Turkish',
+    artistBeginDate: '1842',
+    artistEndDate: '1918',
+    constituents: [
+      {
+        constituentID: 196881,
+        role: 'Patron',
+        name: 'Sultan Abdülhamid II',
+        constituentULAN_URL: '',
+        constituentWikidata_URL: '',
+        gender: '',
+      },
+      {
+        constituentID: 203933,
+        role: 'Workshop director',
+        name: 'Workshop of Warshat al-Khurunfish',
+        constituentULAN_URL: '',
+        constituentWikidata_URL: '',
+        gender: '',
+      },
+    ],
+    accessionNumber: '2009.59.1',
+    accessionYear: '2009',
+    creditLine:
+      'Gift of Professor Maan Z. Madina, in memory of his mother, Najiyya Khanum al-Kurdi, 2009',
+    rightsAndReproduction: '',
+    metadataDate: '2026-04-18T04:56:48.367Z',
+  },
+
+  /**
+   * 488978 — a copyrighted work carrying its rights holder, in the department
+   * whose record name is not its `met_list_departments` name. Trimmed to the
+   * rights, department, and acquisition fields.
+   */
+  copyrightedWork: {
+    objectID: 488978,
+    title: 'Autumn Rhythm: Number 30, 1950',
+    isPublicDomain: false,
+    department: 'Modern and Contemporary Art',
+    artistRole: 'Artist',
+    artistDisplayName: 'Jackson Pollock',
+    accessionNumber: '57.92',
+    accessionYear: '1957',
+    creditLine: 'George A. Hearn Fund, 1957',
+    rightsAndReproduction:
+      '© 2026 Pollock-Krasner Foundation / Artists Rights Society (ARS), New York',
+    metadataDate: '2026-10-01T04:59:29.693Z',
+  },
+
+  /**
+   * 286850 — a full date in `accessionYear` and a `metadataDate` with no
+   * fractional seconds. Trimmed to the department and acquisition fields.
+   */
+  fullDateAccession: {
+    objectID: 286850,
+    title: '[Countess de Castiglione]',
+    department: 'Photographs',
+    accessionNumber: '2005.100.429',
+    accessionYear: '2005-02-15',
+    creditLine: 'Gilman Collection, Gift of The Howard Gilman Foundation, 2005',
+    rightsAndReproduction: '',
+    metadataDate: '2025-03-06T04:54:30Z',
+  },
+
+  /**
+   * 512 — an empty `accessionYear`, a two-digit fraction in `metadataDate`, and
+   * department 1 under its record name. Trimmed to the department and
+   * acquisition fields.
+   */
+  americanWing: {
+    objectID: 512,
+    title: 'Bible',
+    department: 'The American Wing',
+    artistRole: 'Maker',
+    artistDisplayName: 'George Edward Eyre',
+    accessionNumber: 'Inst.1986.1',
+    accessionYear: '',
+    creditLine: 'Gift of Daniel M. C. Hopping, 1986',
+    rightsAndReproduction: '',
+    metadataDate: '2023-02-07T04:46:51.34Z',
+  },
+
+  /**
+   * 544442 — a `reign` beside `period` and `dynasty`, `portfolio` empty.
+   * Trimmed to the text fields those sit beside (live, 2026-10-15).
+   */
+  jointReign: {
+    objectID: 544442,
+    title: 'Sphinx of Hatshepsut',
+    department: 'Egyptian Art',
+    objectName: 'Sphinx, Hatshepsut; Hatshepsut-sculpture',
+    objectDate: 'ca. 1473–1458 BCE',
+    medium: 'Granite, paint',
+    period: 'New Kingdom',
+    dynasty: 'Dynasty 18',
+    reign: 'Joint reign of Hatshepsut and Thutmose III',
+    portfolio: '',
+    accessionNumber: '31.3.166',
+  },
+
+  /**
+   * 383857 — a `portfolio` naming the print series and plate, `reign` empty.
+   * Trimmed to the text fields those sit beside (live, 2026-10-15).
+   */
+  printingPlate: {
+    objectID: 383857,
+    title:
+      'Winter Hawk. Falco hyemalis [current name: Red-shouldered Hawk. Buteo lineatus], printlng plate for "The Birds of America," 1827–38, plate LXXI',
+    department: 'Drawings and Prints',
+    objectName: 'Plate',
+    classification: 'Plates',
+    objectDate: '1829',
+    period: '',
+    dynasty: '',
+    reign: '',
+    portfolio: 'Birds of America, plate LXXI',
+    accessionNumber: '76.1.4',
+  },
+} as const;
+
+/**
+ * Every name the department map holds: the 19 `met_list_departments` names
+ * (live, 2026-10-04), then the five record `department` names that differ from
+ * them, each observed on a live record of that department's `/v1/objects` list.
+ */
+const departmentNames: [string, number][] = [
+  ['American Decorative Arts', 1],
+  ['Ancient West Asian Art', 3],
+  ['Arms and Armor', 4],
+  ['Arts of Africa, Oceania, and the Americas', 5],
+  ['Asian Art', 6],
+  ['The Cloisters', 7],
+  ['The Costume Institute', 8],
+  ['Drawings and Prints', 9],
+  ['Egyptian Art', 10],
+  ['European Paintings', 11],
+  ['European Sculpture and Decorative Arts', 12],
+  ['Greek and Roman Art', 13],
+  ['Islamic Art', 14],
+  ['The Robert Lehman Collection', 15],
+  ['The Libraries', 16],
+  ['Medieval Art', 17],
+  ['Musical Instruments', 18],
+  ['Photographs', 19],
+  ['Modern Art', 21],
+  ['The American Wing', 1],
+  ['The Michael C. Rockefeller Wing', 5],
+  ['Costume Institute', 8],
+  ['Robert Lehman Collection', 15],
+  ['Modern and Contemporary Art', 21],
+];
+
+/** `/v1/objects/{id}` serving each record at its own ID; any other ID is unrouted. */
+function objectsUpstream(...records: { objectID: number }[]) {
+  return routes(
+    Object.fromEntries(
+      records.map((record) => [
+        `/public/collection/v1/objects/${record.objectID}`,
+        () => jsonResponse(record),
+      ]),
+    ),
+  );
+}
+
+type GetObjectOutput = z.infer<typeof metGetObject.output>;
+
+/** The `content[]` section `met_get_object` renders for one object, heading included. */
+function sectionFor(text: string, objectID: number): string {
+  return (
+    text.split(/^(?=## )/m).find((section) => section.includes(`— Object ${objectID}\n`)) ?? ''
+  );
+}
+
+describe('MetService', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    initMetService({} as AppConfig, createInMemoryStorage());
+    // Unstaged calls fail loudly; each test layers the fakes it needs on top.
+    fetchMock = vi.fn().mockRejectedValue(new Error('unmocked fetch'));
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  describe('per-endpoint URLs under the default base', () => {
+    it('fetches an object from /v1/objects/{id} on the collection host', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(rawObjects.populated));
+      await getMetService().getObject(436535, ...call());
+
+      const url = new URL(String(fetchMock.mock.calls[0]?.[0]));
+      expect(url.origin).toBe('https://collectionapi.metmuseum.org');
+      expect(url.pathname).toBe('/public/collection/v1/objects/436535');
+    });
+
+    it('fetches departments from /v1/departments on the collection host', async () => {
+      fetchMock.mockResolvedValue(jsonResponse({ departments: [] }));
+      await getMetService().getDepartments(...call());
+
+      const url = new URL(String(fetchMock.mock.calls[0]?.[0]));
+      expect(url.origin).toBe('https://collectionapi.metmuseum.org');
+      expect(url.pathname).toBe('/public/collection/v1/departments');
+    });
+  });
+
+  /**
+   * An upstream 504/408/425 and the server's own timer abort all arrive as a
+   * `Timeout`-coded `McpError`. Each is transient, so each takes the same retry
+   * ladder `met_list_departments` uses rather than a non-retryable relabel.
+   */
+  describe('search — a Timeout-coded failure is retried like any transient error (#28)', () => {
+    /** A real 504 exchange, minted per call so every retry reads a fresh body. */
+    const gatewayTimeout = () =>
+      Promise.resolve(
+        new Response('<html>gateway timeout</html>', {
+          status: 504,
+          statusText: 'Gateway Timeout',
+          headers: { 'content-type': 'text/html' },
+        }),
+      );
+
+    /** A request that never answers until its signal aborts — the timer-abort shape. */
+    const neverAnswers = (_request: unknown, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+      });
+
+    it('retries an upstream 504 on the ordinary ladder, then surfaces it as the outage (#33)', async () => {
+      vi.useFakeTimers();
+      fetchMock.mockImplementation(gatewayTimeout);
+      const ctx = createMockContext({ errors: metSearchCollections.errors });
+
+      const pending = getMetService()
+        .search({ q: 'cat', limit: 20 }, ...call(ctx))
+        .catch((e: unknown) => e);
+      await vi.runAllTimersAsync();
+      const err = (await pending) as {
+        code: number;
+        message: string;
+        data: Record<string, unknown>;
+        cause: { data: Record<string, unknown> };
+      };
+
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+      expect(err.code).toBe(JsonRpcErrorCode.ServiceUnavailable);
+      expect(err.message).toBe('The Met API answered with a server error (HTTP 504).');
+      expect(err.data).toEqual({ reason: 'upstream_unavailable', status: 504 });
+      // The exhausted ladder's own 504 is the cause: four attempts, never relabeled.
+      expect(err.cause.data.errorSource).toBe('FetchHttpError');
+      expect(err.cause.data.retryAttempts).toBe(4);
+    });
+
+    it('retries a request-timer abort (FetchTimeout) the same way', async () => {
+      vi.useFakeTimers();
+      fetchMock.mockImplementation(neverAnswers);
+      const ctx = createMockContext({ errors: metSearchCollections.errors });
+
+      // Four full 10 s request timers plus backoff need about 48 s — past the
+      // default 30 s call budget, which would end the ladder as its expiry.
+      const pending = getMetService()
+        .search({ q: 'cat', limit: 20 }, ctx, {
+          deadlineAt: Date.now() + 120_000,
+          signal: ctx.signal,
+        })
+        .catch((e: unknown) => e);
+      await vi.runAllTimersAsync();
+      const err = (await pending) as { code: number; data: Record<string, unknown> };
+
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+      expect(err.code).toBe(JsonRpcErrorCode.Timeout);
+      expect(err.data.errorSource).toBe('FetchTimeout');
+      expect(err.data.retryAttempts).toBe(4);
+      expect(err.data.reason).toBeUndefined();
+    });
+
+    it('recovers when a retry after a 504 succeeds', async () => {
+      vi.useFakeTimers();
+      fetchMock
+        .mockImplementationOnce(gatewayTimeout)
+        .mockImplementationOnce(() => Promise.resolve(idsResponse(3)));
+
+      const pending = getMetService().search({ q: 'cat', limit: 20 }, ...call());
+      await vi.runAllTimersAsync();
+      const result = await pending;
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(result.total).toBe(3);
+    });
+
+    it('reaches the caller through the tool contract as upstream_unavailable, with no search_timeout reason', async () => {
+      vi.useFakeTimers();
+      fetchMock.mockImplementation(gatewayTimeout);
+
+      const pending = runToolContract(metSearchCollections, { q: 'cat', limit: 20 });
+      await vi.runAllTimersAsync();
+      const result = await pending;
+
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+      expect(result.isError).toBe(true);
+      const error = (
+        result.structuredContent as { error: { code: number; data: Record<string, unknown> } }
+      ).error;
+      expect(error.code).toBe(JsonRpcErrorCode.ServiceUnavailable);
+      expect(error.data.status).toBe(504);
+      expect(error.data.reason).toBe('upstream_unavailable');
+      const text = (result.content ?? [])
+        .filter((block): block is { type: 'text'; text: string } => block.type === 'text')
+        .map((block) => block.text)
+        .join('\n');
+      expect(text).toContain('(HTTP 504)');
+      expect(text).toContain('reason upstream_unavailable');
+      expect(text).not.toContain('search_timeout');
+      expect(text).not.toContain('too large');
+    });
+  });
+
+  /**
+   * `/v1.1/search` pages upstream: one request per page, `offset`/`limit` passed
+   * through, nothing past `offset + limit = 10,000`, and `total` still the full
+   * count. The fake mirrors those measured behaviors, so every case below runs
+   * the service's real URL building and window arithmetic.
+   */
+  describe('search — /v1.1 paging (#27)', () => {
+    it('requests /v1.1/search once, carrying offset, limit, and every filter', async () => {
+      fetchMock.mockImplementation(searchUpstream(3));
+      await getMetService().search(
+        {
+          q: 'cat',
+          limit: 20,
+          hasImages: true,
+          isHighlight: true,
+          isOnView: false,
+          medium: 'Paintings',
+          departmentId: 11,
+          geoLocation: ['France'],
+          dateBegin: 1800,
+          dateEnd: 1900,
+        },
+        ...call(),
+      );
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const url = new URL(String(fetchMock.mock.calls[0]?.[0]));
+      expect(url.origin).toBe(COLLECTION_ORIGIN);
+      expect(url.pathname).toBe(SEARCH_PATH);
+      expect([...url.searchParams.entries()]).toEqual([
+        ['q', 'cat'],
+        ['offset', '0'],
+        ['limit', '20'],
+        ['hasImages', 'true'],
+        ['isHighlight', 'true'],
+        ['isOnView', 'false'],
+        ['medium', 'Paintings'],
+        ['departmentId', '11'],
+        ['geoLocation', 'France'],
+        ['dateBegin', '1800'],
+        ['dateEnd', '1900'],
+      ]);
+      expect(url.searchParams.has('isPublicDomain')).toBe(false);
+    });
+
+    it('sends q, offset, and limit alone when no filter is set (#13: omitted filters stay off)', async () => {
+      fetchMock.mockImplementation(searchUpstream(3));
+      await getMetService().search({ q: 'cat', limit: 10, offset: 40 }, ...call());
+
+      const url = new URL(String(fetchMock.mock.calls[0]?.[0]));
+      expect([...url.searchParams.entries()]).toEqual([
+        ['q', 'cat'],
+        ['offset', '40'],
+        ['limit', '10'],
+      ]);
+    });
+
+    it('returns the first page with continuation at offset 0', async () => {
+      fetchMock.mockImplementation(searchUpstream(100));
+      const result = await getMetService().search({ q: 'cat', limit: 10 }, ...call());
+
+      expect(result).toEqual({
+        total: 100,
+        objectIDs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        returned: 10,
+        truncated: true,
+        remaining: 90,
+        nextOffset: 10,
+        offset: 0,
+      });
+    });
+
+    it('returns a mid-window page of a result set larger than the window', async () => {
+      fetchMock.mockImplementation(searchUpstream(14_398));
+      const result = await getMetService().search(
+        { q: 'horse', limit: 500, offset: 5000 },
+        ...call(),
+      );
+
+      expect(result.objectIDs[0]).toBe(5001);
+      expect(result.objectIDs.at(-1)).toBe(5500);
+      expect(result.returned).toBe(500);
+      expect(result.total).toBe(14_398);
+      // Against the 10,000 window, not the 14,398 total.
+      expect(result.remaining).toBe(4500);
+      expect(result.truncated).toBe(true);
+      expect(result.nextOffset).toBe(5500);
+    });
+
+    it('ends paging on the page that crosses the 10,000 window', async () => {
+      fetchMock.mockImplementation(searchUpstream(14_398));
+      const result = await getMetService().search(
+        { q: 'horse', limit: 500, offset: 9900 },
+        ...call(),
+      );
+
+      expect(new URL(String(fetchMock.mock.calls[0]?.[0])).searchParams.get('offset')).toBe('9900');
+      expect(result.returned).toBe(100);
+      expect(result.objectIDs.at(-1)).toBe(10_000);
+      expect(result.total).toBe(14_398);
+      expect(result.remaining).toBe(0);
+      expect(result.truncated).toBe(false);
+      expect(result.nextOffset).toBeNull();
+    });
+
+    it('returns an empty page, not an error, at an offset of exactly 10,000', async () => {
+      fetchMock.mockImplementation(searchUpstream(14_398));
+      const result = await getMetService().search(
+        { q: 'horse', limit: 20, offset: 10_000 },
+        ...call(),
+      );
+
+      expect(result).toEqual({
+        total: 14_398,
+        objectIDs: [],
+        returned: 0,
+        truncated: false,
+        remaining: 0,
+        nextOffset: null,
+        offset: 10_000,
+      });
+    });
+
+    it('returns an empty page, not an error, at an offset of exactly total', async () => {
+      fetchMock.mockImplementation(searchUpstream(178));
+      const result = await getMetService().search(
+        { q: 'sunflower', limit: 20, offset: 178 },
+        ...call(),
+      );
+
+      expect(result.objectIDs).toEqual([]);
+      expect(result.total).toBe(178);
+      expect(result.offset).toBe(178);
+      expect(result.remaining).toBe(0);
+      expect(result.nextOffset).toBeNull();
+    });
+
+    it('returns an empty page for an offset far past total', async () => {
+      fetchMock.mockImplementation(searchUpstream(25));
+      const result = await getMetService().search({ q: 'cat', limit: 10, offset: 999 }, ...call());
+
+      expect(result.objectIDs).toEqual([]);
+      expect(result.offset).toBe(999);
+      expect(result.total).toBe(25);
+      expect(result.truncated).toBe(false);
+    });
+
+    it('ends paging on the last partial page of a result set inside the window', async () => {
+      fetchMock.mockImplementation(searchUpstream(25));
+      const result = await getMetService().search({ q: 'cat', limit: 10, offset: 20 }, ...call());
+
+      expect(result.objectIDs).toEqual([21, 22, 23, 24, 25]);
+      expect(result.remaining).toBe(0);
+      expect(result.truncated).toBe(false);
+      expect(result.nextOffset).toBeNull();
+    });
+
+    it('treats a total of exactly 10,000 as fully reachable', async () => {
+      fetchMock.mockImplementation(searchUpstream(10_000));
+      const result = await getMetService().search(
+        { q: 'cat', limit: 500, offset: 9500 },
+        ...call(),
+      );
+
+      expect(result.returned).toBe(500);
+      expect(result.remaining).toBe(0);
+      expect(result.nextOffset).toBeNull();
+    });
+
+    it('normalizes an upstream objectIDs: null with total 0 to an empty page', async () => {
+      fetchMock.mockResolvedValue(jsonResponse({ total: 0, objectIDs: null }));
+      const result = await getMetService().search({ q: 'zzzqqqxyz', limit: 20 }, ...call());
+
+      expect(result.objectIDs).toEqual([]);
+      expect(result.total).toBe(0);
+      expect(result.nextOffset).toBeNull();
+    });
+
+    it('ends the walk on an empty page inside the reachable window rather than repeating its offset (#46)', async () => {
+      fetchMock.mockResolvedValue(jsonResponse({ total: 5000, objectIDs: null }));
+      const result = await getMetService().search(
+        { q: 'horse', limit: 100, offset: 4000 },
+        ...call(),
+      );
+
+      expect(result).toEqual({
+        total: 5000,
+        objectIDs: [],
+        returned: 0,
+        truncated: false,
+        remaining: 0,
+        nextOffset: null,
+        offset: 4000,
+      });
+    });
+
+    it('echoes the applied default of 0 when offset is omitted (#17)', async () => {
+      fetchMock.mockImplementation(searchUpstream(5));
+      const result = await getMetService().search({ q: 'rare', limit: 20 }, ...call());
+      expect(result.offset).toBe(0);
+    });
+
+    it('walks the whole reachable window by following nextOffset', async () => {
+      fetchMock.mockImplementation(searchUpstream(14_398));
+      const seen = new Set<number>();
+      let offset: number | null = 0;
+      let pages = 0;
+      while (offset !== null) {
+        const page = await getMetService().search({ q: 'horse', limit: 500, offset }, ...call());
+        for (const id of page.objectIDs) seen.add(id);
+        offset = page.nextOffset;
+        pages++;
+      }
+
+      expect(pages).toBe(20);
+      expect(seen.size).toBe(10_000);
+      expect(fetchMock).toHaveBeenCalledTimes(20);
+    });
+  });
+
+  /**
+   * `/v1.1/search` honors one keyword-scope flag: `title=true` or `tags=true`.
+   * With both it answers the title set and drops `tags`, and it ignores a
+   * `false` value, so the service sends exactly one flag, set to `true`.
+   */
+  describe('search — matchField restricts the keyword match (#35, #53)', () => {
+    /** The query parameters of the one search request the test issued. */
+    const sentParams = () => [
+      ...new URL(String(fetchMock.mock.calls[0]?.[0])).searchParams.entries(),
+    ];
+
+    it.each([
+      ['title', 'title'],
+      ['tags', 'tags'],
+      ['artistOrCulture', 'artistOrCulture'],
+    ] as const)(
+      'matchField %s sends %s=true after the paging parameters, and no other flag',
+      async (matchField, flag) => {
+        fetchMock.mockImplementation(searchUpstream(36));
+        await getMetService().search({ q: 'sunflower', limit: 20, matchField }, ...call());
+
+        expect(sentParams()).toEqual([
+          ['q', 'sunflower'],
+          ['offset', '0'],
+          ['limit', '20'],
+          [flag, 'true'],
+        ]);
+      },
+    );
+
+    it('sends no flag, and no false value, when matchField is unset', async () => {
+      fetchMock.mockImplementation(searchUpstream(178));
+      await getMetService().search({ q: 'sunflower', limit: 20 }, ...call());
+
+      const keys = sentParams().map(([key]) => key);
+      expect(keys).not.toContain('title');
+      expect(keys).not.toContain('tags');
+      expect(keys).not.toContain('artistOrCulture');
+      expect(sentParams().some(([, value]) => value === 'false')).toBe(false);
+    });
+
+    it('composes with every other filter in the one request', async () => {
+      fetchMock.mockImplementation(searchUpstream(20));
+      await getMetService().search(
+        { q: 'sunflower', limit: 20, matchField: 'title', hasImages: true, departmentId: 11 },
+        ...call(),
+      );
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(sentParams()).toEqual([
+        ['q', 'sunflower'],
+        ['offset', '0'],
+        ['limit', '20'],
+        ['title', 'true'],
+        ['hasImages', 'true'],
+        ['departmentId', '11'],
+      ]);
+    });
+
+    it('leaves paging unchanged: one request per page, the flag on every page', async () => {
+      fetchMock.mockImplementation(searchUpstream(36));
+      const seen: number[] = [];
+      let offset: number | null = 0;
+      while (offset !== null) {
+        const page = await getMetService().search(
+          { q: 'sunflower', limit: 10, offset, matchField: 'tags' },
+          ...call(),
+        );
+        seen.push(...page.objectIDs);
+        offset = page.nextOffset;
+      }
+
+      expect(seen).toEqual(Array.from({ length: 36 }, (_, i) => i + 1));
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+      for (const url of searchRequests(fetchMock)) {
+        expect(url.searchParams.getAll('tags')).toEqual(['true']);
+        expect(url.searchParams.has('title')).toBe(false);
+      }
+    });
+  });
+
+  describe('countKeywordMatches — the keyword-only count behind the zero-match notice (#25)', () => {
+    it('sends one limit=1 request carrying q alone and returns the upstream total', async () => {
+      fetchMock.mockImplementation(searchUpstream(178));
+      const total = await getMetService().countKeywordMatches('sunflower', ...call());
+
+      expect(total).toBe(178);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const url = new URL(String(fetchMock.mock.calls[0]?.[0]));
+      expect(url.pathname).toBe(SEARCH_PATH);
+      expect([...url.searchParams.entries()]).toEqual([
+        ['q', 'sunflower'],
+        ['offset', '0'],
+        ['limit', '1'],
+      ]);
+    });
+
+    it('returns null after one failed attempt instead of throwing or retrying', async () => {
+      fetchMock.mockImplementation(() =>
+        Promise.resolve(new Response('<html>busy</html>', { status: 503 })),
+      );
+      const total = await getMetService().countKeywordMatches('sunflower', ...call());
+
+      expect(total).toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('rethrows a caller abort as cancellation rather than degrading it to null', async () => {
+      fetchMock.mockImplementation(
+        (_request: unknown, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+          }),
+      );
+      const controller = new AbortController();
+      const pending = getMetService().countKeywordMatches(
+        'sunflower',
+        ...call(createMockContext({ signal: controller.signal })),
+      );
+      controller.abort();
+
+      await expect(pending).rejects.toMatchObject({ code: JsonRpcErrorCode.RequestCancelled });
+    });
+  });
+
+  /**
+   * The tool over the real service and a fake upstream, through `runToolContract`
+   * — schema, handler, output parse, `format()`, and the enrichment trailer — so
+   * each case asserts what a client reads on both surfaces.
+   */
+  describe('met_search_collections — the reachable window on both surfaces (#27)', () => {
+    type Structured = Record<string, unknown> & { notice?: string };
+
+    it('carries exactly the output fields and the query echo on a page inside the window', async () => {
+      fetchMock.mockImplementation(searchUpstream(178));
+      const result = await runToolContract(metSearchCollections, { q: 'sunflower' });
+
+      expect(result.structuredContent).toEqual({
+        total: 178,
+        objectIDs: Array.from({ length: 20 }, (_, i) => i + 1),
+        returned: 20,
+        truncated: true,
+        remaining: 158,
+        nextOffset: 20,
+        offset: 0,
+        effectiveQuery: 'q="sunflower"',
+      });
+      expect(readMarkdownText(textOf(result))).toContain('Query: q="sunflower"');
+    });
+
+    it('discloses the window when total exceeds 10,000, on a truncated page', async () => {
+      fetchMock.mockImplementation(searchUpstream(14_398));
+      const result = await runToolContract(metSearchCollections, { q: 'horse', limit: 20 });
+
+      expect(result.isError).toBeFalsy();
+      const structured = result.structuredContent as Structured;
+      expect(structured.total).toBe(14_398);
+      expect(structured.remaining).toBe(9980);
+      expect(structured.notice).toContain('first 10,000 of 14,398');
+      const text = textOf(result);
+      expect(text).toContain('(truncated)');
+      expect(text).toContain('first 10,000 of 14,398');
+    });
+
+    it('marks the page that stops at the window short of total as (window end)', async () => {
+      fetchMock.mockImplementation(searchUpstream(14_398));
+      const result = await runToolContract(metSearchCollections, {
+        q: 'horse',
+        offset: 9900,
+        limit: 500,
+      });
+
+      const structured = result.structuredContent as Structured;
+      expect(structured.returned).toBe(100);
+      expect(structured.remaining).toBe(0);
+      expect(structured.nextOffset).toBeNull();
+      expect(structured.notice).toContain('10,000');
+      const text = textOf(result);
+      expect(text).toContain('**Returned IDs:** 100 (window end)');
+      expect(text).not.toContain('(complete)');
+    });
+
+    it('marks an offset of exactly 10,000 as beyond the result set, not an error', async () => {
+      fetchMock.mockImplementation(searchUpstream(14_398));
+      const result = await runToolContract(metSearchCollections, { q: 'horse', offset: 10_000 });
+
+      expect(result.isError).toBeFalsy();
+      const structured = result.structuredContent as Structured;
+      expect(structured.objectIDs).toEqual([]);
+      expect(structured.offset).toBe(10_000);
+      expect(textOf(result)).toContain('**Returned IDs:** 0 (offset beyond result set)');
+    });
+
+    it('marks an offset of exactly total as beyond the result set, with no notice of either kind', async () => {
+      fetchMock.mockImplementation(searchUpstream(178));
+      const result = await runToolContract(metSearchCollections, { q: 'sunflower', offset: 178 });
+
+      expect(result.isError).toBeFalsy();
+      const structured = result.structuredContent as Structured;
+      expect(structured.total).toBe(178);
+      expect(structured.objectIDs).toEqual([]);
+      expect(structured.notice).toBeUndefined();
+      expect(structured.effectiveQuery).toBe('q="sunflower"');
+      const text = textOf(result);
+      expect(text).toContain('**Returned IDs:** 0 (offset beyond result set)');
+      expect(text).not.toContain('10,000');
+      expect(text).not.toContain('matches no object');
+      // The empty page asks for no keyword-only count: total is not 0.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('renders the last page of a result set inside the window as (complete), with no notice', async () => {
+      fetchMock.mockImplementation(searchUpstream(178));
+      const result = await runToolContract(metSearchCollections, {
+        q: 'sunflower',
+        offset: 170,
+        limit: 20,
+      });
+
+      const structured = result.structuredContent as Structured;
+      expect(structured.returned).toBe(8);
+      expect(structured.notice).toBeUndefined();
+      expect(textOf(result)).toContain('**Returned IDs:** 8 (complete)');
+    });
+
+    it('renders a total of exactly 10,000 as (complete) on its last page, with no notice', async () => {
+      fetchMock.mockImplementation(searchUpstream(10_000));
+      const result = await runToolContract(metSearchCollections, {
+        q: 'cat',
+        offset: 9500,
+        limit: 500,
+      });
+
+      const structured = result.structuredContent as Structured;
+      expect(structured.notice).toBeUndefined();
+      expect(textOf(result)).toContain('**Returned IDs:** 500 (complete)');
+    });
+
+    /**
+     * The window matrix: every boundary cell, asserted on both surfaces. `notice`
+     * is whether the window disclosure appears — on `structuredContent` and in the
+     * `content[]` trailer alike.
+     */
+    it.each([
+      // total, offset, limit → returned, remaining, nextOffset, marker, notice
+      [5, 0, 20, 5, 0, null, '(complete)', false],
+      [20, 0, 20, 20, 0, null, '(complete)', false],
+      [10_000, 9500, 500, 500, 0, null, '(complete)', false],
+      [10_001, 9500, 500, 500, 0, null, '(window end)', true],
+      [10_001, 9000, 500, 500, 500, 9500, '(truncated)', true],
+      [14_398, 9800, 500, 200, 0, null, '(window end)', true],
+      [178, 500, 20, 0, 0, null, '(offset beyond result set)', false],
+      [14_398, 12_000, 20, 0, 0, null, '(offset beyond result set)', true],
+    ] as const)(
+      'total %i, offset %i, limit %i → %i IDs, remaining %i, nextOffset %s, %s',
+      async (total, offset, limit, returned, remaining, nextOffset, marker, notice) => {
+        fetchMock.mockImplementation(searchUpstream(total));
+        const result = await runToolContract(metSearchCollections, { q: 'horse', offset, limit });
+
+        expect(result.isError).toBeFalsy();
+        const structured = result.structuredContent as Structured;
+        expect(structured).toMatchObject({ total, offset, returned, remaining, nextOffset });
+        expect(structured.truncated).toBe(nextOffset !== null);
+        expect(structured.effectiveQuery).toBe('q="horse"');
+        const text = textOf(result);
+        expect(text).toContain(`**Returned IDs:** ${returned} ${marker}`);
+        expect(readMarkdownText(text)).toContain('Query: q="horse"');
+        if (notice) {
+          expect(structured.notice).toContain('first 10,000 of');
+          expect(text).toContain('first 10,000 of');
+        } else {
+          expect(structured.notice).toBeUndefined();
+          expect(text).not.toContain('reachable by paging');
+        }
+      },
+    );
+
+    describe('limit above the 500-ID page (#50)', () => {
+      const limitNotice =
+        'limit 600 is above the 500-ID page maximum, so this page was read with limit 500; continue from nextOffset.';
+
+      it('sends limit 500 and continues from offset + IDs served, the window notice joined after', async () => {
+        fetchMock.mockImplementation(searchUpstream(14_398));
+        const result = await runToolContract(metSearchCollections, {
+          q: 'horse',
+          offset: 1_000,
+          limit: 600,
+        });
+
+        expect(searchRequests(fetchMock).map((url) => url.searchParams.get('limit'))).toEqual([
+          '500',
+        ]);
+        const structured = result.structuredContent as Structured;
+        expect(structured).toMatchObject({
+          returned: 500,
+          remaining: 8_500,
+          truncated: true,
+          nextOffset: 1_500,
+        });
+        expect(structured.notice).toBe(
+          `${limitNotice} Only the first 10,000 of 14,398 matches are reachable by paging. Narrow the search with filters or a more specific keyword to reach the rest.`,
+        );
+        expect(textOf(result)).toContain('**Returned IDs:** 500 (truncated)');
+      });
+
+      it('a short last page ends paging at offset + IDs served, with no limit notice', async () => {
+        fetchMock.mockImplementation(searchUpstream(700));
+        const result = await runToolContract(metSearchCollections, {
+          q: 'horse',
+          offset: 500,
+          limit: 600,
+        });
+
+        const structured = result.structuredContent as Structured;
+        expect(structured).toMatchObject({ returned: 200, remaining: 0, nextOffset: null });
+        expect(structured.notice).toBeUndefined();
+        expect(textOf(result)).toContain('**Returned IDs:** 200 (complete)');
+      });
+
+      it('a page cut by the 10,000 window carries the window notice alone', async () => {
+        fetchMock.mockImplementation(searchUpstream(14_398));
+        const result = await runToolContract(metSearchCollections, {
+          q: 'horse',
+          offset: 9_800,
+          limit: 600,
+        });
+
+        const structured = result.structuredContent as Structured;
+        expect(structured).toMatchObject({ returned: 200, nextOffset: null });
+        expect(structured.notice).not.toContain('500-ID page');
+        expect(textOf(result)).toContain('**Returned IDs:** 200 (window end)');
+      });
+    });
+
+    it('continues from the delivered count when a mid-window page comes back short', async () => {
+      // A page shorter than requested inside the window: continuation keys on what
+      // was delivered, so following nextOffset can re-read a position but never skip one.
+      fetchMock.mockImplementation(
+        routes({
+          [SEARCH_PATH]: (url) =>
+            jsonResponse({
+              total: 14_398,
+              objectIDs: Array.from(
+                { length: 499 },
+                (_, i) => Number(url.searchParams.get('offset')) + i + 1,
+              ),
+            }),
+        }),
+      );
+      const result = await runToolContract(metSearchCollections, {
+        q: 'horse',
+        offset: 5000,
+        limit: 500,
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        returned: 499,
+        remaining: 4501,
+        truncated: true,
+        nextOffset: 5499,
+      });
+      expect(textOf(result)).toContain('**Returned IDs:** 499 (truncated)');
+    });
+
+    it('ends paging on both surfaces when a mid-window page comes back empty (#46)', async () => {
+      fetchMock.mockImplementation(
+        routes({ [SEARCH_PATH]: () => jsonResponse({ total: 5000, objectIDs: null }) }),
+      );
+      const result = await runToolContract(metSearchCollections, {
+        q: 'horse',
+        offset: 4000,
+        limit: 100,
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        total: 5000,
+        returned: 0,
+        remaining: 0,
+        truncated: false,
+        nextOffset: null,
+        offset: 4000,
+      });
+      const text = textOf(result);
+      expect(text).toContain('**Returned IDs:** 0 (complete)');
+      expect(text).toContain('**Next offset:** none');
+    });
+
+    it('rejects isPublicDomain at the schema, naming the key, before any request', async () => {
+      // An undeclared key by construction, so the typed argument cannot express it.
+      const result = await runToolContract(metSearchCollections, {
+        q: 'sunflower',
+        isPublicDomain: true,
+      } as unknown as z.input<typeof metSearchCollections.input>);
+
+      expect(result.isError).toBe(true);
+      const error = (result.structuredContent as { error: { code: number } }).error;
+      expect(error.code).toBe(JsonRpcErrorCode.InvalidParams);
+      expect(textOf(result)).toContain('isPublicDomain');
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['"artist"', 'artist'],
+      ['true', true],
+      ['"Title"', 'Title'],
+    ])('rejects matchField %s at the schema, before any request (#35)', async (_label, value) => {
+      const result = await runToolContract(metSearchCollections, {
+        q: 'sunflower',
+        matchField: value,
+      } as unknown as z.input<typeof metSearchCollections.input>);
+
+      expect(result.isError).toBe(true);
+      expect((result.structuredContent as { error: { code: number } }).error.code).toBe(
+        JsonRpcErrorCode.InvalidParams,
+      );
+      expect(textOf(result)).toContain('matchField');
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('accepts matchField title and tags, each a one-request page on both surfaces (#35)', async () => {
+      fetchMock.mockImplementation(searchUpstream(36));
+      for (const matchField of ['title', 'tags'] as const) {
+        const result = await runToolContract(metSearchCollections, {
+          q: 'sunflower',
+          matchField,
+        });
+        expect(result.isError).toBeFalsy();
+        expect((result.structuredContent as { effectiveQuery: string }).effectiveQuery).toBe(
+          `q="sunflower", matchField="${matchField}"`,
+        );
+        expect(textOf(result)).toContain('**Total matches:** 36');
+      }
+      expect(searchRequests(fetchMock).map((url) => url.search)).toEqual([
+        '?q=sunflower&offset=0&limit=20&title=true',
+        '?q=sunflower&offset=0&limit=20&tags=true',
+      ]);
+    });
+
+    it('accepts matchField artistOrCulture: one request with that flag alone, a page on both surfaces (#53)', async () => {
+      // `q=Rembrandt&artistOrCulture=true`, 2026-11-04: 372 of the keyword's 646 matches.
+      const firstPage = [
+        437403, 437404, 437406, 437407, 437408, 437409, 437410, 437411, 437413, 437414, 437416,
+        437418, 437419, 437420, 437421, 438379, 334627, 334628, 334647, 337063,
+      ];
+      fetchMock.mockImplementation(
+        routes({ [SEARCH_PATH]: () => jsonResponse({ total: 372, objectIDs: firstPage }) }),
+      );
+      const result = await runToolContract(metSearchCollections, {
+        q: 'Rembrandt',
+        matchField: 'artistOrCulture',
+      });
+
+      expect(result.isError).toBeFalsy();
+      const structured = result.structuredContent as {
+        total: number;
+        objectIDs: number[];
+        effectiveQuery: string;
+      };
+      expect(structured.total).toBe(372);
+      expect(structured.objectIDs).toEqual(firstPage);
+      expect(structured.effectiveQuery).toBe('q="Rembrandt", matchField="artistOrCulture"');
+      expect(readMarkdownText(textOf(result))).toContain(
+        'Query: q="Rembrandt", matchField="artistOrCulture"',
+      );
+      expect(textOf(result)).toContain('**Total matches:** 372');
+      expect(searchRequests(fetchMock).map((url) => url.search)).toEqual([
+        '?q=Rembrandt&offset=0&limit=20&artistOrCulture=true',
+      ]);
+    });
+
+    it('rejects a two-element geoLocation at the schema and accepts one location', async () => {
+      const rejected = await runToolContract(metSearchCollections, {
+        q: 'sunflower',
+        geoLocation: ['France', 'Japan'],
+      });
+      expect(rejected.isError).toBe(true);
+      expect((rejected.structuredContent as { error: { code: number } }).error.code).toBe(
+        JsonRpcErrorCode.InvalidParams,
+      );
+      expect(textOf(rejected)).toContain('geoLocation takes one location');
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      fetchMock.mockImplementation(searchUpstream(35));
+      const accepted = await runToolContract(metSearchCollections, {
+        q: 'sunflower',
+        geoLocation: ['France'],
+      });
+      expect(accepted.isError).toBeFalsy();
+      expect(searchRequests(fetchMock)[0]?.searchParams.getAll('geoLocation')).toEqual(['France']);
+    });
+  });
+
+  /**
+   * A zero result is an empty success whose notice is composed from the levers
+   * the call used (#25, moved from the `no_results` error by #44). Whether the
+   * keyword matches on its own separates "bad keyword" from "filters removed
+   * every match", and it costs one extra `limit=1` request, only when a filtered
+   * search comes back empty.
+   */
+  describe('met_search_collections — the zero-match notice names the levers that zeroed the query (#25, #44)', () => {
+    /**
+     * `/v1.1/search` whose filtered requests match `filteredTotal` and whose
+     * keyword-only requests match `keywordTotal` — or answer 503 on `'fail'`.
+     */
+    function searchByShape(filteredTotal: number, keywordTotal: number | 'fail') {
+      return (url: URL) => {
+        const filtered = [...url.searchParams.keys()].some((key) => !PAGING_PARAMS.has(key));
+        if (filtered) return searchPage(url, filteredTotal);
+        return keywordTotal === 'fail'
+          ? new Response('<html>busy</html>', { status: 503 })
+          : searchPage(url, keywordTotal);
+      };
+    }
+
+    const departmentsRoute = () =>
+      jsonResponse({ departments: [{ departmentId: 11, displayName: 'European Paintings' }] });
+
+    type ZeroMatch = Record<string, unknown> & { effectiveQuery: string; notice: string };
+    /** A successful zero result: `total` 0, an empty page, and its notice. */
+    const zeroOf = (result: Awaited<ReturnType<typeof runToolContract>>) => {
+      expect(result.isError).toBeFalsy();
+      const structured = result.structuredContent as ZeroMatch;
+      expect(structured).toMatchObject({ total: 0, objectIDs: [], returned: 0 });
+      return structured;
+    };
+
+    const OTHER_FILTERS = ['hasImages', 'isHighlight', 'isOnView', 'geoLocation', 'dateBegin'];
+
+    /** The correction each named filter adds after `Correct or drop it, then retry.` (#54, #55). */
+    const MEDIUM_SENTENCE =
+      ' medium takes one object type, case-sensitive and spelled as the Met spells it ("Paintings", "Prints", "Sculpture"), not a material description or a "|"-joined list.';
+    const GEO_LOCATION_SENTENCE =
+      ' geoLocation takes one place, whole and case-sensitive as the Met spells it ("Greece", "Japan"), so "greece" or a fragment such as "Gree" matches nothing.';
+    const DATES_SENTENCE =
+      ' dateBegin/dateEnd keep only objects whose whole date span (objectBeginDate to objectEndDate on met_get_object) lies inside the window, and a "ca." date can be stored as a 20-year span, so widen the window.';
+
+    it('an unfiltered miss gets the keyword notice and issues no extra request', async () => {
+      fetchMock.mockImplementation(routes({ [SEARCH_PATH]: searchByShape(0, 0) }));
+      const result = await runToolContract(metSearchCollections, { q: 'zzzqqqxyz' });
+
+      const zero = zeroOf(result);
+      expect(zero.notice).toContain('"zzzqqqxyz" matches no object');
+      expect(zero.notice).not.toContain('departmentId');
+      expect(zero.notice).not.toContain('met_list_departments');
+      expect(zero.effectiveQuery).toBe('q="zzzqqqxyz"');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      // The text surface carries the same notice, an empty page marked complete, and the echo.
+      const text = textOf(result);
+      expect(text).toContain('> The keyword "zzzqqqxyz" matches no object');
+      expect(text).toContain('**Returned IDs:** 0 (complete)');
+      expect(readMarkdownText(text)).toContain('Query: q="zzzqqqxyz"');
+      expect(text).not.toContain('no_results');
+    });
+
+    it('a zero result read from a nonzero offset is marked past the end, notice kept', async () => {
+      fetchMock.mockImplementation(routes({ [SEARCH_PATH]: searchByShape(0, 0) }));
+      const result = await runToolContract(metSearchCollections, { q: 'zzzqqqxyz', offset: 40 });
+
+      expect(zeroOf(result).notice).toContain('"zzzqqqxyz" matches no object');
+      const text = textOf(result);
+      expect(text).toContain('**Returned IDs:** 0 (offset beyond result set)');
+      expect(text).toContain('> The keyword "zzzqqqxyz" matches no object');
+    });
+
+    it('a keyword that matches nothing even unfiltered names no filter', async () => {
+      fetchMock.mockImplementation(routes({ [SEARCH_PATH]: searchByShape(0, 0) }));
+      const result = await runToolContract(metSearchCollections, {
+        q: 'zzzqqqxyz',
+        medium: 'Paintings',
+      });
+
+      const { notice: hint } = zeroOf(result);
+      expect(hint).toContain('even with no filter applied');
+      expect(hint).not.toContain('medium');
+      expect(hint).not.toContain('one object type');
+
+      // Exactly one extra request: q alone, limit 1.
+      const requests = searchRequests(fetchMock);
+      expect(requests).toHaveLength(2);
+      expect([...(requests[1]?.searchParams.entries() ?? [])]).toEqual([
+        ['q', 'zzzqqqxyz'],
+        ['offset', '0'],
+        ['limit', '1'],
+      ]);
+    });
+
+    it('a medium that zeroed a matching keyword is named with its correction, alone', async () => {
+      fetchMock.mockImplementation(routes({ [SEARCH_PATH]: searchByShape(0, 178) }));
+      const result = await runToolContract(metSearchCollections, {
+        q: 'sunflower',
+        medium: 'Painting',
+      });
+
+      const { notice: hint, effectiveQuery } = zeroOf(result);
+      expect(hint).toBe(
+        `The keyword "sunflower" matches 178 objects on its own, so the filter removed every match: medium. Correct or drop it, then retry.${MEDIUM_SENTENCE}`,
+      );
+      // medium is an object-type grouping, not the record's classification field (#61).
+      expect(hint).not.toContain('classification');
+      for (const other of [...OTHER_FILTERS, 'departmentId']) expect(hint).not.toContain(other);
+      expect(effectiveQuery).toBe('q="sunflower", medium="Painting"');
+      // Exactly one extra request: q alone, limit 1.
+      const requests = searchRequests(fetchMock);
+      expect(requests).toHaveLength(2);
+      expect([...(requests[1]?.searchParams.entries() ?? [])]).toEqual([
+        ['q', 'sunflower'],
+        ['offset', '0'],
+        ['limit', '1'],
+      ]);
+      const text = textOf(result);
+      expect(text).toContain('removed every match: medium.');
+      // The sentence's "|" is escaped in content[], so the line is read back, not matched as bytes.
+      expect(readMarkdownText(text).split('\n')).toContain(hint);
+    });
+
+    it('names every filter the call set in one hint', async () => {
+      fetchMock.mockImplementation(
+        routes({ [SEARCH_PATH]: searchByShape(0, 178), [DEPARTMENTS_PATH]: departmentsRoute }),
+      );
+      const result = await runToolContract(metSearchCollections, {
+        q: 'sunflower',
+        medium: 'Painting',
+        departmentId: 11,
+      });
+
+      const { notice: hint, effectiveQuery } = zeroOf(result);
+      expect(hint).toContain(
+        'the filters removed every match: medium, departmentId. Correct or drop them,',
+      );
+      expect(hint).toContain('case-sensitive');
+      for (const other of OTHER_FILTERS) expect(hint).not.toContain(other);
+      expect(effectiveQuery).toBe('q="sunflower", medium="Painting", departmentId=11');
+      expect(textOf(result)).toContain('removed every match: medium, departmentId.');
+    });
+
+    it('counts matchField as a filter: named in the notice, left off the keyword-only count (#35)', async () => {
+      fetchMock.mockImplementation(routes({ [SEARCH_PATH]: searchByShape(0, 178) }));
+      const result = await runToolContract(metSearchCollections, {
+        q: 'sunflower',
+        matchField: 'title',
+      });
+
+      const { notice, effectiveQuery } = zeroOf(result);
+      expect(notice).toBe(
+        'The keyword "sunflower" matches 178 objects on its own, so the filter removed every match: matchField. Correct or drop it, then retry.',
+      );
+      expect(effectiveQuery).toBe('q="sunflower", matchField="title"');
+      const requests = searchRequests(fetchMock);
+      expect(requests).toHaveLength(2);
+      expect(requests[0]?.searchParams.get('title')).toBe('true');
+      expect([...(requests[1]?.searchParams.entries() ?? [])]).toEqual([
+        ['q', 'sunflower'],
+        ['offset', '0'],
+        ['limit', '1'],
+      ]);
+      expect(textOf(result)).toContain(`> ${notice}`);
+    });
+
+    it('names matchField beside the other filters, in schema order (#35)', async () => {
+      fetchMock.mockImplementation(routes({ [SEARCH_PATH]: searchByShape(0, 178) }));
+      const result = await runToolContract(metSearchCollections, {
+        q: 'sunflower',
+        medium: 'Painting',
+        matchField: 'tags',
+      });
+
+      const { notice, effectiveQuery } = zeroOf(result);
+      expect(notice).toContain(
+        'so the filters removed every match: matchField, medium. Correct or drop them, then retry.',
+      );
+      expect(notice).toContain('case-sensitive');
+      expect(effectiveQuery).toBe('q="sunflower", matchField="tags", medium="Painting"');
+    });
+
+    it('names matchField artistOrCulture as a filter, and sends the keyword-only count without it (#53)', async () => {
+      // `q=sunflower&artistOrCulture=true` → 0, 2026-11-04: no artist or culture carries the word.
+      fetchMock.mockImplementation(routes({ [SEARCH_PATH]: searchByShape(0, 178) }));
+      const result = await runToolContract(metSearchCollections, {
+        q: 'sunflower',
+        matchField: 'artistOrCulture',
+      });
+
+      const { notice, effectiveQuery } = zeroOf(result);
+      expect(notice).toBe(
+        'The keyword "sunflower" matches 178 objects on its own, so the filter removed every match: matchField. Correct or drop it, then retry.',
+      );
+      expect(effectiveQuery).toBe('q="sunflower", matchField="artistOrCulture"');
+      const requests = searchRequests(fetchMock);
+      expect(requests.map((url) => url.search)).toEqual([
+        '?q=sunflower&offset=0&limit=20&artistOrCulture=true',
+        '?q=sunflower&offset=0&limit=1',
+      ]);
+    });
+
+    it.each([
+      ['geoLocation', { geoLocation: ['greece'] }, 'geoLocation', GEO_LOCATION_SENTENCE],
+      [
+        'dateBegin/dateEnd window',
+        { dateBegin: 1832, dateEnd: 1832 },
+        'dateBegin/dateEnd',
+        DATES_SENTENCE,
+      ],
+    ])(
+      'a %s that zeroed a matching keyword is named with its correction (#54, #55)',
+      async (_label, filter, name, sentence) => {
+        fetchMock.mockImplementation(routes({ [SEARCH_PATH]: searchByShape(0, 1_330) }));
+        const result = await runToolContract(metSearchCollections, { q: 'vase', ...filter });
+
+        const { notice } = zeroOf(result);
+        expect(notice).toBe(
+          `The keyword "vase" matches 1,330 objects on its own, so the filter removed every match: ${name}. Correct or drop it, then retry.${sentence}`,
+        );
+        expect(notice).not.toContain('one object type');
+        expect(readMarkdownText(textOf(result)).split('\n')).toContain(notice);
+      },
+    );
+
+    it.each([
+      [
+        'removed every match',
+        1_330,
+        'The keyword "vase" matches 1,330 objects on its own, so the filters removed every match: medium, geoLocation, dateBegin/dateEnd.',
+      ],
+      [
+        'may have removed every match',
+        'fail',
+        'The filters may have removed every match: medium, geoLocation, dateBegin/dateEnd — whether "vase" matches on its own could not be checked.',
+      ],
+    ] as const)(
+      'orders the per-filter sentences medium, geoLocation, dates on the "%s" lead (#54, #55)',
+      async (_label, keywordTotal, lead) => {
+        fetchMock.mockImplementation(routes({ [SEARCH_PATH]: searchByShape(0, keywordTotal) }));
+        const result = await runToolContract(metSearchCollections, {
+          q: 'vase',
+          medium: 'Painting',
+          geoLocation: ['greece'],
+          dateBegin: 1832,
+          dateEnd: 1832,
+        });
+
+        const { notice } = zeroOf(result);
+        expect(notice).toBe(
+          `${lead} Correct or drop them, then retry.${MEDIUM_SENTENCE}${GEO_LOCATION_SENTENCE}${DATES_SENTENCE}`,
+        );
+        expect(readMarkdownText(textOf(result)).split('\n')).toContain(notice);
+      },
+    );
+
+    it('gives no per-filter sentence when the keyword matches nothing on its own (#54, #55)', async () => {
+      fetchMock.mockImplementation(routes({ [SEARCH_PATH]: searchByShape(0, 0) }));
+      const result = await runToolContract(metSearchCollections, {
+        q: 'zzzqqqxyz',
+        medium: 'Painting',
+        geoLocation: ['greece'],
+        dateBegin: 1832,
+        dateEnd: 1832,
+      });
+
+      expect(zeroOf(result).notice).toBe(
+        'The keyword "zzzqqqxyz" matches no object in the collection, even with no filter applied. Try a different, broader, or differently spelled keyword.',
+      );
+    });
+
+    it('names the filters used when the keyword-only request fails, and still succeeds', async () => {
+      fetchMock.mockImplementation(routes({ [SEARCH_PATH]: searchByShape(0, 'fail') }));
+      const result = await runToolContract(metSearchCollections, {
+        q: 'sunflower',
+        medium: 'Painting',
+        isOnView: true,
+      });
+
+      const { notice } = zeroOf(result);
+      expect(notice).toContain('may have removed every match: isOnView, medium');
+      expect(notice).toContain('could not be checked');
+      expect(textOf(result)).toContain('could not be checked');
+      // One filtered request, one keyword-only attempt — no retry ladder on the notice.
+      expect(searchRequests(fetchMock)).toHaveLength(2);
+    });
+
+    it('a caller abort during the keyword-only request surfaces as cancellation, not a zero-match success', async () => {
+      const controller = new AbortController();
+      fetchMock.mockImplementation((request: unknown, init?: RequestInit) => {
+        const url = new URL(String(request));
+        if ([...url.searchParams.keys()].some((key) => !PAGING_PARAMS.has(key))) {
+          return Promise.resolve(searchPage(url, 0));
+        }
+        // The keyword-only request is in flight when the caller goes away.
+        queueMicrotask(() => controller.abort());
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+        });
+      });
+      const ctx = createMockContext({
+        errors: metSearchCollections.errors,
+        signal: controller.signal,
+      });
+      const input = metSearchCollections.input.parse({ q: 'sunflower', medium: 'Painting' });
+
+      const err = await Promise.resolve(metSearchCollections.handler(input, ctx)).catch((e) => e);
+      expect(err).toMatchObject({ code: JsonRpcErrorCode.RequestCancelled });
+      expect(err.data?.reason).toBeUndefined();
+      expect(searchRequests(fetchMock)).toHaveLength(2);
+    });
+
+    it('a caller abort during the keyword-only request reaches the caller as a cancelled call', async () => {
+      const controller = new AbortController();
+      fetchMock.mockImplementation((request: unknown, init?: RequestInit) => {
+        const url = new URL(String(request));
+        if ([...url.searchParams.keys()].some((key) => !PAGING_PARAMS.has(key))) {
+          return Promise.resolve(searchPage(url, 0));
+        }
+        queueMicrotask(() => controller.abort());
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+        });
+      });
+
+      const result = await runToolContract(
+        metSearchCollections,
+        { q: 'sunflower', medium: 'Painting' },
+        { context: { signal: controller.signal } },
+      );
+
+      expect(result.isError).toBe(true);
+      expect((result.structuredContent as { error: { code: number } }).error.code).toBe(
+        JsonRpcErrorCode.RequestCancelled,
+      );
+      expect(textOf(result)).not.toContain('matches no object');
+      expect(textOf(result)).not.toContain('removed every match');
+    });
+
+    it('a filtered search with results issues no extra request', async () => {
+      fetchMock.mockImplementation(routes({ [SEARCH_PATH]: searchByShape(11, 178) }));
+      const result = await runToolContract(metSearchCollections, {
+        q: 'sunflower',
+        medium: 'Paintings',
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect((result.structuredContent as { total: number }).total).toBe(11);
+      expect(searchRequests(fetchMock)).toHaveLength(1);
+    });
+
+    /**
+     * The notice quotes the caller's `q`, and the trailer is Markdown: the
+     * notice render escapes it, so the quote line reads back as exactly the raw
+     * notice `structuredContent` carries (#58).
+     */
+    describe('a Markdown-active q reads back unchanged in the content[] notice (#58)', () => {
+      /** The trailer block, and its read-back: the notice line, then the `Query:` line. */
+      const trailerOf = (result: Awaited<ReturnType<typeof runToolContract>>) => {
+        const { text } = (result.content ?? []).at(-1) as { type: 'text'; text: string };
+        return { text, lines: readMarkdownText(text).split('\n') };
+      };
+
+      it.each([
+        [
+          'emphasis, a link, a code span, an entity, and raw HTML',
+          'zz *emphasis* and _under_ [link](https://example.com) `code` &amp; <b>x</b>',
+          'The keyword "zz *emphasis* and _under_ [link](https://example.com) `code` &amp; <b>x</b>" matches no object in the collection. Try a different, broader, or differently spelled keyword.',
+        ],
+        [
+          'JSON-escaped quotes',
+          'zz "a" said "b"',
+          'The keyword "zz \\"a\\" said \\"b\\"" matches no object in the collection. Try a different, broader, or differently spelled keyword.',
+        ],
+      ])('%s, on an unfiltered miss', async (_label, q, notice) => {
+        fetchMock.mockImplementation(routes({ [SEARCH_PATH]: searchByShape(0, 0) }));
+        const result = await runToolContract(metSearchCollections, { q });
+
+        expect(zeroOf(result).notice).toBe(notice);
+        const trailer = trailerOf(result);
+        expect(trailer.lines).toHaveLength(2);
+        expect(trailer.lines[0]).toBe(notice);
+        expect(trailer.lines[1]).toMatch(/^Query: q=/);
+        // A blank line ends the quote, so the echo is its own block, not a lazy continuation.
+        expect(trailer.text).toContain('\n\nQuery: ');
+      });
+
+      it('emphasis markers, on a filtered miss naming geoLocation', async () => {
+        fetchMock.mockImplementation(routes({ [SEARCH_PATH]: searchByShape(0, 1_330) }));
+        const result = await runToolContract(metSearchCollections, {
+          q: '*vase* _x_',
+          geoLocation: ['greece'],
+        });
+
+        const { notice } = zeroOf(result);
+        expect(notice).toMatch(
+          /^The keyword "\*vase\* _x_" matches 1,330 objects on its own, so the filter removed every match: geoLocation\. Correct or drop it, then retry\./,
+        );
+        expect(trailerOf(result).lines[0]).toBe(notice);
+      });
+    });
+  });
+
+  describe('getValidDepartmentIds — memoized (#7)', () => {
+    const departmentsBody = {
+      departments: [
+        { departmentId: 1, displayName: 'American Decorative Arts' },
+        { departmentId: 11, displayName: 'European Paintings' },
+        { departmentId: 21, displayName: 'Modern and Contemporary Art' },
+      ],
+    };
+
+    it('returns the department ID set and fetches upstream only once across calls', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(departmentsBody));
+      const ctx = createMockContext();
+
+      const first = await getMetService().getValidDepartmentIds(...call(ctx));
+      const second = await getMetService().getValidDepartmentIds(...call(ctx));
+
+      expect(first.has(11)).toBe(true);
+      expect(first.has(2)).toBe(false);
+      expect([...second].sort((a, b) => a - b)).toEqual([1, 11, 21]);
+      // Memoized: the second lookup reads the cache instead of re-fetching /departments.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(new URL(String(fetchMock.mock.calls[0]?.[0])).pathname).toBe(DEPARTMENTS_PATH);
+    });
+  });
+
+  describe('getObject — normalizeObject', () => {
+    it('passes a fully populated record through unchanged', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(rawObjects.populated));
+      const record = await getMetService().getObject(436535, ...call());
+
+      expect(record).not.toBeNull();
+      expect(record?.objectID).toBe(436535);
+      expect(record?.title).toBe('Wheat Field with Cypresses');
+      expect(record?.objectURL).toBe(rawObjects.populated.objectURL);
+      expect(record?.creditLine).toBe(rawObjects.populated.creditLine);
+      expect(record?.additionalImages).toEqual(rawObjects.populated.additionalImages);
+      // hasCC0Image is derived, not passed through.
+      expect(record?.hasCC0Image).toBe(true);
+    });
+
+    it('preserves every item of a fully populated tags array, in order', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(rawObjects.populated));
+      const record = await getMetService().getObject(436535, ...call());
+
+      expect(record?.tags).toHaveLength(2);
+      expect(record?.tags?.map((t) => t.term)).toEqual(['Landscapes', 'Cypresses']);
+      expect(record?.tags?.[0]?.AAT_URL).toBe('http://vocab.getty.edu/page/aat/300132294');
+      expect(record?.tags?.[1]?.Wikidata_URL).toBe('https://www.wikidata.org/wiki/Q146911');
+    });
+
+    it('preserves constituents items with their sparse sub-fields intact', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(rawObjects.nullTagUrl));
+      const record = await getMetService().getObject(487659, ...call());
+
+      expect(record?.constituents).toHaveLength(1);
+      expect(record?.constituents?.[0]).toEqual({
+        constituentID: 162095,
+        role: 'Artist',
+        name: 'Paul Manship',
+        constituentULAN_URL: 'http://vocab.getty.edu/page/ulan/500032239',
+        constituentWikidata_URL: 'https://www.wikidata.org/wiki/Q3371768',
+        // Upstream sends '' rather than null here — no per-item guard needed.
+        gender: '',
+      });
+    });
+
+    it('keeps a null tags/constituents array null rather than coercing it to []', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(rawObjects.bceNullTags));
+      const record = await getMetService().getObject(547802, ...call());
+
+      expect(record?.tags).toBeNull();
+      expect(record?.constituents).toBeNull();
+    });
+
+    it('coalesces absent upstream fields to the empty-value convention', async () => {
+      fetchMock.mockResolvedValue(jsonResponse({ objectID: 999 }));
+      const record = await getMetService().getObject(999, ...call());
+
+      expect(record?.title).toBe('');
+      expect(record?.creditLine).toBe('');
+      expect(record?.GalleryNumber).toBe('');
+      expect(record?.additionalImages).toEqual([]);
+      expect(record?.isPublicDomain).toBe(false);
+      expect(record?.hasCC0Image).toBe(false);
+      expect(record?.tags).toBeNull();
+      expect(record?.constituents).toBeNull();
+    });
+
+    it('keeps a multi-part dimensions value with its CRLF breaks, as the Met sends it (#62)', async () => {
+      // 285835: content[] renders each break as a hard break; structuredContent keeps the raw value.
+      const dimensions =
+        'Image: 7 5/16 × 9 1/4 in. (18.6 × 23.5 cm)\r\nMount: 10 5/8 × 13 5/8 in. (27 × 34.6 cm)';
+      fetchMock.mockResolvedValue(jsonResponse({ objectID: 285835, dimensions }));
+      const record = await getMetService().getObject(285835, ...call());
+
+      expect(record?.dimensions).toBe(dimensions);
+    });
+
+    describe('geography and measurements (#16)', () => {
+      it('normalizes the nine findspot fields without touching country/region', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.geographyRich));
+        const record = await getMetService().getObject(548211, ...call());
+
+        expect(record?.geography).toEqual({
+          geographyType: 'From',
+          city: '',
+          state: '',
+          county: '',
+          subregion: 'Saqqara',
+          locale: 'Late Period cemetery, Tomb of Harkhebit',
+          locus: 'burial chamber',
+          excavation: 'Egyptian Antiquities Service excavations, 1902',
+          river: '',
+        });
+        // country and region stay top-level and are not duplicated into the block.
+        expect(record?.country).toBe('Egypt');
+        expect(record?.region).toBe('Memphite Region');
+        expect(record?.geography).not.toHaveProperty('country');
+        expect(record?.geography).not.toHaveProperty('region');
+      });
+
+      it('defaults every findspot field to the empty-string convention when absent', async () => {
+        fetchMock.mockResolvedValue(jsonResponse({ objectID: 999 }));
+        const record = await getMetService().getObject(999, ...call());
+
+        expect(Object.values(record?.geography ?? {})).toEqual(Array(9).fill(''));
+      });
+
+      it('preserves every measurements element in order, each with its own axes', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.multiMeasurement));
+        const record = await getMetService().getObject(544683, ...call());
+
+        expect(record?.measurements).toEqual([
+          {
+            elementName: 'Other',
+            elementDescription: 'Depth nxt to boy',
+            elementMeasurements: { Depth: 4.8 },
+          },
+          {
+            elementName: 'Other',
+            elementDescription: 'Depth nxt to man',
+            elementMeasurements: { Depth: 5.7 },
+          },
+          // Sibling elements carry different axis keys — the open map is load-bearing.
+          {
+            elementName: 'Overall',
+            elementDescription: '',
+            elementMeasurements: { Height: 17, Width: 12.5 },
+          },
+        ]);
+      });
+
+      it('normalizes a null elementDescription to the empty-string convention', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.geographyRich));
+        const record = await getMetService().getObject(548211, ...call());
+
+        // Null on the wire; '' here, matching the tag URL fields rather than the
+        // date pair — a string field has a safe in-domain sentinel.
+        expect(record?.measurements?.[0]?.elementDescription).toBe('');
+        expect(record?.measurements?.[0]?.elementMeasurements).toEqual({
+          Height: 256.5405,
+          Thickness: 132.0803,
+          Width: 127.0003,
+        });
+      });
+
+      it('keeps a null measurements array null rather than coercing it to []', async () => {
+        fetchMock.mockResolvedValue(jsonResponse({ objectID: 999, measurements: null }));
+        const record = await getMetService().getObject(999, ...call());
+
+        expect(record?.measurements).toBeNull();
+      });
+
+      it('defaults a measurement element with no axes to an empty map', async () => {
+        fetchMock.mockResolvedValue(
+          jsonResponse({ objectID: 999, measurements: [{ elementName: 'Overall' }] }),
+        );
+        const record = await getMetService().getObject(999, ...call());
+
+        expect(record?.measurements).toEqual([
+          { elementName: 'Overall', elementDescription: '', elementMeasurements: {} },
+        ]);
+      });
+
+      it('produces a geography-rich record met_get_object’s output schema accepts', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.geographyRich));
+        const rich = await getMetService().getObject(548211, ...call());
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.multiMeasurement));
+        const multi = await getMetService().getObject(544683, ...call());
+
+        const parsed = metGetObject.output.safeParse({ objects: [rich, multi], failed: [] });
+        expect(parsed.error?.message).toBeUndefined();
+        expect(parsed.success).toBe(true);
+      });
+    });
+
+    describe('unknown machine-readable dates (#14)', () => {
+      it('normalizes the upstream 0/0 unknown-date shape to null/null', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.unknownDate));
+        const record = await getMetService().getObject(61296, ...call());
+
+        expect(record?.objectBeginDate).toBeNull();
+        expect(record?.objectEndDate).toBeNull();
+        // The human-readable field still carries what the Met knows.
+        expect(record?.objectDate).toBe('date unknown');
+      });
+
+      it('normalizes a genuinely absent upstream date to null rather than year zero', async () => {
+        fetchMock.mockResolvedValue(jsonResponse({ objectID: 999 }));
+        const record = await getMetService().getObject(999, ...call());
+
+        expect(record?.objectBeginDate).toBeNull();
+        expect(record?.objectEndDate).toBeNull();
+      });
+
+      it('passes a genuine BCE date through as the exact negative integers', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.bceNullTags));
+        const record = await getMetService().getObject(547802, ...call());
+
+        expect(record?.objectBeginDate).toBe(-10);
+        expect(record?.objectEndDate).toBe(-10);
+      });
+
+      it('passes a genuine CE date through unchanged', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.populated));
+        const record = await getMetService().getObject(436535, ...call());
+
+        expect(record?.objectBeginDate).toBe(1889);
+        expect(record?.objectEndDate).toBe(1889);
+      });
+
+      it('passes a BCE century span ending at -1 through, the year adjacent to the sentinel', async () => {
+        // Object 250240 encodes "1st century BCE" as -100 to -1: the Met's date
+        // model skips year zero, which is what leaves 0 free to mean "unknown".
+        fetchMock.mockResolvedValue(
+          jsonResponse({
+            ...rawObjects.populated,
+            objectID: 250240,
+            objectDate: '1st century BCE',
+            objectBeginDate: -100,
+            objectEndDate: -1,
+          }),
+        );
+        const record = await getMetService().getObject(250240, ...call());
+
+        expect(record?.objectBeginDate).toBe(-100);
+        expect(record?.objectEndDate).toBe(-1);
+      });
+
+      it('leaves a single zero bound alone — only the 0/0 pair is the unknown sentinel', async () => {
+        fetchMock.mockResolvedValue(
+          jsonResponse({ ...rawObjects.populated, objectBeginDate: 0, objectEndDate: 1500 }),
+        );
+        const record = await getMetService().getObject(436535, ...call());
+
+        expect(record?.objectBeginDate).toBe(0);
+        expect(record?.objectEndDate).toBe(1500);
+      });
+    });
+
+    describe('nullable tag URLs (#19)', () => {
+      it('normalizes a null tag URL to the empty-string absence convention', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.nullTagUrl));
+        const record = await getMetService().getObject(487659, ...call());
+
+        expect(record?.tags?.[0]).toEqual({
+          term: 'Bow and Arrow',
+          AAT_URL: '',
+          Wikidata_URL: 'https://www.wikidata.org/wiki/Q19827042',
+        });
+      });
+
+      it('leaves the null tag’s fully populated siblings untouched', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.nullTagUrl));
+        const record = await getMetService().getObject(487659, ...call());
+
+        expect(record?.tags).toHaveLength(4);
+        expect(record?.tags?.map((t) => t.term)).toEqual([
+          'Bow and Arrow',
+          'Men',
+          'Hunting',
+          'Dogs',
+        ]);
+        expect(record?.tags?.[1]?.AAT_URL).toBe('http://vocab.getty.edu/page/aat/300025928');
+        expect(record?.tags?.[3]?.Wikidata_URL).toBe('https://www.wikidata.org/wiki/Q144');
+      });
+
+      it('normalizes a null Wikidata_URL on the same per-item guard', async () => {
+        fetchMock.mockResolvedValue(
+          jsonResponse({
+            ...rawObjects.nullTagUrl,
+            tags: [{ term: 'Bow and Arrow', AAT_URL: null, Wikidata_URL: null }],
+          }),
+        );
+        const record = await getMetService().getObject(487659, ...call());
+
+        expect(record?.tags?.[0]).toEqual({ term: 'Bow and Arrow', AAT_URL: '', Wikidata_URL: '' });
+      });
+
+      it('produces a record met_get_object’s output schema accepts', async () => {
+        // The framework runs def.output.parse(handlerResult) before format(), so a
+        // null that reaches structuredContent discards the whole valid batch.
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.nullTagUrl));
+        const record = await getMetService().getObject(487659, ...call());
+
+        const parsed = metGetObject.output.safeParse({ objects: [record], failed: [] });
+        expect(parsed.error?.message).toBeUndefined();
+        expect(parsed.success).toBe(true);
+      });
+
+      it('accepts a record whose tags are all populated, and one with null tags', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.populated));
+        const populated = await getMetService().getObject(436535, ...call());
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.bceNullTags));
+        const nullTags = await getMetService().getObject(547802, ...call());
+
+        const parsed = metGetObject.output.safeParse({
+          objects: [populated, nullTags],
+          failed: [],
+        });
+        expect(parsed.error?.message).toBeUndefined();
+        expect(parsed.success).toBe(true);
+      });
+    });
+
+    /**
+     * The Met writes `9999` — and occasionally another future year — into
+     * `artistEndDate` for a maker still living or active. The clock is fixed so
+     * the "later than the current year" boundary is exact.
+     */
+    describe('artistEndDate placeholder years (#29)', () => {
+      const setNow = (iso: string) => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date(iso));
+      };
+
+      /** Normalize one record whose artist bounds are the given pair. */
+      async function artistDates(artistBeginDate: string, artistEndDate: string) {
+        fetchMock.mockResolvedValue(
+          jsonResponse({ ...rawObjects.populated, artistBeginDate, artistEndDate }),
+        );
+        const record = await getMetService().getObject(436535, ...call());
+        return [record?.artistBeginDate, record?.artistEndDate];
+      }
+
+      it('clears 20121’s 9999 end year and keeps its begin year', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.stillActiveMaker));
+        const record = await getMetService().getObject(20121, ...call());
+
+        expect(record?.artistBeginDate).toBe('1837');
+        expect(record?.artistEndDate).toBe('');
+      });
+
+      it('clears 16682’s 9999 end year, leaving both bounds empty', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.endOnlyPlaceholder));
+        const record = await getMetService().getObject(16682, ...call());
+
+        expect(record?.artistBeginDate).toBe('');
+        expect(record?.artistEndDate).toBe('');
+      });
+
+      it('clears 79199’s 2112 the same way — the rule is not keyed to 9999', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.futureYearPlaceholder));
+        const record = await getMetService().getObject(79199, ...call());
+
+        expect(record?.artistBeginDate).toBe('1921');
+        expect(record?.artistEndDate).toBe('');
+      });
+
+      it('passes an end year equal to the current year through', async () => {
+        setNow('2026-06-15T12:00:00Z');
+        expect(await artistDates('1950', '2026')).toEqual(['1950', '2026']);
+      });
+
+      it('clears an end year one past the current year', async () => {
+        setNow('2026-06-15T12:00:00Z');
+        expect(await artistDates('1950', '2027')).toEqual(['1950', '']);
+      });
+
+      it('reads the current year in UTC across the year boundary', async () => {
+        setNow('2026-12-31T23:59:59Z');
+        expect(await artistDates('1950', '2027')).toEqual(['1950', '']);
+        setNow('2027-01-01T00:00:00Z');
+        expect(await artistDates('1950', '2027')).toEqual(['1950', '2027']);
+      });
+
+      it('passes a genuine range through unchanged', async () => {
+        expect(await artistDates('1853', '1890')).toEqual(['1853', '1890']);
+      });
+
+      it('passes 21830’s genuine 1701–1800 range through unchanged', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.italicFields));
+        const record = await getMetService().getObject(21830, ...call());
+
+        expect([record?.artistBeginDate, record?.artistEndDate]).toEqual(['1701', '1800']);
+      });
+
+      it('passes a full-date value through unchanged, in either bound', async () => {
+        // Object 78941 carries "1928-01-10"; a full date is never a bare year.
+        expect(await artistDates('1928-01-10', '2005-08-01')).toEqual(['1928-01-10', '2005-08-01']);
+      });
+
+      it('leaves #14’s object date range untouched on the same record', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.stillActiveMaker));
+        const record = await getMetService().getObject(20121, ...call());
+
+        expect([record?.objectBeginDate, record?.objectEndDate]).toEqual([1879, 1879]);
+      });
+
+      it('reaches both surfaces: an open range for one bound, a dash for none', async () => {
+        setNow('2026-09-30T12:00:00Z');
+        fetchMock.mockImplementation(
+          objectsUpstream(
+            rawObjects.stillActiveMaker,
+            rawObjects.endOnlyPlaceholder,
+            rawObjects.futureYearPlaceholder,
+          ),
+        );
+        const result = await runToolContract(metGetObject, { objectIDs: [20121, 16682, 79199] });
+
+        const { objects } = result.structuredContent as GetObjectOutput;
+        expect(objects.map((o) => [o.objectID, o.artistBeginDate, o.artistEndDate])).toEqual([
+          [20121, '1837', ''],
+          [16682, '', ''],
+          [79199, '1921', ''],
+        ]);
+        const text = textOf(result);
+        expect(sectionFor(text, 20121)).toContain('**Artist dates:** 1837–\n');
+        expect(sectionFor(text, 16682)).toContain('**Artist dates:** —\n');
+        expect(sectionFor(text, 79199)).toContain('**Artist dates:** 1921–\n');
+        expect(text).not.toMatch(/9999|2112/);
+      });
+    });
+
+    /**
+     * The Met entity-encodes `constituents[].name` alone (`&amp;`, `&#39;`), so
+     * one record spells a maker two ways. Decoded on the way in; escaped again
+     * at the render boundary like every other upstream string.
+     */
+    describe('entity-encoded constituent names (#24)', () => {
+      it('decodes 20121’s Maker name to the artistDisplayName spelling', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.stillActiveMaker));
+        const record = await getMetService().getObject(20121, ...call());
+
+        expect(record?.constituents?.[0]?.name).toBe('Tiffany & Co.');
+        expect(record?.constituents?.[0]?.name).toBe(record?.artistDisplayName);
+      });
+
+      it('decodes each of 288322’s constituents independently', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.encodedConstituents));
+        const record = await getMetService().getObject(288322, ...call());
+
+        expect(record?.constituents?.map((c) => c.name)).toEqual([
+          'Unknown',
+          'Strohmeyer & Wyman',
+          'Good, Berners, & Lant',
+          "World's Views Series",
+        ]);
+      });
+
+      it('leaves every other constituent sub-field as sent', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.encodedConstituents));
+        const record = await getMetService().getObject(288322, ...call());
+
+        const withoutName = ({ name: _name, ...rest }: { name: string }) => rest;
+        expect(record?.constituents?.map(withoutName)).toEqual(
+          rawObjects.encodedConstituents.constituents.map(withoutName),
+        );
+      });
+
+      it('leaves the record’s other fields as sent', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.stillActiveMaker));
+        const record = await getMetService().getObject(20121, ...call());
+
+        expect(record?.artistDisplayName).toBe('Tiffany & Co.');
+        expect(record?.artistDisplayBio).toBe('American, New York, NY, 1837–present');
+        expect(record?.title).toBe('Chocolate Pot');
+      });
+
+      it('decodes an encoded &lt;i&gt; pair first, then strips it as the italic tag it is', async () => {
+        // `name` is entity-encoded as a whole, so the <i> markup other fields
+        // carry raw arrives here encoded; the decode runs first to expose it.
+        fetchMock.mockResolvedValue(
+          jsonResponse({
+            ...rawObjects.stillActiveMaker,
+            constituents: [
+              { ...rawObjects.stillActiveMaker.constituents[0], name: '&lt;i&gt;Tsuba&lt;/i&gt;' },
+            ],
+          }),
+        );
+        const record = await getMetService().getObject(20121, ...call());
+
+        expect(record?.constituents?.[0]?.name).toBe('Tsuba');
+      });
+
+      it('strips a raw <i> pair and decodes the rest of the same name', async () => {
+        fetchMock.mockResolvedValue(
+          jsonResponse({
+            ...rawObjects.stillActiveMaker,
+            constituents: [
+              { ...rawObjects.stillActiveMaker.constituents[0], name: '<i>Tiffany</i> &amp; Co.' },
+            ],
+          }),
+        );
+        const record = await getMetService().getObject(20121, ...call());
+
+        expect(record?.constituents?.[0]?.name).toBe('Tiffany & Co.');
+      });
+
+      it('carries the decoded name on both surfaces, escaped again in content[]', async () => {
+        const markupName = {
+          objectID: 999,
+          constituents: [
+            {
+              constituentID: 1,
+              role: 'Artist',
+              name: '&lt;b&gt;Studio&lt;/b&gt;',
+              constituentULAN_URL: '',
+              constituentWikidata_URL: '',
+              gender: '',
+            },
+          ],
+        };
+        fetchMock.mockImplementation(objectsUpstream(rawObjects.stillActiveMaker, markupName));
+        const result = await runToolContract(metGetObject, { objectIDs: [20121, 999] });
+
+        const { objects } = result.structuredContent as GetObjectOutput;
+        expect(objects[0]?.constituents?.[0]?.name).toBe('Tiffany & Co.');
+        expect(objects[1]?.constituents?.[0]?.name).toBe('<b>Studio</b>');
+        const text = textOf(result);
+        expect(sectionFor(text, 20121)).toContain('constituentID:162539 Tiffany & Co. (Maker');
+        expect(sectionFor(text, 999)).toContain('constituentID:1 \\<b>Studio\\</b> (Artist)');
+        expect(text).not.toContain('&amp;');
+      });
+    });
+
+    /**
+     * Raw `<i>…</i>` pairs mark foreign terms in some titles, object names, and
+     * media. The output is plain text and Markdown, so the exact tokens are
+     * removed on the way in; anything else stays literal.
+     */
+    describe('raw <i> italic tags in free-text fields (#32)', () => {
+      it('strips the pair from 21814’s title', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.italicTitle));
+        const record = await getMetService().getObject(21814, ...call());
+
+        expect(record?.title).toBe('Sword guard (Tsuba) Depicting Bodhidharma (達磨図鐔)');
+      });
+
+      it('strips every pair from 21830’s title, objectName, and medium', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.italicFields));
+        const record = await getMetService().getObject(21830, ...call());
+
+        expect(record?.title).toBe('紅葉蒔絵鞘脇指拵 Mounting for a Short Sword (Wakizashi)');
+        expect(record?.objectName).toBe('Blade and mounting for a short sword (Wakizashi)');
+        expect(record?.medium).toBe(
+          'Steel, wood, lacquer, rayskin (same), thread, copper-gold alloy (shakudō), gold, copper-silver alloy (shibuichi)',
+        );
+      });
+
+      it('strips <I> and </I> regardless of case', async () => {
+        fetchMock.mockResolvedValue(
+          jsonResponse({ ...rawObjects.italicTitle, title: 'Sword guard (<I>Tsuba</I>) <i>x</I>' }),
+        );
+        const record = await getMetService().getObject(21814, ...call());
+
+        expect(record?.title).toBe('Sword guard (Tsuba) x');
+      });
+
+      it('strips the tokens from every free-text field, nested ones included', async () => {
+        const tagged = 'a <i>b</i> c';
+        const plain = 'a b c';
+        const topLevel = [
+          'title',
+          'department',
+          'objectName',
+          'classification',
+          'artistPrefix',
+          'artistDisplayName',
+          'artistSuffix',
+          'artistRole',
+          'artistDisplayBio',
+          'artistNationality',
+          'objectDate',
+          'medium',
+          'dimensions',
+          'culture',
+          'period',
+          'dynasty',
+          'reign',
+          'portfolio',
+          'creditLine',
+          'rightsAndReproduction',
+          'country',
+          'region',
+        ];
+        const findspot = [
+          'geographyType',
+          'city',
+          'state',
+          'county',
+          'subregion',
+          'locale',
+          'locus',
+          'excavation',
+          'river',
+        ];
+        const each = (keys: string[], value: string) =>
+          Object.fromEntries(keys.map((key) => [key, value]));
+        fetchMock.mockResolvedValue(
+          jsonResponse({
+            objectID: 999,
+            ...each([...topLevel, ...findspot], tagged),
+            measurements: [
+              {
+                elementName: tagged,
+                elementDescription: tagged,
+                elementMeasurements: { Height: 1 },
+              },
+            ],
+            tags: [{ term: tagged, AAT_URL: '', Wikidata_URL: '' }],
+            constituents: [
+              {
+                constituentID: 1,
+                role: tagged,
+                name: tagged,
+                constituentULAN_URL: '',
+                constituentWikidata_URL: '',
+                gender: tagged,
+              },
+            ],
+          }),
+        );
+        const record = await getMetService().getObject(999, ...call());
+
+        expect(record).toMatchObject({
+          ...each(topLevel, plain),
+          geography: each(findspot, plain),
+          measurements: [{ elementName: plain, elementDescription: plain }],
+          tags: [{ term: plain }],
+          constituents: [{ role: plain, name: plain, gender: plain }],
+        });
+      });
+
+      it('leaves a value with no <i> token byte-identical', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.populated));
+        const record = await getMetService().getObject(436535, ...call());
+
+        const raw = rawObjects.populated;
+        expect([
+          record?.title,
+          record?.objectName,
+          record?.medium,
+          record?.dimensions,
+          record?.artistDisplayBio,
+          record?.creditLine,
+          record?.constituents?.[0]?.name,
+          record?.tags?.map((t) => t.term),
+        ]).toEqual([
+          raw.title,
+          raw.objectName,
+          raw.medium,
+          raw.dimensions,
+          raw.artistDisplayBio,
+          raw.creditLine,
+          raw.constituents[0].name,
+          raw.tags.map((t) => t.term),
+        ]);
+      });
+
+      it('leaves every other tag-like sequence literal', async () => {
+        // None of these is the exact `<i>` or `</i>` token.
+        const title =
+          'A <b>b</b> <i class="x">c</ i> <em>d</em> < i>e <i >f <iframe> <ii> &lt;i&gt; <\\i>';
+        fetchMock.mockResolvedValue(jsonResponse({ ...rawObjects.italicTitle, title }));
+        const record = await getMetService().getObject(21814, ...call());
+
+        expect(record?.title).toBe(title);
+      });
+
+      it('reaches both surfaces as plain text, any other < still escaped', async () => {
+        const mixedMarkup = { objectID: 999, title: 'Sword <b>guard</b> (<i>Tsuba</i>)' };
+        fetchMock.mockImplementation(
+          objectsUpstream(rawObjects.italicTitle, rawObjects.italicFields, mixedMarkup),
+        );
+        const result = await runToolContract(metGetObject, { objectIDs: [21814, 21830, 999] });
+
+        const { objects } = result.structuredContent as GetObjectOutput;
+        expect(objects.map((o) => o.title)).toEqual([
+          'Sword guard (Tsuba) Depicting Bodhidharma (達磨図鐔)',
+          '紅葉蒔絵鞘脇指拵 Mounting for a Short Sword (Wakizashi)',
+          'Sword <b>guard</b> (Tsuba)',
+        ]);
+        const text = textOf(result);
+        expect(text).toContain(
+          '## Sword guard (Tsuba) Depicting Bodhidharma (達磨図鐔) — Object 21814',
+        );
+        expect(sectionFor(text, 21830)).toContain(
+          '**Object name:** Blade and mounting for a short sword (Wakizashi)',
+        );
+        expect(sectionFor(text, 21830)).toContain(
+          '**Medium:** Steel, wood, lacquer, rayskin (same), thread, copper-gold alloy (shakudō), gold, copper-silver alloy (shibuichi)',
+        );
+        expect(text).toContain('## Sword \\<b>guard\\</b> (Tsuba) — Object 999');
+        expect(text).not.toMatch(/\\?<\/?i>/i);
+      });
+    });
+
+    describe('artist attribution qualifier and role (#38)', () => {
+      it('carries 437403’s prefix, leaving the name and the constituent as sent', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.styleOfAttribution));
+        const record = await getMetService().getObject(437403, ...call());
+
+        expect(record).toMatchObject({
+          artistPrefix: 'Style of',
+          artistDisplayName: 'Rembrandt',
+          artistSuffix: '',
+          artistRole: 'Artist',
+          // The dates stay the named artist's, whatever the prefix says.
+          artistBeginDate: '1606',
+          artistEndDate: '1669',
+        });
+        expect(record?.constituents?.map((c) => c.name)).toEqual(['Style of Rembrandt']);
+      });
+
+      it('carries 456947’s suffix and patron role from the top level, not the constituents', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.patronAttribution));
+        const record = await getMetService().getObject(456947, ...call());
+
+        expect(record).toMatchObject({
+          artistPrefix: '',
+          artistDisplayName: 'Sultan Abdülhamid II',
+          artistSuffix: '(r. 1876–1909)',
+          artistRole: 'Patron',
+        });
+        expect(record?.constituents?.map((c) => [c.role, c.name])).toEqual([
+          ['Patron', 'Sultan Abdülhamid II'],
+          ['Workshop director', 'Workshop of Warshat al-Khurunfish'],
+        ]);
+      });
+
+      it('keeps the whitespace the Met sends around a prefix — trimming is the render’s', async () => {
+        fetchMock.mockResolvedValue(
+          jsonResponse({ ...rawObjects.styleOfAttribution, artistPrefix: 'Style of ' }),
+        );
+        const record = await getMetService().getObject(437403, ...call());
+
+        expect(record?.artistPrefix).toBe('Style of ');
+      });
+
+      it('defaults all three to empty strings when the Met omits them', async () => {
+        fetchMock.mockResolvedValue(jsonResponse({ objectID: 999 }));
+        const record = await getMetService().getObject(999, ...call());
+
+        expect([record?.artistPrefix, record?.artistSuffix, record?.artistRole]).toEqual([
+          '',
+          '',
+          '',
+        ]);
+      });
+    });
+
+    describe('rights, metadata date, and accession year (#41)', () => {
+      it('carries 437403’s accession year beside a credit line naming another year', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.styleOfAttribution));
+        const record = await getMetService().getObject(437403, ...call());
+
+        expect(record).toMatchObject({
+          accessionYear: '1960',
+          creditLine: 'Bequest of Lillian S. Timken, 1959',
+          rightsAndReproduction: '',
+          metadataDate: '2025-09-17T04:49:46.407Z',
+        });
+      });
+
+      it('carries 488978’s rights holder', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.copyrightedWork));
+        const record = await getMetService().getObject(488978, ...call());
+
+        expect(record?.rightsAndReproduction).toBe(
+          '© 2026 Pollock-Krasner Foundation / Artists Rights Society (ARS), New York',
+        );
+        expect(record?.isPublicDomain).toBe(false);
+      });
+
+      it('passes 286850’s full-date accessionYear and fraction-less metadataDate through', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.fullDateAccession));
+        const record = await getMetService().getObject(286850, ...call());
+
+        expect(record?.accessionYear).toBe('2005-02-15');
+        expect(record?.metadataDate).toBe('2025-03-06T04:54:30Z');
+      });
+
+      it('passes 512’s two-digit fraction and empty accessionYear through', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.americanWing));
+        const record = await getMetService().getObject(512, ...call());
+
+        expect(record?.metadataDate).toBe('2023-02-07T04:46:51.34Z');
+        expect(record?.accessionYear).toBe('');
+      });
+
+      it('defaults all three to empty strings when the Met omits them', async () => {
+        fetchMock.mockResolvedValue(jsonResponse({ objectID: 999 }));
+        const record = await getMetService().getObject(999, ...call());
+
+        expect([
+          record?.accessionYear,
+          record?.rightsAndReproduction,
+          record?.metadataDate,
+        ]).toEqual(['', '', '']);
+      });
+    });
+
+    describe('departmentId from the record’s department name (#42)', () => {
+      it.each(departmentNames)('resolves "%s" to %i', async (department, departmentId) => {
+        fetchMock.mockResolvedValue(jsonResponse({ objectID: 999, department }));
+        const record = await getMetService().getObject(999, ...call());
+
+        expect(record?.departmentId).toBe(departmentId);
+        expect(record?.department).toBe(department);
+      });
+
+      it('holds exactly those 24 names', () => {
+        expect(Object.fromEntries(DEPARTMENT_ID_BY_NAME)).toEqual(
+          Object.fromEntries(departmentNames),
+        );
+      });
+
+      it.each([
+        [512, 'The American Wing', 1],
+        [307454, 'The Michael C. Rockefeller Wing', 5],
+        [100153, 'Costume Institute', 8],
+        [458994, 'Robert Lehman Collection', 15],
+        [488978, 'Modern and Contemporary Art', 21],
+      ])('resolves live record %i’s "%s" to %i', async (objectID, department, departmentId) => {
+        fetchMock.mockResolvedValue(jsonResponse({ objectID, department }));
+        const record = await getMetService().getObject(objectID, ...call());
+
+        expect(record?.departmentId).toBe(departmentId);
+      });
+
+      it.each([
+        ['an unrecognized name', 'Department of Unknowns'],
+        ['another casing of a known name', 'european paintings'],
+        ['a known name with surrounding whitespace', ' European Paintings '],
+        ['an empty name', ''],
+      ])('resolves %s to null, leaving department as sent', async (_case, department) => {
+        fetchMock.mockResolvedValue(jsonResponse({ objectID: 999, department }));
+        const record = await getMetService().getObject(999, ...call());
+
+        expect(record?.departmentId).toBeNull();
+        expect(record?.department).toBe(department);
+      });
+
+      it('resolves an absent department to null', async () => {
+        fetchMock.mockResolvedValue(jsonResponse({ objectID: 999 }));
+        const record = await getMetService().getObject(999, ...call());
+
+        expect(record?.departmentId).toBeNull();
+      });
+    });
+
+    describe('reign and portfolio (#51)', () => {
+      it('carries 544442’s reign beside its period and dynasty', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.jointReign));
+        const record = await getMetService().getObject(544442, ...call());
+
+        expect(record).toMatchObject({
+          period: 'New Kingdom',
+          dynasty: 'Dynasty 18',
+          reign: 'Joint reign of Hatshepsut and Thutmose III',
+          portfolio: '',
+        });
+      });
+
+      it('carries 383857’s portfolio', async () => {
+        fetchMock.mockResolvedValue(jsonResponse(rawObjects.printingPlate));
+        const record = await getMetService().getObject(383857, ...call());
+
+        expect(record).toMatchObject({ reign: '', portfolio: 'Birds of America, plate LXXI' });
+      });
+
+      it('defaults both to empty strings when the Met omits them', async () => {
+        fetchMock.mockResolvedValue(jsonResponse({ objectID: 999 }));
+        const record = await getMetService().getObject(999, ...call());
+
+        expect([record?.reign, record?.portfolio]).toEqual(['', '']);
+      });
+
+      it('carries both onto both surfaces, after Period and Dynasty', async () => {
+        fetchMock.mockImplementation(
+          objectsUpstream(rawObjects.jointReign, rawObjects.printingPlate),
+        );
+        const result = await runToolContract(metGetObject, { objectIDs: [544442, 383857] });
+
+        const { objects } = result.structuredContent as GetObjectOutput;
+        expect(objects.map((o) => [o.objectID, o.reign, o.portfolio])).toEqual([
+          [544442, 'Joint reign of Hatshepsut and Thutmose III', ''],
+          [383857, '', 'Birds of America, plate LXXI'],
+        ]);
+        const text = textOf(result);
+        expect(sectionFor(text, 544442)).toContain(
+          [
+            '**Period:** New Kingdom',
+            '**Dynasty:** Dynasty 18',
+            '**Reign:** Joint reign of Hatshepsut and Thutmose III',
+            '**Portfolio:** —',
+          ].join('\n'),
+        );
+        expect(sectionFor(text, 383857)).toContain(
+          ['**Dynasty:** —', '**Reign:** —', '**Portfolio:** Birds of America, plate LXXI'].join(
+            '\n',
+          ),
+        );
+      });
+
+      it('escapes Markdown in both on content[] and keeps them raw on structuredContent', async () => {
+        const reign = 'reign of *Pepi* II [Dynasty 6]';
+        const portfolio = 'Series_1 <plate> `LXXI`';
+        fetchMock.mockResolvedValue(jsonResponse({ objectID: 999, reign, portfolio }));
+        const result = await runToolContract(metGetObject, { objectIDs: [999] });
+
+        const { objects } = result.structuredContent as GetObjectOutput;
+        expect([objects[0]?.reign, objects[0]?.portfolio]).toEqual([reign, portfolio]);
+        const text = textOf(result);
+        expect(text).toContain(`**Reign:** ${escapeMarkdown(reign)}`);
+        expect(text).toContain(`**Portfolio:** ${escapeMarkdown(portfolio)}`);
+        expect(text).not.toContain(reign);
+        expect(text).not.toContain(portfolio);
+      });
+
+      it('returns 544442 with both keys after a record that alone runs past 60,000 bytes', async () => {
+        const heavy = { objectID: 1, creditLine: 'x'.repeat(60_000) };
+        fetchMock.mockImplementation(objectsUpstream(heavy, rawObjects.jointReign));
+
+        const result = await runToolContract(metGetObject, { objectIDs: [1, 544442] });
+
+        const structured = result.structuredContent as GetObjectOutput;
+        expect(Object.keys(structured)).toEqual(['objects', 'failed']);
+        expect(structured.objects.map((o) => o.objectID)).toEqual([1, 544442]);
+        expect(structured.objects[1]).toMatchObject({
+          reign: 'Joint reign of Hatshepsut and Thutmose III',
+          portfolio: '',
+        });
+      });
+    });
+
+    it('produces records with every new field that met_get_object’s output schema accepts', async () => {
+      fetchMock.mockImplementation(
+        objectsUpstream(
+          rawObjects.styleOfAttribution,
+          rawObjects.copyrightedWork,
+          rawObjects.fullDateAccession,
+          { objectID: 999 },
+        ),
+      );
+      const records = await Promise.all(
+        [437403, 488978, 286850, 999].map((id) => getMetService().getObject(id, ...call())),
+      );
+
+      const parsed = metGetObject.output.safeParse({ objects: records, failed: [] });
+      expect(parsed.error?.message).toBeUndefined();
+      expect(parsed.data?.objects.map((o) => o.departmentId)).toEqual([11, 21, 19, null]);
+    });
+
+    it('carries the attribution, rights, and departmentId fields onto both surfaces', async () => {
+      fetchMock.mockImplementation(
+        objectsUpstream(
+          rawObjects.styleOfAttribution,
+          rawObjects.patronAttribution,
+          rawObjects.copyrightedWork,
+          rawObjects.americanWing,
+        ),
+      );
+      const result = await runToolContract(metGetObject, {
+        objectIDs: [437403, 456947, 488978, 512],
+      });
+
+      const { objects } = result.structuredContent as GetObjectOutput;
+      expect(
+        objects.map((o) => [
+          o.objectID,
+          o.departmentId,
+          o.artistPrefix,
+          o.artistRole,
+          o.accessionYear,
+        ]),
+      ).toEqual([
+        [437403, 11, 'Style of', 'Artist', '1960'],
+        [456947, 14, '', 'Patron', '2009'],
+        [488978, 21, '', 'Artist', '1957'],
+        [512, 1, '', 'Maker', ''],
+      ]);
+
+      const text = textOf(result);
+      const rembrandt = sectionFor(text, 437403);
+      expect(rembrandt).toContain(
+        '**Artist:** Style of Rembrandt (Dutch, ca. 1655) | **Artist role:** Artist',
+      );
+      expect(rembrandt).toContain('**Artist dates:** 1606–1669');
+      expect(rembrandt).toContain('**Department:** European Paintings | **departmentId:** 11 |');
+      expect(rembrandt).toContain(
+        [
+          '**Accession:** 60.71.14 | **Accession year:** 1960',
+          '**Credit:** Bequest of Lillian S. Timken, 1959',
+          '**Rights:** —',
+          '**Metadata date:** 2025-09-17T04:49:46.407Z',
+        ].join('\n'),
+      );
+      expect(sectionFor(text, 456947)).toContain(
+        '**Artist:** Sultan Abdülhamid II (r. 1876–1909) | **Artist role:** Patron',
+      );
+      expect(sectionFor(text, 488978)).toContain(
+        '**Rights:** © 2026 Pollock-Krasner Foundation / Artists Rights Society (ARS), New York',
+      );
+      expect(sectionFor(text, 488978)).toContain(
+        '**Department:** Modern and Contemporary Art | **departmentId:** 21 |',
+      );
+      expect(sectionFor(text, 512)).toContain('**Accession:** Inst.1986.1 | **Accession year:** —');
+      expect(sectionFor(text, 512)).toContain('**Metadata date:** 2023-02-07T04:46:51.34Z');
+    });
+
+    it('returns null for a 404 instead of throwing', async () => {
+      fetchMock.mockResolvedValue(new Response('Not found', { status: 404 }));
+      const record = await getMetService().getObject(999999999, ...call());
+
+      expect(record).toBeNull();
+    });
+  });
+
+  /**
+   * The image fetch behind met_get_object's includeImages: one attempt at the
+   * pinned image host, every failure an `ok: false` value rather than a throw —
+   * except the caller's own abort, which must still end the call.
+   */
+  describe('fetchImage — one rendition from the pinned image host (#36)', () => {
+    const IMAGE_URL = 'https://images.metmuseum.org/CRDImages/ep/web-large/DP145935.jpg';
+    /** A JPEG's leading bytes — enough for a body whose encoding is checkable. */
+    const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46]);
+
+    const imageResponse = (contentType = 'image/jpeg') =>
+      new Response(JPEG, { headers: { 'content-type': contentType } });
+
+    /** A request that never answers until its signal aborts. */
+    const neverAnswers = (_request: unknown, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+      });
+
+    it('returns the body base64-encoded with its MIME type, from one request that refuses redirects', async () => {
+      fetchMock.mockResolvedValue(imageResponse());
+      const result = await getMetService().fetchImage(IMAGE_URL, ...call());
+
+      expect(result).toEqual({
+        ok: true,
+        data: Buffer.from(JPEG).toString('base64'),
+        mimeType: 'image/jpeg',
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [request, init] = fetchMock.mock.calls[0] ?? [];
+      expect(String(request)).toBe(IMAGE_URL);
+      expect((init as RequestInit).redirect).toBe('error');
+    });
+
+    it('takes the MIME type without its parameters', async () => {
+      fetchMock.mockResolvedValue(imageResponse('Image/PNG; charset=binary'));
+      const result = await getMetService().fetchImage(IMAGE_URL, ...call());
+
+      expect(result).toMatchObject({ ok: true, mimeType: 'image/png' });
+    });
+
+    it.each([
+      [
+        'a look-alike host',
+        'https://images.metmuseum.org.evil.example/CRDImages/ep/web-large/DP1.jpg',
+      ],
+      ['the http scheme', 'http://images.metmuseum.org/CRDImages/ep/web-large/DP1.jpg'],
+      ['another port', 'https://images.metmuseum.org:8443/CRDImages/ep/web-large/DP1.jpg'],
+      ['userinfo spelling the host', 'https://images.metmuseum.org@evil.example/DP1.jpg'],
+      ['the API host', 'https://collectionapi.metmuseum.org/public/collection/v1/objects/1'],
+      ['an empty field', ''],
+      ['catalog text', '(not assigned)'],
+    ])('never requests %s', async (_label, url) => {
+      const result = await getMetService().fetchImage(url, ...call());
+
+      expect(result).toMatchObject({ ok: false });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('refuses a redirect: fetch is told to error on one, and that error is unavailable', async () => {
+      // Real fetch semantics: under `redirect: 'error'` a 3xx rejects; under the
+      // default it would be followed to wherever the Location points.
+      fetchMock.mockImplementation((_request: unknown, init?: RequestInit) =>
+        init?.redirect === 'error'
+          ? Promise.reject(new TypeError('fetch failed'))
+          : Promise.resolve(imageResponse()),
+      );
+      const result = await getMetService().fetchImage(IMAGE_URL, ...call());
+
+      expect(result).toMatchObject({ ok: false });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([403, 404, 500, 503])(
+      'reports HTTP %i unavailable after one attempt — no retry, never upstream_blocked',
+      async (status) => {
+        fetchMock.mockImplementation(() =>
+          Promise.resolve(new Response('<html>error</html>', { status })),
+        );
+        const result = await getMetService().fetchImage(IMAGE_URL, ...call());
+
+        expect(result).toMatchObject({ ok: false });
+        expect(JSON.stringify(result)).not.toContain('firewall');
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it.each([
+      [
+        'text/html',
+        new Response('<html>Not an image</html>', { headers: { 'content-type': 'text/html' } }),
+      ],
+      ['application/json', new Response('{}', { headers: { 'content-type': 'application/json' } })],
+      ['no content type', new Response(JPEG)],
+    ])('reports a 200 with %s unavailable', async (_label, response) => {
+      fetchMock.mockResolvedValue(response);
+      const result = await getMetService().fetchImage(IMAGE_URL, ...call());
+
+      expect(result).toMatchObject({ ok: false });
+    });
+
+    it("sends nothing once the call's time budget is spent", async () => {
+      const ctx = createMockContext();
+      const result = await getMetService().fetchImage(IMAGE_URL, ctx, {
+        deadlineAt: Date.now() - 1,
+        signal: ctx.signal,
+      });
+
+      expect(result).toMatchObject({ ok: false });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('caps the request timeout at the time left in the call budget', async () => {
+      fetchMock.mockImplementation(neverAnswers);
+      const ctx = createMockContext();
+      const started = Date.now();
+      const result = await getMetService().fetchImage(IMAGE_URL, ctx, {
+        deadlineAt: Date.now() + 50,
+        signal: ctx.signal,
+      });
+
+      expect(result).toMatchObject({ ok: false });
+      // The 10 s request timeout would have held it; the 50 ms left ended it.
+      expect(Date.now() - started).toBeLessThan(5_000);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('throws when the caller aborts mid-fetch, so the call ends as cancelled', async () => {
+      const controller = new AbortController();
+      const ctx = createMockContext({ signal: controller.signal });
+      fetchMock.mockImplementation((request: unknown, init?: RequestInit) => {
+        const pending = neverAnswers(request, init);
+        controller.abort();
+        return pending;
+      });
+
+      await expect(getMetService().fetchImage(IMAGE_URL, ...call(ctx))).rejects.toMatchObject({
+        code: JsonRpcErrorCode.RequestCancelled,
+      });
+    });
+
+    it('met_get_object attaches a record’s rendition end to end over the real service', async () => {
+      const smallUrl = rawObjects.populated.primaryImageSmall;
+      fetchMock.mockImplementation((request: unknown) => {
+        const url = new URL(String(request));
+        if (url.href === `${COLLECTION_ORIGIN}/public/collection/v1/objects/436535`) {
+          return Promise.resolve(jsonResponse(rawObjects.populated));
+        }
+        if (url.href === smallUrl) return Promise.resolve(imageResponse());
+        return Promise.reject(new Error(`unrouted fetch ${url.href}`));
+      });
+      const called = await runToolContract(metGetObject, {
+        objectIDs: [436535],
+        includeImages: true,
+      });
+
+      expect(called.isError).toBeFalsy();
+      expect(called.content.slice(0, 2)).toEqual([
+        { type: 'text', text: 'Image of object 436535 (primaryImageSmall)' },
+        { type: 'image', data: Buffer.from(JPEG).toString('base64'), mimeType: 'image/jpeg' },
+      ]);
+      expect((called.structuredContent as { images: unknown[] }).images).toEqual([
+        { objectID: 436535, status: 'attached' },
+      ]);
+      expect(fetchMock.mock.calls.map(([request]) => String(request))).toEqual([
+        `${COLLECTION_ORIGIN}/public/collection/v1/objects/436535`,
+        smallUrl,
+      ]);
+    });
+  });
+
+  describe('listObjects — /v1/objects sorted, cached, and shared (#26)', () => {
+    const OBJECTS_URL = `${COLLECTION_ORIGIN}/public/collection/v1/objects`;
+    /** The list cache's TTL: one hour. */
+    const TTL_MS = 60 * 60 * 1000;
+
+    /** A `/v1/objects` answer carrying `ids` in the order given, as upstream sends it. */
+    const objectsBody = (ids: number[]) => jsonResponse({ total: ids.length, objectIDs: ids });
+
+    /** The `/v1/objects` requests a test issued, parsed. */
+    const objectsRequests = () =>
+      fetchMock.mock.calls
+        .map((c) => new URL(String(c[0])))
+        .filter((url) => url.pathname === '/public/collection/v1/objects');
+
+    /** The departmentIds each `/v1/objects` request carried, in request order. */
+    const requestedDepartments = () =>
+      objectsRequests().map((url) => Number(url.searchParams.get('departmentIds')));
+
+    const listDepartment = (departmentId: number, limit = 1) =>
+      getMetService().listObjects({ departmentId, limit }, ...call());
+
+    it('requests /v1/objects on the collection host, carrying only the filters set', async () => {
+      fetchMock.mockImplementation(() => Promise.resolve(objectsBody([3, 1, 2])));
+      const service = getMetService();
+
+      await service.listObjects({ limit: 5 }, ...call());
+      await service.listObjects({ departmentId: 10, limit: 5 }, ...call());
+      await service.listObjects({ updatedSince: '2026-09-01', limit: 5 }, ...call());
+      await service.listObjects(
+        { departmentId: 10, updatedSince: '2026-09-01', limit: 5 },
+        ...call(),
+      );
+
+      expect(fetchMock.mock.calls.map((c) => new URL(String(c[0])).href)).toEqual([
+        OBJECTS_URL,
+        `${OBJECTS_URL}?departmentIds=10`,
+        `${OBJECTS_URL}?metadataDate=2026-09-01`,
+        `${OBJECTS_URL}?departmentIds=10&metadataDate=2026-09-01`,
+      ]);
+    });
+
+    it('sorts the upstream order numerically ascending and pages it', async () => {
+      // Lexicographic order would be 10, 100, 2, 545138, 746253, 9.
+      fetchMock.mockImplementation(() =>
+        Promise.resolve(objectsBody([100, 9, 746253, 10, 545138, 2])),
+      );
+
+      const first = await getMetService().listObjects({ limit: 4 }, ...call());
+      const second = await getMetService().listObjects({ limit: 4, offset: 4 }, ...call());
+
+      expect(first).toEqual({
+        total: 6,
+        objectIDs: [2, 9, 10, 100],
+        returned: 4,
+        offset: 0,
+        remaining: 2,
+        truncated: true,
+        nextOffset: 4,
+      });
+      expect(second).toEqual({
+        total: 6,
+        objectIDs: [545138, 746253],
+        returned: 2,
+        offset: 4,
+        remaining: 0,
+        truncated: false,
+        nextOffset: null,
+      });
+      expect(objectsRequests()).toHaveLength(1);
+    });
+
+    it('answers an empty list as total 0 and an empty page', async () => {
+      fetchMock.mockImplementation(() => Promise.resolve(objectsBody([])));
+
+      expect(
+        await getMetService().listObjects({ updatedSince: '2030-01-01', limit: 20 }, ...call()),
+      ).toEqual({
+        total: 0,
+        objectIDs: [],
+        returned: 0,
+        offset: 0,
+        remaining: 0,
+        truncated: false,
+        nextOffset: null,
+      });
+    });
+
+    it('serves a repeat call from the cache for an hour, then refetches', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      fetchMock.mockImplementation(() => Promise.resolve(objectsBody([3, 1, 2])));
+      const loadedAt = Date.now();
+
+      await listDepartment(10);
+      vi.setSystemTime(loadedAt + TTL_MS - 1);
+      await listDepartment(10);
+      expect(objectsRequests()).toHaveLength(1);
+
+      vi.setSystemTime(loadedAt + TTL_MS);
+      expect((await listDepartment(10, 5)).objectIDs).toEqual([1, 2, 3]);
+      expect(objectsRequests()).toHaveLength(2);
+
+      // The refetched list is cached afresh.
+      await listDepartment(10);
+      expect(objectsRequests()).toHaveLength(2);
+    });
+
+    it('evicts the least-recently-used list first, holding retained bytes within the bound', async () => {
+      // Three 6 MB lists against the 16 MiB bound: any two fit, all three do not.
+      const count = 1_500_000;
+      expect(2 * count * Int32Array.BYTES_PER_ELEMENT).toBeLessThanOrEqual(
+        OBJECT_IDS_CACHE_MAX_BYTES,
+      );
+      expect(3 * count * Int32Array.BYTES_PER_ELEMENT).toBeGreaterThan(OBJECT_IDS_CACHE_MAX_BYTES);
+      const body = JSON.stringify({
+        total: count,
+        objectIDs: Array.from({ length: count }, (_, i) => count - i),
+      });
+      fetchMock.mockImplementation(() => Promise.resolve(new Response(body)));
+
+      expect((await listDepartment(1)).objectIDs).toEqual([1]); // A
+      await listDepartment(3); // B — A and B together fit
+      await listDepartment(1); // A again: B is now the least recently used
+      await listDepartment(4); // C — room is made by evicting B, not A
+      expect(requestedDepartments()).toEqual([1, 3, 4]);
+
+      await listDepartment(1);
+      await listDepartment(4);
+      expect(requestedDepartments()).toEqual([1, 3, 4]); // A and C were retained
+
+      await listDepartment(3); // B was evicted — refetched, evicting A (least recent now)
+      await listDepartment(4);
+      expect(requestedDepartments()).toEqual([1, 3, 4, 3]);
+      await listDepartment(1);
+      expect(requestedDepartments()).toEqual([1, 3, 4, 3, 1]);
+    }, 30_000);
+
+    it('releases an expired list’s bytes when it is refetched, so a fresh sibling is not evicted', async () => {
+      // Two 6 MB lists against the 16 MiB bound fit together; three do not. An
+      // expired entry still counted on refetch would read as three and evict B.
+      vi.useFakeTimers({ toFake: ['Date'] });
+      const count = 1_500_000;
+      const body = JSON.stringify({
+        total: count,
+        objectIDs: Array.from({ length: count }, (_, i) => count - i),
+      });
+      fetchMock.mockImplementation(() => Promise.resolve(new Response(body)));
+      const loadedAt = Date.now();
+
+      await listDepartment(1); // A
+      vi.setSystemTime(loadedAt + TTL_MS / 2);
+      await listDepartment(3); // B, fresh for another hour
+      vi.setSystemTime(loadedAt + TTL_MS);
+      await listDepartment(1); // A has expired: refetched in place of its stale copy
+      await listDepartment(3); // B is still cached
+      expect(requestedDepartments()).toEqual([1, 3, 1]);
+
+      // The count is exact, not merely under the bound: a third list evicts one
+      // list (A, now least recently used), never both.
+      await listDepartment(4);
+      await listDepartment(3);
+      expect(requestedDepartments()).toEqual([1, 3, 1, 4]);
+    }, 30_000);
+
+    it('returns a list larger than the whole bound without retaining it or evicting others', async () => {
+      const count = OBJECT_IDS_CACHE_MAX_BYTES / Int32Array.BYTES_PER_ELEMENT + 1;
+      const body = JSON.stringify({
+        total: count,
+        objectIDs: Array.from({ length: count }, (_, i) => i + 1),
+      });
+      fetchMock.mockImplementation((request: unknown) =>
+        Promise.resolve(
+          new URL(String(request)).searchParams.get('departmentIds') === '1'
+            ? objectsBody([2, 1])
+            : new Response(body),
+        ),
+      );
+
+      await listDepartment(1);
+      const page = await getMetService().listObjects(
+        { departmentId: 3, limit: 2, offset: count - 2 },
+        ...call(),
+      );
+      expect(page).toMatchObject({ total: count, objectIDs: [count - 1, count], remaining: 0 });
+
+      await listDepartment(3); // not retained: refetched
+      await listDepartment(1); // not evicted to make room for it
+      expect(requestedDepartments()).toEqual([1, 3, 3]);
+    }, 30_000);
+
+    describe('one load per filter set, shared by concurrent callers', () => {
+      /** Holds every `/v1/objects` answer until the test settles it, in request order. */
+      function heldAnswers() {
+        const answers: { answer: PromiseWithResolvers<Response>; signal: AbortSignal }[] = [];
+        fetchMock.mockImplementation((_request: unknown, init?: RequestInit) => {
+          const answer = Promise.withResolvers<Response>();
+          answers.push({ answer, signal: init?.signal as AbortSignal });
+          return answer.promise;
+        });
+        return answers;
+      }
+
+      /** A caller of department 10 with its own signal and deadline. */
+      function caller(deadlineMs = 30_000) {
+        const controller = new AbortController();
+        const ctx = createMockContext({ signal: controller.signal });
+        const pending = getMetService().listObjects({ departmentId: 10, limit: 5 }, ctx, {
+          deadlineAt: Date.now() + deadlineMs,
+          signal: controller.signal,
+        });
+        return { controller, pending: pending.catch((e: unknown) => e) };
+      }
+
+      it('sends one request for concurrent callers and answers each of them', async () => {
+        const answers = heldAnswers();
+
+        const first = caller();
+        const second = caller();
+        await vi.waitFor(() => expect(answers).toHaveLength(1));
+        answers[0]?.answer.resolve(objectsBody([30, 10, 20]));
+
+        expect(await first.pending).toMatchObject({ total: 3, objectIDs: [10, 20, 30] });
+        expect(await second.pending).toMatchObject({ total: 3, objectIDs: [10, 20, 30] });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      });
+
+      it('cancelling one caller rejects it alone; the load finishes for the other and is cached', async () => {
+        const answers = heldAnswers();
+
+        const cancelled = caller();
+        const kept = caller();
+        await vi.waitFor(() => expect(answers).toHaveLength(1));
+        cancelled.controller.abort();
+
+        expect(await cancelled.pending).toMatchObject({ name: 'AbortError' });
+        // The request belongs to the load, not to the caller that started it.
+        expect(answers[0]?.signal.aborted).toBe(false);
+        answers[0]?.answer.resolve(objectsBody([30, 10, 20]));
+        expect(await kept.pending).toMatchObject({ objectIDs: [10, 20, 30] });
+
+        expect(await caller().pending).toMatchObject({ objectIDs: [10, 20, 30] });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      });
+
+      it("ends a caller at its own deadline while the load runs on under the load's", async () => {
+        const answers = heldAnswers();
+
+        const short = caller(50);
+        const long = caller();
+        await vi.waitFor(() => expect(answers).toHaveLength(1));
+
+        expect(await short.pending).toMatchObject({
+          code: JsonRpcErrorCode.Timeout,
+          data: { reason: 'retry_deadline_exceeded' },
+        });
+        expect(answers[0]?.signal.aborted).toBe(false);
+        answers[0]?.answer.resolve(objectsBody([2, 1]));
+        expect(await long.pending).toMatchObject({ objectIDs: [1, 2] });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      });
+
+      it('rejects a caller whose signal is already aborted', async () => {
+        fetchMock.mockImplementation(() => Promise.resolve(objectsBody([1])));
+        const controller = new AbortController();
+        controller.abort();
+        const ctx = createMockContext({ signal: controller.signal });
+
+        const err = await getMetService()
+          .listObjects({ limit: 5 }, ctx, { deadlineAt: Date.now() + 30_000, signal: ctx.signal })
+          .catch((e: unknown) => e);
+
+        expect(err).toMatchObject({ name: 'AbortError' });
+      });
+
+      it('starts no load for a caller whose signal is already aborted, so none can fail unobserved', async () => {
+        // A 403 is not retried: a load started here would fail at once, with no caller attached.
+        fetchMock.mockImplementation(() =>
+          Promise.resolve(new Response('<html>Access Denied</html>', { status: 403 })),
+        );
+        const unhandled = vi.fn();
+        process.on('unhandledRejection', unhandled);
+        try {
+          const controller = new AbortController();
+          const reason = new Error('caller went away');
+          controller.abort(reason);
+          const ctx = createMockContext({ signal: controller.signal });
+
+          const err = await getMetService()
+            .listObjects({ departmentId: 10, limit: 5 }, ctx, {
+              deadlineAt: Date.now() + 30_000,
+              signal: ctx.signal,
+            })
+            .catch((e: unknown) => e);
+          // Give a load, had one started, time to fail and surface as unhandled.
+          await new Promise((resolve) => setTimeout(resolve, 50));
+
+          expect(err).toBe(reason);
+          expect(unhandled).not.toHaveBeenCalled();
+          expect(objectsRequests()).toHaveLength(0);
+        } finally {
+          process.off('unhandledRejection', unhandled);
+        }
+      });
+
+      it('fails every waiting caller when the load fails, caches nothing, and retries on the next call', async () => {
+        const answers = heldAnswers();
+
+        const first = caller();
+        const second = caller();
+        await vi.waitFor(() => expect(answers).toHaveLength(1));
+        // A 403 is not retried, so the load fails on its first answer.
+        answers[0]?.answer.resolve(new Response('<html>Access Denied</html>', { status: 403 }));
+
+        for (const { pending } of [first, second]) {
+          expect(await pending).toMatchObject({ data: { reason: 'upstream_blocked' } });
+        }
+
+        const retry = caller();
+        await vi.waitFor(() => expect(answers).toHaveLength(2));
+        answers[1]?.answer.resolve(objectsBody([5, 4]));
+        expect(await retry.pending).toMatchObject({ objectIDs: [4, 5] });
+      });
+    });
+  });
+});

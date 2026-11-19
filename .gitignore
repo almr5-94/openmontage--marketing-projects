@@ -132,3 +132,6 @@ projects/kli/events.jsonl
 projects/kli/world/build.log
 projects/kli/world/refs/*.imagen.png
 projects/kli/PAUSE
+
+# Vendored third-party runtimes (installed by scripts, never committed)
+vendor/*/.runtime/
