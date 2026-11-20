@@ -138,3 +138,13 @@ def test_editorial_layout_gives_chromium_a_longer_render_limit():
 
     src = inspect.getsource(editorial_layout)
     assert src.count('"timeout_seconds": int(inputs.get("timeout_seconds", 300))') == 2
+
+
+def test_issue_images_finds_pictures_inside_freeform_html():
+    """The quality gate missed every freeform picture and face-checked the whole project instead, 2026-11-20."""
+    from lib.studio_api import issue_images
+
+    issue = {"pages": [{"type": "art_page", "image": "assets/a.jpg"},
+                       {"type": "freeform", "html": '<img src="{{img:assets/b.jpg}}"><img src="{{img: assets/c.png }}">'},
+                       {"type": "freeform_spread", "html": ['<img src="{{img:assets/b.jpg}}">', "<p>no picture</p>"]}]}
+    assert issue_images(issue) == ["assets/a.jpg", "assets/b.jpg", "assets/c.png"]

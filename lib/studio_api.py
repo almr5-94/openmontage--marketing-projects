@@ -17,6 +17,7 @@ Rules enforced here, not in the wrappers:
 from __future__ import annotations
 
 import json
+import re
 import os
 import shutil
 from pathlib import Path
@@ -294,8 +295,11 @@ def issue_images(issue: Any) -> list[str]:
     elif isinstance(issue, list):
         for v in issue:
             out += issue_images(v)
-    elif isinstance(issue, str) and issue.lower().endswith(IMG_EXT):
-        out.append(issue)
+    elif isinstance(issue, str):
+        if issue.lower().endswith(IMG_EXT):
+            out.append(issue)
+        # freeform pages name their pictures inside HTML as {{img:path}}
+        out += [m.strip() for m in re.findall(r"\{\{img:([^}]+)\}\}", issue) if m.strip().lower().endswith(IMG_EXT)]
     return list(dict.fromkeys(out))
 
 
