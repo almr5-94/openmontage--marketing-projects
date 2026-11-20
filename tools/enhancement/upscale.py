@@ -318,8 +318,10 @@ class Upscale(BaseTool):
             "half": half,
             # Full-frame x4 inference can terminate the process on low-memory
             # CPU/MPS hosts before Python can raise an exception. Bound the
-            # working set there; keep CUDA on the faster single-pass path.
-            "tile": 0 if _device == "cuda" else 256,
+            # working set there. On CUDA a full-frame pass of a print-size photo
+            # (3000 px and up) needs several GiB and runs out of memory on a
+            # shared card, so CUDA tiles too, in larger tiles.
+            "tile": 512 if _device == "cuda" else 256,
             "tile_pad": 10,
         }
         # Guard: only pass device= if the installed version accepts it

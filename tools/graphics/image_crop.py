@@ -389,7 +389,10 @@ class ImageCrop(BaseTool):
         if (inputs.get("shape_params") or {}).get("drop_neutral"):
             # cast shadows on a studio ground are light and colourless; a coloured object (bronze, glaze) is not
             hsv = cv2.cvtColor(arr, cv2.COLOR_BGR2HSV)
-            neutral = (hsv[..., 1] < 28) & (hsv[..., 2] > 120)
+            # neutral_v: how bright a colourless pixel must be to count as ground. Raise it for a grey
+            # metal object (mail, steel) so only the pale studio ground goes
+            nv = int((inputs.get("shape_params") or {}).get("neutral_v", 120))
+            neutral = (hsv[..., 1] < 28) & (hsv[..., 2] > nv)
             fg[neutral] = 0
             n2, lab2, st2, _ = cv2.connectedComponentsWithStats(fg)
             if n2 > 1:
@@ -405,6 +408,12 @@ class ImageCrop(BaseTool):
             if n3 > 1:
                 fg = np.where(lab3 == 1 + int(np.argmax(st3[1:, cv2.CC_STAT_AREA])), 255, 0).astype(np.uint8)
         fg = cv2.morphologyEx(fg, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+        if (inputs.get("shape_params") or {}).get("fill_holes"):
+            # a solid object (a stone bezel, a lacquer lid) has no holes: grey engraving punched out by
+            # drop_neutral is filled back. Do not use it on open-work (mail, pierced brass).
+            ff = fg.copy()
+            cv2.floodFill(ff, np.zeros((h + 2, w + 2), np.uint8), (0, 0), 255)
+            fg = fg | cv2.bitwise_not(ff)
         alpha = Image.fromarray(fg).resize(im.size, Image.LANCZOS).filter(ImageFilter.GaussianBlur(1.2))
         out_im = im.convert("RGBA")
         out_im.putalpha(alpha)

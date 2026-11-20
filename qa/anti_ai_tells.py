@@ -165,7 +165,13 @@ DENIAL = re.compile(r"^\s*[:\-\u2013]?\s*(none|no\b|not\b|n/a|absent|nothing)", 
 # the 7B model often restates the code's definition, then denies it: "The page does not contain ...",
 # "There is no ...", "The page lacks any ...". Those name a code without finding it.
 DENIAL_PHRASE = re.compile(r"\b(does not|do not|doesn't|don't|there (is|are) no|lacks?\b|lacking|is not present|are not "
-                           r"present|no (sign|signs|evidence|instance|instances) of|free of|without any)\b", re.I)
+                           r"present|no (sign|signs|evidence|instance|instances) of|free of|without any|"
+                           r"(is|are) not (reused|repeated|drawn|used|present|visible|found|shown|evident))\b", re.I)
+
+
+# a statement that stops on a function word was cut off by the token limit, not finished
+CUT_OFF = re.compile(r"\b(the|a|an|does|do|is|are|not|no|any|of|to|and|or|with|contain|contains|use|uses|has|have|this|that|page)\s*$",
+                     re.I)
 
 
 def local_codes(answer: str) -> tuple[list[str], list[str]]:
@@ -179,11 +185,18 @@ def local_codes(answer: str) -> tuple[list[str], list[str]]:
         return [], []
     firm, hedged = set(), set()
     parts = re.split(r"(?=AP-[1-7])", answer)
+    # a code the critic already judged in its own statement is not re-judged by a closing summary
+    # ("... AP-6: The objects are not drawn in code.  Faults: AP-5, AP-6"): the statement is the finding
+    stated = {f"AP-{m.group(1)}" for part in parts if (m := re.match(r"AP-([1-7])\s*:\s*(\w.{8,})", part, re.S))}
     for part in parts:
         m = re.match(r"AP-([1-7])(.*)", part, re.S)
         if not m:
             continue
         code, rest = f"AP-{m.group(1)}", m.group(2)
+        if code in stated and not re.match(r"\s*:\s*\w.{8,}", rest, re.S):
+            continue
+        if part is parts[-1] and not re.search(r"[.!?\n]\s*$", rest) and CUT_OFF.search(rest):
+            continue  # the answer was cut off mid-statement ("AP-3: The page does"): not a finding
         if DENIAL.match(rest) or DENIAL_PHRASE.search(rest):
             continue
         (hedged if HEDGES.search(rest) else firm).add(code)
@@ -196,6 +209,14 @@ ROLE_HINTS = {
     "back": "a back cover: deliberately near-empty, one object or one line of type on open paper",
     "contents": "a contents page: a short list of titles and page numbers",
     "index": "a series index: a short list of titles and page numbers",
+    "text": "an essay page: running text in the magazine's body type, with no picture on purpose",
+    "opening": "a feature opener: one museum object or document on open paper above the feature title",
+    "inventory": "an inventory page: real museum objects on bare paper, each with a small caption",
+    "art": "an art page: one museum artwork on a paper mat with a short caption",
+    "pullq": "a pull-quote page: one line of display type on open paper",
+    "photo": "a full-bleed photograph page: ONE real photograph to the edges with one line of display type on it",
+    "feature": "a feature page: a headline, running text and at most one or two real photographs, each shown once",
+    "free": "an art-directed magazine page: real photographs and display type",
 }
 
 
@@ -446,10 +467,19 @@ class Gate:
             # RTL reading order: Arabic columns must run right to left in stream order
             ar = [w for w in words if is_arabic(w["text"])]
             if len(ar) > 30:
-                order = []
+                # judge where each LINE starts (its right edge), in stream order: the words inside one
+                # line can come out left to right, which says nothing about the order of columns
+                lines, cur = [], []
                 for w in ar:  # stream order
-                    cx = (w["x0"] + w["x1"]) / 2
-                    col = round(cx / (W / 4))
+                    if cur and abs(w["top"] - cur[-1]["top"]) > 2:
+                        lines.append(cur)
+                        cur = []
+                    cur.append(w)
+                if cur:
+                    lines.append(cur)
+                order = []
+                for ln in lines:
+                    col = round(max(w["x1"] for w in ln) / (W / 4))
                     if not order or order[-1] != col:
                         order.append(col)
                 cols = [c for i, c in enumerate(order) if c not in order[:i]]
@@ -590,12 +620,16 @@ class Gate:
             role = ROLE_HINTS.get(roles[i]) if i < len(roles) else None
             ctx = f"This page is {role}. Judge it as that kind of page. " if role else ""
             try:
-                a = lm.see(png, ctx + q_codes, max_tokens=80)
+                a = lm.see(png, ctx + q_codes, max_tokens=200)
                 b = lm.see(png, ctx + q_rate, max_tokens=6)
             except Exception as e:  # noqa: BLE001
                 pr.notes.append(f"local critic unavailable: {e}")
                 continue
             codes, hedged = local_codes(a)
+            if i < len(roles) and roles[i] == "colophon" and "AP-1" in codes:
+                # AP-1's own rule sends operational facts (contact, timelines) to the colophon's fine print
+                codes = [c for c in codes if c != "AP-1"]
+                pr.notes.append("local critic named AP-1 on the colophon, where operational fine print belongs by rule")
             if hedged:
                 pr.notes.append(f"local vision critic suggests {', '.join(hedged)} (hedged, for review): {a[:120]}")
             m = re.search(r"[1-5]", b)

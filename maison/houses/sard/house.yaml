@@ -1,0 +1,48 @@
+# Sard (سرد), the owner's own brand: the intelligent secretary of the Kuwaiti law office.
+# brand_owner: self, so brand_lint allows the name. Facts about the product come only from
+# the owner's capability inventory (SARD-FEATURES-CUSTOMER-2026-11-19.md); never invent any.
+id: sard
+name: Sard
+brand_owner: self
+founded: 2026
+heritage: >
+  In Arabic, sard is the telling of events in their order, and in the old craft of the armourer it
+  is the joining of rings into mail, each ring measured and closed into the next. The house takes
+  its name from both: the account of a matter kept in sequence, and the patient linking of facts,
+  papers, dates and people so that nothing comes loose. Sard serves the law office in Kuwait. The
+  lawyer gives the intention and keeps the judgment; Sard carries the work that gives it effect.
+values: [attention, discretion, continuity, the lawyer's judgment, work that can be followed to its end]
+voice:
+  register: literary Arabic, measured and exact; the voice of a scribe who respects the court
+  do: [name the paper, name the hour, name the gesture, leave the judgment with the lawyer]
+  never: [superlatives, urgency, prices, feature counts, promises about legal outcomes, operational copy in display type]
+languages: [ar]
+palette:
+  paper: "#F1EBDC"            # warm ivory
+  ink: "#252C28"              # graphite
+  ink_soft: "#5b5f57"
+  accent: "#A88951"           # muted brass
+  rule: "#cfc7b6"
+  green: "#233A32"            # deep evergreen, the house colour
+  white: "#FAF7EF"            # reading white
+type:
+  latin_display: Bodoni Moda Display   # the SARD masthead and the hour numerals
+  latin_text: Hanken Grotesk           # tracked capitals for running labels and folios
+  arabic_display: Amiri                 # classical Naskh, Bulaq press tradition
+  arabic_text: IBM Plex Sans Arabic     # body copy, captions
+motifs: [linked rings of mail, the reed pen, the seal, the sand of the hourglass, the ruled ledger]
+masthead: "SARD"
+masthead_ar: "سرد"
+grid:
+  columns: 12
+  margins_mm: {inner: 24, outer: 20, top: 22, bottom: 28}
+  baseline_pt: 22
+production:
+  cadence: annual
+  trim: a4
+  bleed_mm: 3
+  paper_stock: uncoated_offwhite
+  finish: "uncoated text; cover in deep green cloth with the masthead blind-debossed"
+drawing_series:
+  frame: "سرد، لوحة {n}"
+  hand: {medium: engraving, line: fine cross-hatch, palette: [ink, accent], paper: uncoated_offwhite}

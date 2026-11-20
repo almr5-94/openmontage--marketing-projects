@@ -44,7 +44,18 @@ from tools.base_tool import (
 USER_AGENT = "OpenMontage/1.0 (art_source; open-access museum client)"
 
 
+def _safe_url(url: str) -> str:
+    """Museum CDNs sometimes return file names with spaces ('Farman - mma 1998 color 1.JPG').
+    Percent-encode the path and query without double-encoding what is already escaped."""
+    import urllib.parse
+
+    u = urllib.parse.urlsplit(url)
+    return urllib.parse.urlunsplit((u.scheme, u.netloc, urllib.parse.quote(u.path, safe="/%:@!$&'()*+,;=~"),
+                                    urllib.parse.quote(u.query, safe="=&%/:+,;"), u.fragment))
+
+
 def _get(url: str, *, accept: str = "application/json", timeout: int = 30) -> bytes:
+    url = _safe_url(url)
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": accept})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:

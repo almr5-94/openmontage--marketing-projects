@@ -60,8 +60,9 @@ TRIMS = {"a4": (210.0, 297.0), "us_letter": (215.9, 279.4), "magazine_230x300": 
          "social_4x5": (216.0, 270.0), "social_9x16": (216.0, 384.0),
          "ooh_portrait": (420.0, 594.0), "ooh_landscape": (594.0, 420.0)}
 PAGE_TYPES = ["cover", "contents", "opening_spread", "feature_spread", "art_page", "pull_quote",
-              "text_page", "campaign", "back_cover", "colophon", "inventory", "opener"]
-SPREADS = {"opening_spread", "feature_spread"}
+              "text_page", "campaign", "back_cover", "colophon", "inventory", "opener",
+              "freeform", "freeform_spread"]
+SPREADS = {"opening_spread", "feature_spread", "freeform_spread"}
 # Paper stocks for soft proofs: paper white (multiplied in), ink density, grain strength.
 STOCKS = {
     "uncoated_offwhite": {"paper": (243, 238, 226), "density": 0.90, "grain": 0.030},
@@ -161,6 +162,14 @@ def page_inner(p: dict[str, Any], book: Book) -> tuple[str, str]:
     t = s["type"]
     side = p["side"]
     folio = folio_html(p, book)
+    if t in ("freeform", "freeform_spread"):
+        # an art-directed page: the issue supplies the HTML inside .page; {{img:path}} resolves (and credits) a picture,
+        # {{folio}} drops in the running folio. A spread supplies one HTML string per half.
+        html = s.get("html", "")
+        if t == "freeform_spread":
+            html = html[p["half"]] if isinstance(html, list) else html
+        html = re.sub(r"\{\{img:([^}]+)\}\}", lambda m: book.img(m.group(1).strip()), str(html))
+        return f'{esc(s.get("cls", "free"))} {side}', html.replace("{{folio}}", folio)
     if t == "cover" and s.get("fit") == "plate":
         # the singular cover object on bare paper: masthead above it, the line below it, nothing on top of it
         ink = s.get("cover_ink") or "var(--ink)"
@@ -232,8 +241,10 @@ def page_inner(p: dict[str, Any], book: Book) -> tuple[str, str]:
             head = (f'<div class="feature-head" style="margin-bottom:calc(var(--baseline)*1.5)">'
                     f'<div class="label kicker">{esc(s.get("kicker", ""))}</div>'
                     f'<h2 class="display">{esc(s.get("title", ""))}</h2></div>')
+        if s.get("sink"):  # a short essay set low on the page under its title, the air above it on purpose
+            head += '<div style="flex:1"></div>'
         return f"text {side}", (f'<div class="trim"><div class="live" style="display:flex;flex-direction:column">{head}'
-                                f'<div style="flex:1;min-height:0;{f"font-size:{float(s['size_pt'])}pt;line-height:{float(s['size_pt']) * 1.42:.1f}pt" if s.get("size_pt") else ""}">{body_html(s.get("body"), int(s.get("columns", 2)), s.get("dropcap", False), fill=bool(s.get("fill", False)))}</div>'
+                                f'<div style="{"flex:none;" if s.get("sink") else "flex:1;min-height:0;"}{f"font-size:{float(s['size_pt'])}pt;line-height:{float(s['size_pt']) * 1.42:.1f}pt" if s.get("size_pt") else ""}">{body_html(s.get("body"), int(s.get("columns", 2)), s.get("dropcap", False), fill=bool(s.get("fill", False))).replace('style="height:100%"', 'style="height:auto;padding-bottom:6pt"' if s.get("sink") else 'style="height:100%"')}</div>'
                                 f'</div>{folio}</div>')
     if t == "art_page":
         cap = ""
@@ -404,7 +415,7 @@ def build_html(book: Book, mode: str) -> str:
     return (f'<!doctype html><html lang="{esc(iss.get("lang", "ar" if rtl else "en"))}" dir="{"rtl" if rtl else "ltr"}">'
             f'<head><meta charset="utf-8"><title>{esc(iss.get("title", "Issue"))}</title>'
             f'<link rel="stylesheet" href="fonts/fonts.css"><link rel="stylesheet" href="css/editorial.css">'
-            f'<style>@page{{size:{sheet_w:.2f}mm {sheet_h:.2f}mm;margin:0}}{css_root}</style></head>'
+            f'<style>@page{{size:{sheet_w:.2f}mm {sheet_h:.2f}mm;margin:0}}{css_root}{iss.get("css", "")}</style></head>'
             f'<body class="{mode}{grid}">{"".join(sheets)}</body></html>')
 
 
@@ -502,7 +513,7 @@ class EditorialLayout(BaseTool):
                 W, H = book.trim
                 r = pr.execute({"html_path": str(prep["html"]["print"]), "mode": "pdf", "preview_dpi": 0,
                                 "width_mm": W + 2 * (book.bleed + slug), "height_mm": H + 2 * (book.bleed + slug),
-                                "output_path": str(outd / f"{name}-print.pdf"), "expected_pages": len(book.pages)})
+                                "output_path": str(outd / f"{name}-print.pdf"), "expected_pages": len(book.pages), "timeout_seconds": int(inputs.get("timeout_seconds", 300))})
                 if not r.success:
                     return ToolResult(success=False, error=f"print PDF: {r.error}", data=data)
                 data["print_pdf"] = r.data["output_path"]
@@ -516,7 +527,7 @@ class EditorialLayout(BaseTool):
                     keep.parent.mkdir(parents=True, exist_ok=True)
                     pages_dir.rename(keep)
                 r = pr.execute({"html_path": str(prep["html"]["screen"]), "mode": "pdf",
-                                "width_mm": W, "height_mm": H, "expected_pages": len(book.pages),
+                                "width_mm": W, "height_mm": H, "expected_pages": len(book.pages), "timeout_seconds": int(inputs.get("timeout_seconds", 300)),
                                 "preview_dpi": int(inputs.get("png_dpi", 150)) if ({"pngs", "proofs"} & set(outputs)) else 0,
                                 "preview_dir": str(pages_dir), "output_path": str(outd / f"{name}-screen.pdf")})
                 if not r.success:
