@@ -26,6 +26,23 @@ from tools.base_tool import (
 )
 
 
+def _torchvision_compat() -> None:
+    """basicsr 1.4.2 (Real-ESRGAN's base) imports
+    torchvision.transforms.functional_tensor, which torchvision 0.17+ removed.
+    Register the old module name pointing at its replacement before importing."""
+    import sys
+    if "torchvision.transforms.functional_tensor" in sys.modules:
+        return
+    try:
+        import torchvision.transforms.functional_tensor  # noqa: F401
+    except ImportError:
+        try:
+            import torchvision.transforms.functional as _f
+        except ImportError:
+            return
+        sys.modules["torchvision.transforms.functional_tensor"] = _f
+
+
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi"}
 
 MODELS = {
@@ -114,6 +131,7 @@ class Upscale(BaseTool):
 
     def get_status(self) -> ToolStatus:
         try:
+            _torchvision_compat()
             import realesrgan  # noqa: F401
             return ToolStatus.AVAILABLE
         except ImportError:
@@ -273,6 +291,7 @@ class Upscale(BaseTool):
         import inspect
 
         import torch
+        _torchvision_compat()
         from basicsr.archs.rrdbnet_arch import RRDBNet
         from realesrgan import RealESRGANer
 

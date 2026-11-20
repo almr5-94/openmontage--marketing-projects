@@ -15,3 +15,15 @@ diffusers>=0.40
 transformers>=5.0
 accelerate>=1.6
 bitsandbytes>=0.45
+
+# Local upscaler (tools/enhancement/upscale.py, Real-ESRGAN). On an RTX 50xx
+# card torch must come from the CUDA 12.8 index:
+#   uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+# Install the Real-ESRGAN family with --no-deps so it cannot downgrade numpy or
+# OpenCV, then its small pure-Python deps:
+#   uv pip install --no-deps realesrgan basicsr facexlib gfpgan
+#   uv pip install addict future lmdb scipy tqdm yapf tb-nightly filterpy numba
+# basicsr 1.4.2 imports a torchvision module removed in 0.17; upscale.py
+# registers the old name (_torchvision_compat), so no site-packages patch.
+realesrgan>=0.3
+basicsr>=1.4.2
