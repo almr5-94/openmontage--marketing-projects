@@ -250,6 +250,15 @@ def maison_critique(project_id: str, claude_scores: Optional[str] = typer.Option
     raise typer.Exit(0 if r["pass"] else 1)
 
 
+@maison.command("approve-critique")
+def maison_approve_critique(project_id: str, criterion: str = typer.Option(...),
+                            reason: str = typer.Option(..., help="your own reason, in your words"),
+                            critic: str = typer.Option("local"), pdf: Optional[str] = None) -> None:
+    """Approve one critic's low score for the exact PDF last critiqued (you are the human)."""
+    _out(_guard(api.approve_critique, project_id, criterion=criterion, critic=critic, reason=reason, pdf=pdf,
+                actor=ACTOR))
+
+
 @maison.command("gate")
 def maison_gate(project_id: str) -> None:
     """Assemble qa/quality_gate.json."""

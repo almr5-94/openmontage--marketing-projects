@@ -74,3 +74,30 @@ def record_override(project_dir: str | Path, anti_pattern: str, pages: list[int]
                            {"option_id": "fix", "label": "fix the page", "score": 0, "reason": "default"}],
                   selected="keep", reason=reason, actor=actor, user_approved=True,
                   anti_pattern=anti_pattern, pages=pages)
+
+
+def record_critique_override(project_dir: str | Path, *, criterion: str, critic: str, score: int,
+                             pdf_sha256: str, reason: str, actor: str = "human") -> dict[str, Any]:
+    """Log the human's approval of one critic's low score on one criterion, for one exact PDF.
+
+    It covers only that critic, that criterion, scores of ``score`` or higher, and the PDF whose
+    sha256 is given: a re-render, a lower score or the other critic still sends the work back.
+    A general "go ahead" never counts: the caller must pass the human's own reason.
+    """
+    if not reason or len(reason.strip()) < 8:
+        raise ValueError("a critique override needs the human's own reason")
+    return record(project_dir, stage="critique", category="critique_override",
+                  subject=f"{critic} {criterion} {score}/5 on {pdf_sha256[:12]}",
+                  options=[{"option_id": "approve", "label": "approve over the critic (human)", "score": 1,
+                            "reason": reason},
+                           {"option_id": "send_back", "label": "send back to its stage", "score": 0,
+                            "reason": "default rule: below 4 goes back"}],
+                  selected="approve", reason=reason, actor=actor, user_approved=True,
+                  criterion=criterion, critic=critic, max_score=int(score), pdf_sha256=pdf_sha256)
+
+
+def critique_overrides(project_dir: str | Path, pdf_sha256: str) -> list[dict[str, Any]]:
+    """Human-approved critique overrides that cover the PDF with this sha256."""
+    return [d for d in load(project_dir)["decisions"]
+            if d.get("category") == "critique_override" and d.get("user_approved")
+            and d.get("pdf_sha256") == pdf_sha256]

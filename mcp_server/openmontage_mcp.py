@@ -166,6 +166,15 @@ def maison_critique(project_id: str, claude_scores: Optional[dict[str, Any]] = N
 
 
 @mcp.tool()
+def approve_critique(project_id: str, criterion: str, reason: str, critic: str = "local",
+                     pdf: Optional[str] = None) -> dict[str, Any]:
+    """Record the HUMAN's approval over one critic's low score, for the exact PDF last critiqued.
+    Never call it on your own: pass the human's own words as reason. Then re-run maison_critique."""
+    return api.approve_critique(project_id, criterion=criterion, critic=critic, reason=reason, pdf=pdf,
+                                actor="human")
+
+
+@mcp.tool()
 def maison_quality_gate(project_id: str) -> dict[str, Any]:
     """Assemble qa/quality_gate.json from anti-AI-tells, face gate, provenance, brand_lint and the critique."""
     return api.quality_gate(project_id)

@@ -455,6 +455,37 @@ def maison_critique(project_id: str, *, pdf: Optional[str] = None, claude_scores
     return res
 
 
+def approve_critique(project_id: str, *, criterion: str, critic: str = "local", reason: str,
+                     pdf: Optional[str] = None, actor: str = "human") -> dict[str, Any]:
+    """Record the HUMAN's approval of a critic's low score on one criterion, for the PDF last
+    critiqued (or ``pdf``). Only the score it saw is covered; a re-render needs a new approval.
+    Re-run maison_critique and quality_gate afterwards."""
+    import hashlib
+
+    from lib import decision_log
+
+    _require_maison(project_id)
+    pd = project_dir(project_id)
+    mc = pd / "qa" / "maison_critique.json"
+    if not mc.exists():
+        raise StudioError("run maison_critique first: there is no send-back to approve")
+    res = json.loads(mc.read_text(encoding="utf-8"))
+    pdf_p = Path(pdf) if pdf else Path(res["target"])
+    if str(pdf_p.resolve()) != str(Path(res["target"]).resolve()):
+        raise StudioError(f"the last critique was of {res['target']}, not {pdf_p}: critique it first")
+    score = None
+    for c in res["critics"]:
+        if c["critic"] == critic:
+            score = (c["scores"].get(criterion) or {}).get("score")
+    if score is None or score >= 4:
+        raise StudioError(f"{critic} has no score below 4 on {criterion!r} in the last critique: nothing to approve")
+    sha = hashlib.sha256(pdf_p.read_bytes()).hexdigest()
+    d = decision_log.record_critique_override(pd, criterion=criterion, critic=critic, score=int(score),
+                                              pdf_sha256=sha, reason=reason, actor=actor)
+    return {"decision_id": d["decision_id"], "criterion": criterion, "critic": critic, "score": score,
+            "pdf": str(pdf_p), "pdf_sha256": sha}
+
+
 def maison_export(project_id: str, issue: Optional[dict[str, Any] | str] = None, name: Optional[str] = None,
                   proof_stock: Optional[str] = None) -> dict[str, Any]:
     _require_maison(project_id)

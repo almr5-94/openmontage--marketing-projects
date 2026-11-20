@@ -408,6 +408,38 @@
     },
     "pass": {
       "type": "boolean"
+    },
+    "overridden": {
+      "type": "array",
+      "description": "Send-backs the human approved over (critique_override decisions); they no longer block, and stay on the record",
+      "items": {
+        "type": "object",
+        "required": [
+          "criterion",
+          "critic",
+          "score",
+          "decision_id",
+          "reason"
+        ],
+        "properties": {
+          "criterion": {
+            "type": "string"
+          },
+          "critic": {
+            "type": "string"
+          },
+          "score": {
+            "type": "integer"
+          },
+          "decision_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false

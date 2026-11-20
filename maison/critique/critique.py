@@ -154,8 +154,9 @@ def pdf_text(pdf: Path) -> tuple[str, str]:
     return text, ar
 
 
-def merge(target: str, critics: list[dict[str, Any]], offline: bool, has_arabic_edition: bool) -> dict[str, Any]:
-    send_backs, ok = [], True
+def merge(target: str, critics: list[dict[str, Any]], offline: bool, has_arabic_edition: bool,
+          overrides: Optional[list[dict[str, Any]]] = None) -> dict[str, Any]:
+    send_backs, ok, overridden = [], True, []
     if not any(c["critic"] == "claude" for c in critics) and not offline:
         ok = False
         send_backs.append({"criterion": "all", "stage": "critique", "notes": "Claude critic has not scored this yet"})
@@ -171,6 +172,14 @@ def merge(target: str, critics: list[dict[str, Any]], offline: bool, has_arabic_
             send_backs.append({"criterion": crit, "stage": SEND_BACK[crit], "notes": "no critic scored this criterion"})
             continue
         who, low = min(scored, key=lambda t: t[1]["score"])
+        lows = [(w, sc) for w, sc in scored if sc["score"] < 4]
+        approved = {w: d for w, sc in lows for d in (overrides or [])
+                    if d.get("criterion") == crit and d.get("critic") == w and sc["score"] >= d.get("max_score", 6)}
+        if lows and all(w in approved for w, _ in lows):
+            for w, sc in lows:
+                overridden.append({"criterion": crit, "critic": w, "score": sc["score"],
+                                   "decision_id": approved[w]["decision_id"], "reason": approved[w]["reason"]})
+            continue
         if low["score"] < 4:
             ok = False
             send_backs.append({"criterion": crit, "stage": low.get("send_back_to") or SEND_BACK[crit],
@@ -178,7 +187,10 @@ def merge(target: str, critics: list[dict[str, Any]], offline: bool, has_arabic_
     for c in critics:
         nums = [s["score"] for s in c["scores"].values() if s and "score" in s]
         c["min_score"] = min(nums) if nums else 0
-    return {"version": "1.0", "target": target, "critics": critics, "send_backs": send_backs, "pass": ok}
+    res = {"version": "1.0", "target": target, "critics": critics, "send_backs": send_backs, "pass": ok}
+    if overridden:
+        res["overridden"] = overridden
+    return res
 
 
 def run_critique(project_dir: str | Path, pdf: str | Path, house_yaml: str | Path,
@@ -206,7 +218,12 @@ def run_critique(project_dir: str | Path, pdf: str | Path, house_yaml: str | Pat
                 ls[crit] = {"not_applicable": "local model gave no usable score for this criterion"}
         critics.append({"critic": "local", "model": f"{lm.detect().get('vision')} + {lm.detect().get('planner')}",
                         "scores": ls})
-    res = merge(str(pdf), critics, offline, "ar" in (house.get("languages") or []))
+    import hashlib
+
+    from lib import decision_log
+
+    ovr = decision_log.critique_overrides(pd, hashlib.sha256(pdf.read_bytes()).hexdigest()) if pdf.exists() else []
+    res = merge(str(pdf), critics, offline, "ar" in (house.get("languages") or []), overrides=ovr)
     validate_artifact("maison_critique", res)
     out = pd / "qa" / "maison_critique.json"
     out.write_text(json.dumps(res, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -218,6 +235,10 @@ def run_critique(project_dir: str | Path, pdf: str | Path, house_yaml: str | Pat
             s = c["scores"].get(crit) or {}
             row.append(str(s.get("score", "n/a")) + (f" — {s['evidence'][:90]}" if s.get("evidence") else ""))
         md.append(f"| {crit} | " + " | ".join(r.replace("|", "/") for r in row) + " |")
+    if res.get("overridden"):
+        md += ["", "## Approved over the critic by the human", ""] + [
+            f"- **{o['criterion']}**: {o['critic']} scored {o['score']}; approved in `{o['decision_id']}`: {o['reason']}"
+            for o in res["overridden"]]
     if res["send_backs"]:
         md += ["", "## Send back", ""] + [f"- **{s['criterion']}** → `{s['stage']}`: {s['notes']}" for s in res["send_backs"]]
     out.with_suffix(".md").write_text("\n".join(md) + "\n", encoding="utf-8")

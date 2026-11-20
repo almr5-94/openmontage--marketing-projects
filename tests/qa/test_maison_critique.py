@@ -76,3 +76,38 @@ def test_local_questions_only_where_they_apply(tmp_path, monkeypatch):
     sc2 = cq.local_scores([p, p], {}, "", "", tmp_path,
                           kinds=[{"image": True, "text": True}, {"image": False, "text": True}])
     assert "pages [1]" in sc2["craft"]["evidence"]
+
+
+def _low_local(score: int) -> list[dict]:
+    claude = {"critic": "claude", "model": "x", "scores": _scores(5)}
+    local = {"critic": "local", "model": "y",
+             "scores": {**_scores(5), "one_idea": {"score": score, "evidence": "engravings", "send_back_to": "inventory"}}}
+    return [claude, local]
+
+
+def test_critique_override_covers_only_that_critic_criterion_and_score():
+    ov = [{"decision_id": "d-001", "category": "critique_override", "user_approved": True,
+           "criterion": "one_idea", "critic": "local", "max_score": 3, "reason": "the owner approved it"}]
+    res = cq.merge("t.pdf", _low_local(3), offline=False, has_arabic_edition=True, overrides=ov)
+    validate_artifact("maison_critique", res)
+    assert res["pass"] is True and res["send_backs"] == []
+    assert res["overridden"][0]["decision_id"] == "d-001"
+    # a lower score than the one approved still sends back
+    assert cq.merge("t.pdf", _low_local(2), offline=False, has_arabic_edition=True, overrides=ov)["pass"] is False
+    # an approval for the other critic or another criterion does not count
+    for bad in ({"critic": "claude"}, {"criterion": "craft"}):
+        assert cq.merge("t.pdf", _low_local(3), offline=False, has_arabic_edition=True,
+                        overrides=[{**ov[0], **bad}])["pass"] is False
+
+
+def test_critique_override_is_bound_to_the_exact_pdf(tmp_path):
+    from lib import decision_log
+
+    with pytest.raises(ValueError):
+        decision_log.record_critique_override(tmp_path, criterion="one_idea", critic="local", score=3,
+                                              pdf_sha256="a" * 64, reason="ok")
+    d = decision_log.record_critique_override(tmp_path, criterion="one_idea", critic="local", score=3,
+                                              pdf_sha256="a" * 64, reason="the owner approved it over the critic")
+    assert d["category"] == "critique_override" and d["user_approved"] is True
+    assert decision_log.critique_overrides(tmp_path, "a" * 64)[0]["decision_id"] == d["decision_id"]
+    assert decision_log.critique_overrides(tmp_path, "b" * 64) == []

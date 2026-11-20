@@ -19,4 +19,4 @@ from BOTH critics, with evidence. Anything lower goes back to the stage the rubr
 6. Write `quality_gate` (pass only when every check passed) and show the human the scores table.
 
 Each send-back is logged in the decision log; after `max_send_backs` (3) the human decides.
-A `critique_override` is valid only with the human's own reason.
+A `critique_override` is valid only with the human's own reason. Record it with MCP `approve_critique` or `om maison approve-critique <project> --criterion <c> --critic <claude|local> --reason "<the human's words>"`. It covers that critic, that criterion, that score and the exact PDF last critiqued; a re-render or a lower score sends back again. Re-run the critique: the override shows under "Approved over the critic by the human".

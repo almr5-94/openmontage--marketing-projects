@@ -307,7 +307,9 @@ stage director, elect every paid tool out loud.
      as an `anti_pattern_override` decision with the user's own reason and the page numbers.
   2. face gate — `run_face_gate` on **every** image that may show a person (photo or cartoon mode).
   3. Maison critique — `maison_critique`: your rubric scores plus the local models'; the lower score
-     counts; anything under 4 goes back to the stage the rubric names.
+     counts; anything under 4 goes back to the stage the rubric names. Only the human can approve a
+     low score over a critic: `approve_critique` / `om maison approve-critique`, with the human's own
+     reason, bound to that critic, criterion, score and the exact PDF. Never call it on your own.
   4. `brand_lint` — no real house's name, monogram or trade dress unless `brand_owner` is self/client.
 - **Controls:** the `openmontage` MCP server (`mcp_server/openmontage_mcp.py`, in `.mcp.json`) and
   the `om` CLI (`bin/om`) call the same functions in `lib/studio_api.py`; decision logs from either
